@@ -1,0 +1,21 @@
+Compose:
+  active: true
+  ModifierMissing:
+    active: false
+  ModifierNotUsedAtRoot:
+    active: false
+  PreviewAnnotationNaming:
+    active: false
+  CompositionLocalNaming:
+    active: false
+  CompositionLocalAllowlist:
+    active: false
+  ViewModelForwarding:
+    active: false
+  ViewModelInjection:
+    active: false
+
+naming:
+  active: true
+  MatchingDeclarationName:
+    active: false

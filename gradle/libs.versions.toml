@@ -1,0 +1,76 @@
+[versions]
+desugar_jdk_libs = "2.1.5"
+kotlin = "2.3.20"
+agp = "9.0.0-alpha06"
+composeMultiplatform = "1.11.0-beta02"
+android-compileSdk = "36"
+android-minSdk = "28"
+android-targetSdk = "36"
+androidx-compose = "1.10.6"
+androidx-activityCompose = "1.13.0"
+atomicfu = "0.32.1"
+skie = "0.10.11"
+oskitCompose = "4.1.1"
+oskitKmp = "5.1.0"
+kotlinxCoroutinesCore = "1.10.2"
+kermit = "2.1.0"
+koinCore = "4.2.0"
+kotlinxDatetime = "0.7.1"
+nordic-ble-scanner = "1.6.0"
+nordic-ble = "2.11.0"
+nordic-ble-kotlin = "1.3.1"
+uuid = "0.8.4"
+ktor = "3.4.2"
+material-icons = "1.7.3"
+detekt = "2.0.0-alpha.2"
+detektCompose = "0.5.6"
+ktfmt = "0.26.0"
+navigationEvent = "1.0.2"
+navigationEventCompose = "1.0.1"
+
+[libraries]
+desugar_jdk_libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar_jdk_libs" }
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activityCompose" }
+kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
+atomicfu = { module = "org.jetbrains.kotlinx:atomicfu", version.ref = "atomicfu" }
+kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
+koin-core = { module = "io.insert-koin:koin-core", version.ref = "koinCore" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutinesCore" }
+kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutinesCore" }
+oskit-compose = { module = "com.outsidesource:oskit-compose", version.ref = "oskitCompose" }
+oskit-kmp = { module = "com.outsidesource:oskit-kmp", version.ref = "oskitKmp" }
+nordic-ble-client-kotlin = { module = "no.nordicsemi.android.kotlin.ble:client", version.ref = "nordic-ble-kotlin" }
+nordic-ble-scanner-kotlin = { module = "no.nordicsemi.android.kotlin.ble:scanner", version.ref = "nordic-ble-kotlin" }
+nordic-ble-scanner = { module = "no.nordicsemi.android.support.v18:scanner", version.ref = "nordic-ble-scanner" }
+nordic-ble-client = { module = "no.nordicsemi.android:ble", version.ref = "nordic-ble" }
+nordic-ble-client-ktx = { module = "no.nordicsemi.android:ble-ktx", version.ref = "nordic-ble" }
+uuid = { module = "com.benasher44:uuid", version.ref = "uuid" }
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
+ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor" }
+ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
+ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+ktor-client-websockets = { module = "io.ktor:ktor-client-websockets", version.ref = "ktor" }
+material-icons = { module = "org.jetbrains.compose.material:material-icons-core", version.ref = "material-icons" }
+detektCompose = { module = "io.nlopez.compose.rules:detekt", version.ref = "detektCompose" }
+compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "composeMultiplatform" }
+compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "composeMultiplatform" }
+compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "composeMultiplatform" }
+compose-ui-preview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "composeMultiplatform" }
+compose-ui-tooling = { module = "org.jetbrains.compose.ui:ui-tooling", version.ref = "composeMultiplatform" }
+compose-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "composeMultiplatform" }
+compose-material = { module = "org.jetbrains.compose.material:material", version.ref = "composeMultiplatform" }
+navigationEvent-compose = { module = "org.jetbrains.androidx.navigationevent:navigationevent-compose", version.ref = "navigationEventCompose" }
+navigationEvent = { module = "androidx.navigationevent:navigationevent", version.ref = "navigationEvent" }
+
+[plugins]
+androidMultiplatformLibrary = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
+androidApplication = { id = "com.android.application", version.ref = "agp" }
+kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+skie = { id = "co.touchlab.skie", version.ref = "skie" }
+kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }
+detekt = { id = "dev.detekt", version.ref = "detekt" }
+ktfmt = { id = "com.ncorti.ktfmt.gradle", version.ref = "ktfmt" }

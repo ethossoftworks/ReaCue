@@ -1,0 +1,128 @@
+@file:OptIn(ExperimentalWasmDsl::class, ExperimentalKotlinGradlePluginApi::class)
+
+import com.ncorti.ktfmt.gradle.TrailingCommaManagementStrategy
+import org.jetbrains.kotlin.compose.compiler.gradle.ComposeFeatureFlag
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig
+
+plugins {
+    alias(libs.plugins.kotlinMultiplatform)
+    alias(libs.plugins.kotlinSerialization)
+    alias(libs.plugins.androidMultiplatformLibrary)
+    alias(libs.plugins.composeMultiplatform)
+    alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.skie)
+    alias(libs.plugins.ktfmt)
+    alias(libs.plugins.detekt)
+}
+
+dependencies { detektPlugins(libs.detektCompose) }
+
+kotlin {
+    KmpBuildInfo.generate(rootProject)
+
+    jvmToolchain(17)
+
+    compilerOptions {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+        freeCompilerArgs.add("-Xconsistent-data-class-copy-visibility")
+    }
+
+    androidLibrary {
+        namespace = "com.ethossoftworks.ixdlibrary"
+        compileSdk = libs.versions.android.compileSdk.get().toInt()
+
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_17)
+        }
+
+        androidResources {
+            enable = true
+        }
+    }
+
+    listOf(iosArm64(), iosSimulatorArm64()).forEach { iosTarget ->
+        iosTarget.binaries.framework {
+            baseName = "Shared"
+            isStatic = true
+            binaryOption("bundleId", "com.ethossoftworks.reaperbleiem.shared")
+            export(libs.oskit.kmp)
+            export(libs.kotlinx.coroutines.core)
+        }
+    }
+
+    applyDefaultHierarchyTemplate()
+
+    sourceSets {
+        all { languageSettings { optIn("kotlin.time.ExperimentalTime") } }
+
+        commonMain {
+            kotlin.srcDir("${layout.buildDirectory.asFile.get().absolutePath}/generated/com/outsidesource/kmpbuild")
+        }
+
+        commonMain.dependencies {
+            api(libs.oskit.kmp)
+            api(libs.kotlinx.coroutines.core)
+
+            implementation(libs.compose.runtime)
+            implementation(libs.compose.foundation)
+            implementation(libs.compose.material)
+            implementation(libs.compose.ui)
+            implementation(libs.compose.resources)
+            implementation(libs.compose.ui.preview)
+
+            implementation(libs.kermit)
+            implementation(libs.oskit.compose)
+            implementation(libs.ktor.client.core)
+            implementation(libs.ktor.client.content.negotiation)
+            implementation(libs.ktor.client.logging)
+            implementation(libs.ktor.serialization.kotlinx.json)
+            implementation(libs.ktor.client.websockets)
+            implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.koin.core)
+            implementation(libs.kotlinx.datetime)
+            implementation(libs.atomicfu)
+            implementation(libs.uuid)
+            implementation(libs.material.icons)
+            implementation(libs.navigationEvent)
+            implementation(libs.navigationEvent.compose)
+        }
+        androidMain.dependencies {
+            implementation(libs.androidx.activity.compose)
+            implementation(libs.ktor.client.okhttp)
+            implementation(libs.kotlinx.coroutines.android)
+            implementation(libs.ktor.client.okhttp)
+            implementation(libs.nordic.ble.scanner.kotlin)
+            implementation(libs.nordic.ble.client.kotlin)
+            implementation(libs.nordic.ble.client)
+            implementation(libs.nordic.ble.scanner)
+            implementation(libs.nordic.ble.client.ktx)
+        }
+        iosMain.dependencies {
+            implementation(libs.ktor.client.darwin)
+        }
+    }
+
+    composeCompiler {
+        featureFlags.set(
+            setOf(
+                ComposeFeatureFlag.OptimizeNonSkippingGroups
+            )
+        )
+    }
+}
+
+detekt {
+    source.setFrom("src/")
+    buildUponDefaultConfig = true // preconfigure defaults
+    config.setFrom(rootProject.file("detekt.yml"), rootProject.file("detekt-compose.yml"))
+}
+
+ktfmt {
+    kotlinLangStyle()
+    maxWidth.set(120)
+    removeUnusedImports.set(true)
+    trailingCommaManagementStrategy.set(TrailingCommaManagementStrategy.COMPLETE)
+}

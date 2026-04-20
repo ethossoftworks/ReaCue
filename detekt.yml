@@ -1,0 +1,57 @@
+complexity:
+  active: true
+  LongParameterList:
+    active: true
+    allowedFunctionParameters: 8
+    allowedConstructorParameters: 10
+    ignoreDefaultParameters: true
+    ignoreDataClasses: true
+  TooManyFunctions:
+    active: false
+
+naming:
+  active: true
+  FunctionNaming:
+    active: true
+    ignoreAnnotated:
+      - Composable
+      - Preview
+  TopLevelPropertyNaming:
+    active: true
+    constantPattern: "[A-Z][_A-Za-z0-9]*"
+    privatePropertyPattern: "(_)?[A-Za-z][A-Za-z0-9]*"
+  MatchingDeclarationName:
+    active: true
+    mustBeFirst: false
+    multiplatformTargets: ['ios', 'android', 'jvm', 'wasmjs', 'wasmJs']
+
+exceptions:
+  active: true
+  TooGenericExceptionCaught:
+    active: false
+  SwallowedException:
+    active: false
+  TooGenericExceptionThrown:
+    active: false
+
+style:
+  active: true
+  MagicNumber:
+    active: false
+  ReturnCount:
+    active: false
+  ForbiddenComment:
+    active: true
+    allowedPatterns: 'TODO'
+  LoopWithTooManyJumpStatements:
+    active: false
+  MaxLineLength:
+    active: false
+  UnusedPrivateFunction:
+    active: true
+    ignoreAnnotated: ['Preview']
+
+empty-blocks:
+  active: true
+  EmptyFunctionBlock:
+    ignoreOverridden: true
