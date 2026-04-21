@@ -1,11 +1,9 @@
-@file:OptIn(ExperimentalWasmDsl::class, ExperimentalKotlinGradlePluginApi::class)
+@file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
 import com.ncorti.ktfmt.gradle.TrailingCommaManagementStrategy
 import org.jetbrains.kotlin.compose.compiler.gradle.ComposeFeatureFlag
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
-import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -30,6 +28,8 @@ kotlin {
         freeCompilerArgs.add("-Xconsistent-data-class-copy-visibility")
     }
 
+    applyDefaultHierarchyTemplate()
+
     androidLibrary {
         namespace = "com.ethossoftworks.ixdlibrary"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -53,7 +53,14 @@ kotlin {
         }
     }
 
-    applyDefaultHierarchyTemplate()
+    macosArm64 {
+        binaries {
+            executable {
+                entryPoint = "main"
+                linkerOpts("-lsqlite3")
+            }
+        }
+    }
 
     sourceSets {
         all { languageSettings { optIn("kotlin.time.ExperimentalTime") } }
@@ -100,17 +107,10 @@ kotlin {
             implementation(libs.nordic.ble.scanner)
             implementation(libs.nordic.ble.client.ktx)
         }
+
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
         }
-    }
-
-    composeCompiler {
-        featureFlags.set(
-            setOf(
-                ComposeFeatureFlag.OptimizeNonSkippingGroups
-            )
-        )
     }
 }
 

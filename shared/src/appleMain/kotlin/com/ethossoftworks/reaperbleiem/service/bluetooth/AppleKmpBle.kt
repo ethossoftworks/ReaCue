@@ -76,16 +76,16 @@ import platform.darwin.dispatch_queue_t
 import platform.posix.memcpy
 
 @Suppress("FunctionNaming")
-fun KmpBle(cbCentralFactory: () -> CBCentralManager): IKmpBle = IosKmpBle(cbCentralFactory)
+fun KmpBle(cbCentralFactory: () -> CBCentralManager): IKmpBle = AppleKmpBle(cbCentralFactory)
 
 val KmpBleCbCentralQueue: dispatch_queue_t = dispatch_queue_create("kmp-ble", attr = null)
 
-internal class IosKmpBle(cbCentralFactory: () -> CBCentralManager) : IKmpBle {
+internal class AppleKmpBle(cbCentralFactory: () -> CBCentralManager) : IKmpBle {
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     internal val events = MutableSharedFlow<CentralEvent>(replay = 0, extraBufferCapacity = Channel.UNLIMITED)
-    internal val central: CBCentralManager by lazy { cbCentralFactory().apply { delegate = this@IosKmpBle.delegate } }
-    private val delegate = IosCBCentralDelegate(scope, events)
+    internal val central: CBCentralManager by lazy { cbCentralFactory().apply { delegate = this@AppleKmpBle.delegate } }
+    private val delegate = AppleCBCentralDelegate(scope, events)
 
     override fun scan(): Flow<KmpBleScanRecord> = callbackFlow {
         awaitCentralPoweredOn() ?: return@callbackFlow
@@ -119,7 +119,7 @@ internal class IosKmpBle(cbCentralFactory: () -> CBCentralManager) : IKmpBle {
 
         if (result.outcome is Outcome.Error) return result.outcome
 
-        return Outcome.Ok(IosKmpBlePeripheral(scope, this, peripheral))
+        return Outcome.Ok(AppleKmpBlePeripheral(scope, this, peripheral))
     }
 
     private suspend fun awaitCentralPoweredOn(): Unit? {
@@ -132,7 +132,7 @@ internal class IosKmpBle(cbCentralFactory: () -> CBCentralManager) : IKmpBle {
     }
 }
 
-private class IosCBCentralDelegate(
+private class AppleCBCentralDelegate(
     private val scope: CoroutineScope,
     private val events: MutableSharedFlow<CentralEvent>,
 ) : CBCentralManagerDelegateProtocol, NSObject() {
@@ -232,17 +232,17 @@ internal sealed class CentralEvent {
     data class ScanRecord(val record: KmpBleScanRecord) : CentralEvent()
 }
 
-private class IosKmpBlePeripheral(
+private class AppleKmpBlePeripheral(
     override val scope: CoroutineScope,
-    private val iosKmpBle: IosKmpBle,
+    private val appleKmpBle: AppleKmpBle,
     private val peripheral: CBPeripheral,
 ) : IKmpBlePeripheral {
 
     private val events = MutableSharedFlow<PeripheralEvent>(replay = 0, extraBufferCapacity = Channel.UNLIMITED)
     private val canSendWriteWithoutResponseFlow = MutableStateFlow(peripheral.canSendWriteWithoutResponse)
-    private val delegate = IosPeripheralDelegate(scope, canSendWriteWithoutResponseFlow, events)
-    private val localServices: AtomicRef<Map<String, IosKmpBleService>> = atomic(emptyMap())
-    private val localCharacteristics: AtomicRef<Map<String, IosKmpBleCharacteristic>> = atomic(emptyMap())
+    private val delegate = ApplePeripheralDelegate(scope, canSendWriteWithoutResponseFlow, events)
+    private val localServices: AtomicRef<Map<String, AppleKmpBleService>> = atomic(emptyMap())
+    private val localCharacteristics: AtomicRef<Map<String, AppleKmpBleCharacteristic>> = atomic(emptyMap())
     private val localConnectionFlow = MutableStateFlow<KmpBleConnectionStatus>(KmpBleConnectionStatus.Connected)
 
     override val services: Map<String, IKmpBleService> = localServices.value
@@ -253,7 +253,7 @@ private class IosKmpBlePeripheral(
         peripheral.delegate = delegate
 
         scope.launch {
-            iosKmpBle.events.filterIsInstance<CentralEvent.Disconnected>().collect {
+            appleKmpBle.events.filterIsInstance<CentralEvent.Disconnected>().collect {
                 localConnectionFlow.value = KmpBleConnectionStatus.Disconnected
                 scope.coroutineContext.cancelChildren(KmpBlePeripheralDisconnect())
             }
@@ -267,8 +267,8 @@ private class IosKmpBlePeripheral(
 
     override suspend fun disconnect(): Outcome<Unit, KmpBleError> =
         withScope(scope) {
-            iosKmpBle.central.cancelPeripheralConnection(peripheral)
-            iosKmpBle.events
+            appleKmpBle.central.cancelPeripheralConnection(peripheral)
+            appleKmpBle.events
                 .filterIsInstance<CentralEvent.Disconnected> { it.peripheral.identifier == peripheral.identifier }
                 .first()
             Outcome.Ok(Unit)
@@ -309,14 +309,14 @@ private class IosKmpBlePeripheral(
             val serviceMap = buildMap {
                 peripheral.services?.forEach { service ->
                     if (service !is CBService) return@forEach
-                    put(formatCbUuid(service.UUID), IosKmpBleService(service, this@IosKmpBlePeripheral))
+                    put(formatCbUuid(service.UUID), AppleKmpBleService(service, this@AppleKmpBlePeripheral))
                 }
             }
 
             val characteristicMap = buildMap {
                 serviceMap.forEach { (_, service) ->
                     service.characteristics.forEach {
-                        val characteristic = it.value as? IosKmpBleCharacteristic ?: return@forEach
+                        val characteristic = it.value as? AppleKmpBleCharacteristic ?: return@forEach
                         put(it.key, characteristic)
                     }
                 }
@@ -430,7 +430,7 @@ private class IosKmpBlePeripheral(
             .flowIn(scope)
 }
 
-private class IosPeripheralDelegate(
+private class ApplePeripheralDelegate(
     private val scope: CoroutineScope,
     private val canSendWriteWithoutResponseFlow: MutableStateFlow<Boolean>,
     private val events: MutableSharedFlow<PeripheralEvent>,
@@ -504,20 +504,20 @@ private sealed class PeripheralEvent {
     data class NotificationStateChanged(val characteristic: CBCharacteristic, val error: NSError?) : PeripheralEvent()
 }
 
-private class IosKmpBleService(private val service: CBService, private val peripheral: IosKmpBlePeripheral) :
+private class AppleKmpBleService(private val service: CBService, private val peripheral: AppleKmpBlePeripheral) :
     IKmpBleService {
     override val uuid: String = formatCbUuid(service.UUID)
     override val characteristics: Map<String, IKmpBleCharacteristic> = buildMap {
         service.characteristics?.forEach {
             if (it !is CBCharacteristic) return@forEach
-            put(formatCbUuid(it.UUID), IosKmpBleCharacteristic(it, peripheral))
+            put(formatCbUuid(it.UUID), AppleKmpBleCharacteristic(it, peripheral))
         }
     }
 }
 
-private class IosKmpBleCharacteristic(
+private class AppleKmpBleCharacteristic(
     internal val characteristic: CBCharacteristic,
-    private val peripheral: IosKmpBlePeripheral,
+    private val peripheral: AppleKmpBlePeripheral,
 ) : IKmpBleCharacteristic {
 
     override val uuid = formatCbUuid(characteristic.UUID)

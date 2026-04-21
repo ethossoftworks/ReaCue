@@ -13,8 +13,6 @@ import com.outsidesource.oskitcompose.systemui.SystemBarIconColor
 fun App(
     coordinator: AppCoordinator = rememberInject(),
 ) {
-    SystemBarColorEffect(statusBarIconColor = SystemBarIconColor.Light)
-
     AppThemeProvider {
         RouteSwitch(coordinator) {
             when (it) {
