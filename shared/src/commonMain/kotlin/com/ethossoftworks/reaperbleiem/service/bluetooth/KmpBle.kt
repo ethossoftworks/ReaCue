@@ -134,6 +134,13 @@ enum class KmpBleGattProperty(val value: Int) {
     ExtendedProps(128),
 }
 
+enum class KmpBleGattPermission {
+    Readable,
+    Writable,
+    ReadEncryptionRequired,
+    WriteEncryptionRequired,
+}
+
 sealed class KmpBleError {
     object PlatformHandlerNotReady : KmpBleError()
 

@@ -17,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
@@ -31,6 +32,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.onEach
@@ -40,12 +42,17 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
+import platform.CoreBluetooth.CBATTRequest
+import platform.CoreBluetooth.CBAdvertisementDataLocalNameKey
 import platform.CoreBluetooth.CBAdvertisementDataManufacturerDataKey
 import platform.CoreBluetooth.CBAdvertisementDataServiceDataKey
 import platform.CoreBluetooth.CBAdvertisementDataServiceUUIDsKey
+import platform.CoreBluetooth.CBAttributePermissionsReadable
+import platform.CoreBluetooth.CBCentral
 import platform.CoreBluetooth.CBCentralManager
 import platform.CoreBluetooth.CBCentralManagerDelegateProtocol
 import platform.CoreBluetooth.CBCharacteristic
+import platform.CoreBluetooth.CBCharacteristicProperties
 import platform.CoreBluetooth.CBCharacteristicPropertyAuthenticatedSignedWrites
 import platform.CoreBluetooth.CBCharacteristicPropertyBroadcast
 import platform.CoreBluetooth.CBCharacteristicPropertyExtendedProperties
@@ -57,8 +64,12 @@ import platform.CoreBluetooth.CBCharacteristicPropertyWriteWithoutResponse
 import platform.CoreBluetooth.CBCharacteristicWriteWithResponse
 import platform.CoreBluetooth.CBCharacteristicWriteWithoutResponse
 import platform.CoreBluetooth.CBManagerStatePoweredOn
+import platform.CoreBluetooth.CBMutableCharacteristic
+import platform.CoreBluetooth.CBMutableService
 import platform.CoreBluetooth.CBPeripheral
 import platform.CoreBluetooth.CBPeripheralDelegateProtocol
+import platform.CoreBluetooth.CBPeripheralManager
+import platform.CoreBluetooth.CBPeripheralManagerDelegateProtocol
 import platform.CoreBluetooth.CBService
 import platform.CoreBluetooth.CBUUID
 import platform.CoreFoundation.CFAbsoluteTime
@@ -73,47 +84,57 @@ import platform.Foundation.data
 import platform.darwin.NSObject
 import platform.darwin.dispatch_queue_create
 import platform.darwin.dispatch_queue_t
+import platform.posix.err
 import platform.posix.memcpy
+import kotlin.getValue
+import kotlin.time.Duration.Companion.milliseconds
 
 @Suppress("FunctionNaming")
-fun KmpBle(cbCentralFactory: () -> CBCentralManager): IKmpBle = AppleKmpBle(cbCentralFactory)
+fun KmpBle(
+    cbCentralFactory: (() -> CBCentralManager)? = null,
+): IKmpBle = AppleKmpBle(cbCentralFactory)
 
-val KmpBleCbCentralQueue: dispatch_queue_t = dispatch_queue_create("kmp-ble", attr = null)
+val KmpBleCbCentralQueue: dispatch_queue_t = dispatch_queue_create("kmp-ble-central-manager", attr = null)
 
-internal class AppleKmpBle(cbCentralFactory: () -> CBCentralManager) : IKmpBle {
+internal class AppleKmpBle(
+    cbCentralManagerFactory: (() -> CBCentralManager)? = null,
+) : IKmpBle {
 
-    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    internal val events = MutableSharedFlow<CentralEvent>(replay = 0, extraBufferCapacity = Channel.UNLIMITED)
-    internal val central: CBCentralManager by lazy { cbCentralFactory().apply { delegate = this@AppleKmpBle.delegate } }
-    private val delegate = AppleCBCentralDelegate(scope, events)
+    private val centralManagerScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    internal val centralEvents = MutableSharedFlow<CentralManagerEvent>(replay = 0, extraBufferCapacity = Channel.UNLIMITED)
+    internal val centralManager: CBCentralManager by lazy {
+        val manager = (cbCentralManagerFactory?.invoke() ?: CBCentralManager(null, KmpBleCbCentralQueue))
+        manager.apply { delegate = this@AppleKmpBle.centralManagerDelegate }
+    }
+    private val centralManagerDelegate = AppleCBCentralDelegate(centralManagerScope, centralEvents)
 
     override fun scan(): Flow<KmpBleScanRecord> = callbackFlow {
-        awaitCentralPoweredOn() ?: return@callbackFlow
-        central.scanForPeripheralsWithServices(null, null)
-        events.filterIsInstance<CentralEvent.ScanRecord>().onEach { send(it.record) }.launchIn(scope)
-        awaitClose { central.stopScan() }
+        awaitCentralManagerPoweredOn() ?: return@callbackFlow
+        centralManager.scanForPeripheralsWithServices(null, null)
+        centralEvents.filterIsInstance<CentralManagerEvent.ScanRecord>().onEach { send(it.record) }.launchIn(centralManagerScope)
+        awaitClose { centralManager.stopScan() }
     }
 
     override suspend fun connect(
         identifier: KmpBleIdentifier,
         scope: CoroutineScope,
     ): Outcome<IKmpBlePeripheral, KmpBleError> {
-        awaitCentralPoweredOn() ?: return Outcome.Error(KmpBleError.PlatformHandlerNotReady)
+        awaitCentralManagerPoweredOn() ?: return Outcome.Error(KmpBleError.PlatformHandlerNotReady)
 
         val uuid = NSUUID(identifier)
-        val peripherals = central.retrievePeripheralsWithIdentifiers(listOf(uuid))
+        val peripherals = centralManager.retrievePeripheralsWithIdentifiers(listOf(uuid))
         val peripheral =
             peripherals.firstOrNull() as? CBPeripheral ?: return Outcome.Error(KmpBleError.InvalidIdentifier)
 
-        central.connectPeripheral(peripheral, null)
+        centralManager.connectPeripheral(peripheral, null)
 
         val result =
-            withTimeoutOrNull(30_000) {
-                events.filterIsInstance<CentralEvent.ConnectionResult> { it.identifier == identifier }.first()
+            withTimeoutOrNull(30_000.milliseconds) {
+                centralEvents.filterIsInstance<CentralManagerEvent.ConnectionResult> { it.identifier == identifier }.first()
             }
 
         if (result == null) {
-            central.cancelPeripheralConnection(peripheral)
+            centralManager.cancelPeripheralConnection(peripheral)
             return Outcome.Error(KmpBleError.Unknown(Unit))
         }
 
@@ -122,11 +143,11 @@ internal class AppleKmpBle(cbCentralFactory: () -> CBCentralManager) : IKmpBle {
         return Outcome.Ok(AppleKmpBlePeripheral(scope, this, peripheral))
     }
 
-    private suspend fun awaitCentralPoweredOn(): Unit? {
-        return withTimeoutOrNull(2_000) {
+    private suspend fun awaitCentralManagerPoweredOn(): Unit? {
+        return withTimeoutOrNull(2_000.milliseconds) {
             while (isActive) {
-                if (central.state == CBManagerStatePoweredOn) return@withTimeoutOrNull
-                delay(16)
+                if (centralManager.state == CBManagerStatePoweredOn) return@withTimeoutOrNull
+                delay(16.milliseconds)
             }
         }
     }
@@ -134,7 +155,7 @@ internal class AppleKmpBle(cbCentralFactory: () -> CBCentralManager) : IKmpBle {
 
 private class AppleCBCentralDelegate(
     private val scope: CoroutineScope,
-    private val events: MutableSharedFlow<CentralEvent>,
+    private val events: MutableSharedFlow<CentralManagerEvent>,
 ) : CBCentralManagerDelegateProtocol, NSObject() {
 
     @OptIn(ExperimentalStdlibApi::class)
@@ -179,7 +200,7 @@ private class AppleCBCentralDelegate(
                     serviceUuids = serviceUUIDs,
                 )
 
-            events.emit(CentralEvent.ScanRecord(record))
+            events.emit(CentralManagerEvent.ScanRecord(record))
         }
     }
 
@@ -188,7 +209,7 @@ private class AppleCBCentralDelegate(
     override fun centralManager(central: CBCentralManager, didFailToConnectPeripheral: CBPeripheral, error: NSError?) {
         scope.launch {
             val event =
-                CentralEvent.ConnectionResult(
+                CentralManagerEvent.ConnectionResult(
                     identifier = didFailToConnectPeripheral.identifier.UUIDString,
                     outcome =
                         if (error?.code == 14L) {
@@ -204,7 +225,7 @@ private class AppleCBCentralDelegate(
     override fun centralManager(central: CBCentralManager, didConnectPeripheral: CBPeripheral) {
         scope.launch {
             val event =
-                CentralEvent.ConnectionResult(
+                CentralManagerEvent.ConnectionResult(
                     identifier = didConnectPeripheral.identifier.UUIDString,
                     outcome = Outcome.Ok(Unit),
                 )
@@ -219,17 +240,17 @@ private class AppleCBCentralDelegate(
         isReconnecting: Boolean,
         error: NSError?,
     ) {
-        scope.launch { events.emit(CentralEvent.Disconnected(didDisconnectPeripheral)) }
+        scope.launch { events.emit(CentralManagerEvent.Disconnected(didDisconnectPeripheral)) }
     }
 }
 
-internal sealed class CentralEvent {
+internal sealed class CentralManagerEvent {
     data class ConnectionResult(val identifier: KmpBleIdentifier, val outcome: Outcome<Unit, KmpBleError>) :
-        CentralEvent()
+        CentralManagerEvent()
 
-    data class Disconnected(val peripheral: CBPeripheral) : CentralEvent()
+    data class Disconnected(val peripheral: CBPeripheral) : CentralManagerEvent()
 
-    data class ScanRecord(val record: KmpBleScanRecord) : CentralEvent()
+    data class ScanRecord(val record: KmpBleScanRecord) : CentralManagerEvent()
 }
 
 private class AppleKmpBlePeripheral(
@@ -253,7 +274,7 @@ private class AppleKmpBlePeripheral(
         peripheral.delegate = delegate
 
         scope.launch {
-            appleKmpBle.events.filterIsInstance<CentralEvent.Disconnected>().collect {
+            appleKmpBle.centralEvents.filterIsInstance<CentralManagerEvent.Disconnected>().collect {
                 localConnectionFlow.value = KmpBleConnectionStatus.Disconnected
                 scope.coroutineContext.cancelChildren(KmpBlePeripheralDisconnect())
             }
@@ -267,9 +288,9 @@ private class AppleKmpBlePeripheral(
 
     override suspend fun disconnect(): Outcome<Unit, KmpBleError> =
         withScope(scope) {
-            appleKmpBle.central.cancelPeripheralConnection(peripheral)
-            appleKmpBle.events
-                .filterIsInstance<CentralEvent.Disconnected> { it.peripheral.identifier == peripheral.identifier }
+            appleKmpBle.centralManager.cancelPeripheralConnection(peripheral)
+            appleKmpBle.centralEvents
+                .filterIsInstance<CentralManagerEvent.Disconnected> { it.peripheral.identifier == peripheral.identifier }
                 .first()
             Outcome.Ok(Unit)
         }
