@@ -83,10 +83,8 @@ kotlin {
             implementation(libs.kermit)
             implementation(libs.oskit.compose)
             implementation(libs.ktor.client.core)
-            implementation(libs.ktor.client.content.negotiation)
-            implementation(libs.ktor.client.logging)
-            implementation(libs.ktor.serialization.kotlinx.json)
-            implementation(libs.ktor.client.websockets)
+            implementation(libs.ktor.client.cio)
+            implementation(libs.ktor.network)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.koin.core)
             implementation(libs.kotlinx.datetime)
@@ -98,9 +96,7 @@ kotlin {
         }
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
-            implementation(libs.ktor.client.okhttp)
             implementation(libs.kotlinx.coroutines.android)
-            implementation(libs.ktor.client.okhttp)
             implementation(libs.nordic.ble.scanner.kotlin)
             implementation(libs.nordic.ble.client.kotlin)
             implementation(libs.nordic.ble.client)
@@ -109,7 +105,6 @@ kotlin {
         }
 
         iosMain.dependencies {
-            implementation(libs.ktor.client.darwin)
         }
     }
 }
