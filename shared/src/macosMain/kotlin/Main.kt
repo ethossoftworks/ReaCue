@@ -16,7 +16,10 @@ fun main() {
     Window("Native MacOS App") {
         LaunchedEffect(Unit) {
             val iemService = NetworkIemService()
-            iemService.start()
+            iemService.subscribe().collect {
+                println(it)
+            }
+
             val kmpBle = BlePeripheralService(AppleKmpBlePeripheralManager())
             kmpBle.start()
         }

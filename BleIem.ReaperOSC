@@ -28,7 +28,7 @@
 # receive information
 
 DEVICE_TRACK_COUNT 0
-DEVICE_SEND_COUNT 0
+DEVICE_SEND_COUNT 1
 DEVICE_RECEIVE_COUNT 0
 DEVICE_FX_COUNT 0
 DEVICE_FX_PARAM_COUNT 0
@@ -212,12 +212,11 @@ DEVICE_ROTARY_CENTER 0
 # The default REAPER OSC pattern configuration follows. To create a custom
 # configuration, copy this file and edit the copy.
 
-TRACK_NAME s/track/name s/track/@/name
-TRACK_NUMBER s/track/number/str s/track/@/number/str
-
-TRACK_RECV_NAME s/track/recv/@/name s/track/@/recv/@/name
-TRACK_RECV_VOLUME n/track/recv/@/volume n/track/@/recv/@/volume
-TRACK_RECV_PAN n/track/recv/@/pan n/track/@/recv/@/pan
+TRACK_NAME s/track/@/name
+TRACK_RECV_NAME s/track/@/recv/@/name
+TRACK_RECV_VOLUME n/track/@/recv/@/volume
+TRACK_RECV_PAN n/track/@/recv/@/pan
+TRACK_SEND_VOLUME n/track/@/send/@/volume
 
 ACTION i/action s/action/str t/action/@ f/action/@/cc
 
