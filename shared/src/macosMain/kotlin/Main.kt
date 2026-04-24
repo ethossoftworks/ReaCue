@@ -8,12 +8,16 @@ import com.ethossoftworks.reaperbleiem.service.iem.NetworkIemService
 import com.ethossoftworks.reaperbleiem.ui.app.App
 import platform.AppKit.NSApp
 import platform.AppKit.NSApplication
-
-val koin = initKoin(platformContext = PlatformContext()).koin
+import platform.AppKit.NSWindowTitleHidden
 
 fun main() {
+    initKoin(platformContext = PlatformContext()).koin
+
     NSApplication.sharedApplication()
     Window("Native MacOS App") {
+        window.titleVisibility = NSWindowTitleHidden
+        window.titlebarAppearsTransparent = true
+
         LaunchedEffect(Unit) {
             val iemService = NetworkIemService()
             iemService.subscribe().collect {
