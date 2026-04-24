@@ -6,13 +6,9 @@ import com.ethossoftworks.reaperbleiem.coordinator.AppCoordinator
 import com.ethossoftworks.reaperbleiem.ui.theme.AppThemeProvider
 import com.outsidesource.oskitcompose.lib.rememberInject
 import com.outsidesource.oskitcompose.router.RouteSwitch
-import com.outsidesource.oskitcompose.systemui.SystemBarColorEffect
-import com.outsidesource.oskitcompose.systemui.SystemBarIconColor
 
 @Composable
-fun App(
-    coordinator: AppCoordinator = rememberInject(),
-) {
+fun App(coordinator: AppCoordinator = rememberInject()) {
     AppThemeProvider {
         RouteSwitch(coordinator) {
             when (it) {

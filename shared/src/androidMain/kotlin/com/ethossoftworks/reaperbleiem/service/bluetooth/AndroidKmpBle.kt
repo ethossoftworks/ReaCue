@@ -41,8 +41,7 @@ import no.nordicsemi.android.support.v18.scanner.ScanCallback
 import no.nordicsemi.android.support.v18.scanner.ScanResult
 import no.nordicsemi.android.support.v18.scanner.ScanSettings
 
-@Suppress("FunctionNaming")
-fun KmpBle(context: Context): IKmpBle = AndroidKmpBle(context)
+@Suppress("FunctionNaming") fun KmpBle(context: Context): IKmpBle = AndroidKmpBle(context)
 
 internal class AndroidKmpBle(private val context: Context) : IKmpBle {
     override fun scan(): Flow<KmpBleScanRecord> = callbackFlow {

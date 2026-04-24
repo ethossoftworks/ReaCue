@@ -9,7 +9,7 @@ actual class PlatformContext
 private var swiftModule: Module = module {}
 
 fun initKoinIos() {
-    swiftModule = module { }
+    swiftModule = module {}
 
     initKoin(platformContext = PlatformContext())
 }

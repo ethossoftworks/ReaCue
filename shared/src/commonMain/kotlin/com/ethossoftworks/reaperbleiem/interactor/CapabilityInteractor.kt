@@ -28,11 +28,7 @@ class CapabilityInteractor(private val capabilities: KmpCapabilities) :
     suspend fun fetchCapabilityStatus() {
         interactorScope.launch {
             val bluetoothStatus = capabilities.bluetooth.queryStatus()
-            update { state ->
-                state.copy(
-                    bluetoothStatus = bluetoothStatus,
-                )
-            }
+            update { state -> state.copy(bluetoothStatus = bluetoothStatus) }
         }
     }
 
@@ -55,6 +51,4 @@ class CapabilityInteractor(private val capabilities: KmpCapabilities) :
     }
 }
 
-data class CapabilityState(
-    val bluetoothStatus: CapabilityStatus = CapabilityStatus.NoPermission(),
-)
+data class CapabilityState(val bluetoothStatus: CapabilityStatus = CapabilityStatus.NoPermission())

@@ -1,6 +1,7 @@
 package com.ethossoftworks.reaperbleiem.service.bluetooth
 
 import com.outsidesource.oskitkmp.lib.update
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.atomicfu.AtomicRef
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
@@ -48,7 +49,6 @@ import platform.Foundation.NSError
 import platform.darwin.NSObject
 import platform.darwin.dispatch_queue_create
 import platform.darwin.dispatch_queue_t
-import kotlin.time.Duration.Companion.milliseconds
 
 val KmpBleCbPeripheralQueue: dispatch_queue_t = dispatch_queue_create("kmp-ble-peripheral-manager", attr = null)
 
@@ -70,9 +70,8 @@ data class KmpBleAdvertisementCharacteristic(
     val permissions: Set<KmpBleGattPermission>,
 )
 
-class AppleKmpBlePeripheralManager(
-    cbPeripheralManagerFactory: (() -> CBPeripheralManager)? = null,
-): CBPeripheralManagerDelegateProtocol, NSObject() {
+class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripheralManager)? = null) :
+    CBPeripheralManagerDelegateProtocol, NSObject() {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     internal val events =
         MutableSharedFlow<KmpBlePeripheralManagerEvent>(replay = 0, extraBufferCapacity = Channel.UNLIMITED)
@@ -90,45 +89,64 @@ class AppleKmpBlePeripheralManager(
 
             try {
                 advertisementData.services.forEach { service ->
-                    val mutableService = CBMutableService(
-                        type = CBUUID.UUIDWithString(service.uuid), primary = service.isPrimaryService
-                    ).apply {
-                        val characteristics = service.characteristics.map { characteristic ->
-                            val mutableCharacteristic = CBMutableCharacteristic(
-                                type = CBUUID.UUIDWithString(characteristic.uuid),
-                                value = null,
-                                properties = characteristic.properties.fold(0uL) { accum, property ->
-                                    when (property) {
-                                        KmpBleGattProperty.Broadcast -> accum or CBCharacteristicPropertyBroadcast
-                                        KmpBleGattProperty.Read -> accum or CBCharacteristicPropertyRead
-                                        KmpBleGattProperty.WriteWithoutResponse -> accum or CBCharacteristicPropertyWriteWithoutResponse
-                                        KmpBleGattProperty.Write -> accum or CBCharacteristicPropertyWrite
-                                        KmpBleGattProperty.Notify -> accum or CBCharacteristicPropertyNotify
-                                        KmpBleGattProperty.Indicate -> accum or CBCharacteristicPropertyIndicate
-                                        KmpBleGattProperty.SignedWrite -> accum or CBCharacteristicPropertyAuthenticatedSignedWrites
-                                        KmpBleGattProperty.ExtendedProps -> accum or CBCharacteristicPropertyExtendedProperties
+                    val mutableService =
+                        CBMutableService(type = CBUUID.UUIDWithString(service.uuid), primary = service.isPrimaryService)
+                            .apply {
+                                val characteristics =
+                                    service.characteristics.map { characteristic ->
+                                        val mutableCharacteristic =
+                                            CBMutableCharacteristic(
+                                                type = CBUUID.UUIDWithString(characteristic.uuid),
+                                                value = null,
+                                                properties =
+                                                    characteristic.properties.fold(0uL) { accum, property ->
+                                                        when (property) {
+                                                            KmpBleGattProperty.Broadcast ->
+                                                                accum or CBCharacteristicPropertyBroadcast
+                                                            KmpBleGattProperty.Read ->
+                                                                accum or CBCharacteristicPropertyRead
+                                                            KmpBleGattProperty.WriteWithoutResponse ->
+                                                                accum or CBCharacteristicPropertyWriteWithoutResponse
+                                                            KmpBleGattProperty.Write ->
+                                                                accum or CBCharacteristicPropertyWrite
+                                                            KmpBleGattProperty.Notify ->
+                                                                accum or CBCharacteristicPropertyNotify
+                                                            KmpBleGattProperty.Indicate ->
+                                                                accum or CBCharacteristicPropertyIndicate
+                                                            KmpBleGattProperty.SignedWrite ->
+                                                                accum or
+                                                                    CBCharacteristicPropertyAuthenticatedSignedWrites
+                                                            KmpBleGattProperty.ExtendedProps ->
+                                                                accum or CBCharacteristicPropertyExtendedProperties
+                                                        }
+                                                    },
+                                                permissions =
+                                                    characteristic.permissions.fold(0uL) { accum, permission ->
+                                                        when (permission) {
+                                                            KmpBleGattPermission.Readable ->
+                                                                accum or CBAttributePermissionsReadable
+                                                            KmpBleGattPermission.Writable ->
+                                                                accum or CBAttributePermissionsWriteable
+                                                            KmpBleGattPermission.ReadEncryptionRequired ->
+                                                                accum or CBAttributePermissionsReadEncryptionRequired
+                                                            KmpBleGattPermission.WriteEncryptionRequired ->
+                                                                accum or CBAttributePermissionsWriteEncryptionRequired
+                                                        }
+                                                    },
+                                            )
+                                        localCharacteristics.update {
+                                            it.update { this[characteristic.uuid] = mutableCharacteristic }
+                                        }
+                                        mutableCharacteristic
                                     }
-                                },
-                                permissions = characteristic.permissions.fold(0uL) { accum, permission ->
-                                    when (permission) {
-                                        KmpBleGattPermission.Readable -> accum or CBAttributePermissionsReadable
-                                        KmpBleGattPermission.Writable -> accum or CBAttributePermissionsWriteable
-                                        KmpBleGattPermission.ReadEncryptionRequired -> accum or CBAttributePermissionsReadEncryptionRequired
-                                        KmpBleGattPermission.WriteEncryptionRequired -> accum or CBAttributePermissionsWriteEncryptionRequired
-                                    }
-                                },
-                            )
-                            localCharacteristics.update { it.update { this[characteristic.uuid] = mutableCharacteristic } }
-                            mutableCharacteristic
-                        }
-                        setCharacteristics(characteristics)
-                    }
+                                setCharacteristics(characteristics)
+                            }
 
                     peripheralManager.addService(mutableService)
 
                     val response = events.first {
                         it is KmpBlePeripheralManagerEvent.Error ||
-                                it == KmpBlePeripheralManagerEvent.ServiceAdded(service.uuid)
+                            it == KmpBlePeripheralManagerEvent.ServiceAdded(service.uuid)
                     }
                     send(response)
 
@@ -138,13 +156,13 @@ class AppleKmpBlePeripheralManager(
                 peripheralManager.startAdvertising(
                     buildMap {
                         this[CBAdvertisementDataLocalNameKey] = advertisementData.name
-                        this[CBAdvertisementDataServiceUUIDsKey] = advertisementData.services.map {
-                            CBUUID.UUIDWithString(it.uuid)
-                        }
+                        this[CBAdvertisementDataServiceUUIDsKey] =
+                            advertisementData.services.map { CBUUID.UUIDWithString(it.uuid) }
                         if (advertisementData.manufacturerData != null) {
                             this[CBAdvertisementDataManufacturerDataKey] = advertisementData.manufacturerData
                         }
-                    })
+                    }
+                )
 
                 events.onEach { send(it) }.launchIn(this)
             } catch (t: Throwable) {
@@ -152,9 +170,7 @@ class AppleKmpBlePeripheralManager(
                 close()
             }
 
-            awaitClose {
-                peripheralManager.stopAdvertising()
-            }
+            awaitClose { peripheralManager.stopAdvertising() }
         }
 
     private suspend fun notify(data: ByteArray, characteristicUuid: String, centralUuids: List<String>? = null) {
@@ -182,12 +198,9 @@ class AppleKmpBlePeripheralManager(
         events.tryEmit(KmpBlePeripheralManagerEvent.ServiceAdded(didAddService.UUID.UUIDString()))
     }
 
-    override fun peripheralManager(peripheral: CBPeripheralManager, didReceiveReadRequest: CBATTRequest) {
+    override fun peripheralManager(peripheral: CBPeripheralManager, didReceiveReadRequest: CBATTRequest) {}
 
-    }
-
-    override fun peripheralManager(peripheral: CBPeripheralManager, didReceiveWriteRequests: List<*>) {
-    }
+    override fun peripheralManager(peripheral: CBPeripheralManager, didReceiveWriteRequests: List<*>) {}
 
     @ObjCSignatureOverride
     override fun peripheralManager(
@@ -196,7 +209,12 @@ class AppleKmpBlePeripheralManager(
         didSubscribeToCharacteristic: CBCharacteristic,
     ) {
         localCentrals.update { it.update { this[central.identifier.UUIDString()] = central } }
-        events.tryEmit(KmpBlePeripheralManagerEvent.CentralSubscribedToCharacteristic(centralId = central.identifier.UUIDString(), didSubscribeToCharacteristic.UUID.UUIDString()))
+        events.tryEmit(
+            KmpBlePeripheralManagerEvent.CentralSubscribedToCharacteristic(
+                centralId = central.identifier.UUIDString(),
+                didSubscribeToCharacteristic.UUID.UUIDString(),
+            )
+        )
     }
 
     @ObjCSignatureOverride
@@ -206,7 +224,12 @@ class AppleKmpBlePeripheralManager(
         didUnsubscribeFromCharacteristic: CBCharacteristic,
     ) {
         localCentrals.update { it.update { remove(central.identifier.UUIDString()) } }
-        events.tryEmit(KmpBlePeripheralManagerEvent.CentralUnsubscribedFromCharacteristic(centralId = central.identifier.UUIDString(), didUnsubscribeFromCharacteristic.UUID.UUIDString()))
+        events.tryEmit(
+            KmpBlePeripheralManagerEvent.CentralUnsubscribedFromCharacteristic(
+                centralId = central.identifier.UUIDString(),
+                didUnsubscribeFromCharacteristic.UUID.UUIDString(),
+            )
+        )
     }
 
     override fun peripheralManagerDidStartAdvertising(peripheral: CBPeripheralManager, error: NSError?) {
@@ -217,15 +240,19 @@ class AppleKmpBlePeripheralManager(
         events.tryEmit(KmpBlePeripheralManagerEvent.Advertising)
     }
 
-    override fun peripheralManagerIsReadyToUpdateSubscribers(peripheral: CBPeripheralManager) {
-
-    }
+    override fun peripheralManagerIsReadyToUpdateSubscribers(peripheral: CBPeripheralManager) {}
 }
 
 sealed class KmpBlePeripheralManagerEvent {
     data class Error(val error: KmpBleError) : KmpBlePeripheralManagerEvent()
+
     data class ServiceAdded(val uuid: String) : KmpBlePeripheralManagerEvent()
+
     data object Advertising : KmpBlePeripheralManagerEvent()
-    data class CentralSubscribedToCharacteristic(val centralId: String, val characteristicUuid: String) : KmpBlePeripheralManagerEvent()
-    data class CentralUnsubscribedFromCharacteristic(val centralId: String, val characteristicUuid: String) : KmpBlePeripheralManagerEvent()
+
+    data class CentralSubscribedToCharacteristic(val centralId: String, val characteristicUuid: String) :
+        KmpBlePeripheralManagerEvent()
+
+    data class CentralUnsubscribedFromCharacteristic(val centralId: String, val characteristicUuid: String) :
+        KmpBlePeripheralManagerEvent()
 }

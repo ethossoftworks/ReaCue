@@ -1,7 +1,6 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
 import com.ncorti.ktfmt.gradle.TrailingCommaManagementStrategy
-import org.jetbrains.kotlin.compose.compiler.gradle.ComposeFeatureFlag
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -34,13 +33,9 @@ kotlin {
         namespace = "com.ethossoftworks.ixdlibrary"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
 
-        compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_17)
-        }
+        compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
 
-        androidResources {
-            enable = true
-        }
+        androidResources { enable = true }
     }
 
     listOf(iosArm64(), iosSimulatorArm64()).forEach { iosTarget ->
@@ -104,8 +99,7 @@ kotlin {
             implementation(libs.nordic.ble.client.ktx)
         }
 
-        iosMain.dependencies {
-        }
+        iosMain.dependencies {}
     }
 }
 

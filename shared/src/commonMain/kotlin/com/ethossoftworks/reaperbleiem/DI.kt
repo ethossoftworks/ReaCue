@@ -9,7 +9,6 @@ import org.koin.core.KoinApplication
 import org.koin.core.context.startKoin
 import org.koin.core.module.Module
 import org.koin.dsl.KoinAppDeclaration
-import org.koin.dsl.bind
 import org.koin.dsl.module
 
 expect fun platformModule(platformContext: PlatformContext): Module
@@ -60,5 +59,4 @@ fun commonModule() = module {
     single { InfoMessageInteractor() }
 }
 
-fun mockModule() = module {
-}
+fun mockModule() = module {}

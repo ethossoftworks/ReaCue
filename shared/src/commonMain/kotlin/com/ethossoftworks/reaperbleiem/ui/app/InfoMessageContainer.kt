@@ -25,7 +25,6 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.ethossoftworks.reaperbleiem.interactor.InfoMessageInteractor
-import com.ethossoftworks.reaperbleiem.ui.theme.AppTheme
 import com.outsidesource.oskitcompose.interactor.collectAsState
 import com.outsidesource.oskitcompose.lib.rememberInject
 import com.outsidesource.oskitcompose.modifier.kmpOuterShadow
