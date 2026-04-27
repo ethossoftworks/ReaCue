@@ -31,6 +31,7 @@ import kotlinx.io.readFloat
 import kotlinx.io.readString
 import kotlinx.io.writeFloat
 import kotlinx.io.writeString
+import kotlin.collections.get
 
 class NetworkIemService(
     val restDomain: String = "http://localhost:8000",
@@ -76,6 +77,7 @@ class NetworkIemService(
     }
 
     override suspend fun refresh() {
+        events.emit(IemEvent.Refreshing)
         val tracks = getTracks()
         trackCache.update { tracks.associateBy { it.id } }
         trackNameCache.update { buildMap { tracks.forEach { this[it.name] = it.id } } }

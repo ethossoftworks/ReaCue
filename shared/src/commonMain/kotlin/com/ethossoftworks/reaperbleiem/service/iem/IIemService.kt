@@ -19,6 +19,8 @@ interface IIemService {
 sealed class IemEvent {
     data class Error(val error: Any) : IemEvent()
 
+    data object Refreshing : IemEvent()
+
     data class Refreshed(val tracks: List<Track>) : IemEvent()
 
     data class TrackNameUpdated(val trackId: Int, val name: String) : IemEvent()
