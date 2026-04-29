@@ -7,13 +7,13 @@ interface IIemService {
 
     suspend fun refresh()
 
-    suspend fun setOutputVolume(trackId: Int, value: Float) {}
+    suspend fun setOutputVolume(trackId: Int, value: Float)
 
-    suspend fun setReceiveVolume(trackId: Int, receiveId: Int, value: Float) {}
+    suspend fun setReceiveVolume(trackId: Int, receiveId: Int, value: Float)
 
-    suspend fun setReceivePan(trackId: Int, receiveId: Int, value: Float) {}
+    suspend fun setReceivePan(trackId: Int, receiveId: Int, value: Float)
 
-    suspend fun setReceiveMute(trackId: Int, receiveId: Int, isMuted: Boolean) {}
+    suspend fun setReceiveMute(trackId: Int, receiveId: Int, isMuted: Boolean)
 }
 
 sealed class IemEvent {

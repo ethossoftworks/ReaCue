@@ -1,29 +1,102 @@
 package com.ethossoftworks.reaperbleiem.interactor
 
+import com.ethossoftworks.reaperbleiem.service.iem.IIemService
+import com.ethossoftworks.reaperbleiem.service.iem.IemEvent
 import com.ethossoftworks.reaperbleiem.service.iem.Track
 import com.outsidesource.oskitkmp.interactor.Interactor
+import com.outsidesource.oskitkmp.lib.update
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onEach
 
-data class IemState(
-    val tracks: Map<Int, Track> = emptyMap(),
-    val iems: Map<Int, Track> = emptyMap(),
-    val receiveData: Map<Int, ReceiveData> = emptyMap(),
-)
+data class IemState(val tracks: Map<Int, Track> = emptyMap(), val iems: Map<Int, IemMix> = emptyMap())
+
+data class IemMix(val trackId: Int, val volume: Float, val receives: Map<Int, ReceiveData>)
 
 data class ReceiveData(
-    val iemId: Int,
-    val receiveId: Int,
-    val srcTrackId: Int,
+    val trackId: Int, // The IEM track ID
+    val receiveId: Int, // The receive ID for the IEM track
+    val srcTrackId: Int, // The track ID the receive is receiving from
     val volume: Float = 0f,
     val pan: Float = .5f,
     val isMuted: Boolean = false,
 )
 
-class IemInteractor : Interactor<IemState>(
-    dependencies = emptyList(),
-    initialState = IemState(),
-) {
+class IemInteractor(private val iemService: IIemService) :
+    Interactor<IemState>(dependencies = emptyList(), initialState = IemState()) {
 
-    fun start() {
+    fun subscribe() =
+        iemService
+            .subscribe()
+            .onEach { event ->
+                when (event) {
+                    IemEvent.Refreshing -> update { state -> state.copy(tracks = emptyMap(), iems = emptyMap()) }
+                    is IemEvent.Refreshed ->
+                        update { state ->
+                            state.copy(
+                                tracks = event.tracks.associateBy { it.id },
+                                iems =
+                                    buildMap {
+                                        for (track in event.tracks) {
+                                            if (!track.isIem) continue
+                                            this[track.id] =
+                                                IemMix(trackId = track.id, receives = emptyMap(), volume = 0f)
+                                        }
+                                    },
+                            )
+                        }
+                    is IemEvent.OutputVolumeUpdated ->
+                        update { state ->
+                            state.copy(
+                                iems =
+                                    state.iems.update {
+                                        val mix = this[event.trackId] ?: return@update
+                                        this[event.trackId] = mix.copy(volume = mix.volume)
+                                    }
+                            )
+                        }
+                    is IemEvent.ReceivePanUpdated ->
+                        updateReceive(event.trackId, event.receiveId) { it?.copy(pan = event.value) }
+                    is IemEvent.ReceiveRegistered ->
+                        updateReceive(event.trackId, event.receiveId) {
+                            ReceiveData(
+                                trackId = event.trackId,
+                                receiveId = event.receiveId,
+                                srcTrackId = event.srcTrackId,
+                            )
+                        }
+                    is IemEvent.ReceiveVolumeUpdated ->
+                        updateReceive(event.trackId, event.receiveId) { it?.copy(volume = event.value) }
+                    is IemEvent.TrackNameUpdated ->
+                        update { state ->
+                            state.copy(
+                                tracks =
+                                    state.tracks.update {
+                                        val track = this[event.trackId] ?: return@update
+                                        this[event.trackId] = track.copy(name = event.name)
+                                    }
+                            )
+                        }
+                    is IemEvent.Error -> update { state -> state.copy(tracks = emptyMap(), iems = emptyMap()) }
+                }
+            }
+            .onCompletion { update { state -> state.copy(tracks = emptyMap(), iems = emptyMap()) } }
 
+    private inline fun updateReceive(trackId: Int, receiveId: Int, crossinline block: (ReceiveData?) -> ReceiveData?) {
+        update { state ->
+            state.copy(
+                iems =
+                    state.iems.update {
+                        val track = this[trackId] ?: return@update
+                        this[trackId] =
+                            track.copy(
+                                receives =
+                                    track.receives.update {
+                                        val updated = block(this[receiveId]) ?: return@update
+                                        this[receiveId] = updated
+                                    }
+                            )
+                    }
+            )
+        }
     }
 }

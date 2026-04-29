@@ -2,8 +2,10 @@ package com.ethossoftworks.reaperbleiem
 
 import com.ethossoftworks.reaperbleiem.coordinator.AppCoordinator
 import com.ethossoftworks.reaperbleiem.interactor.CapabilityInteractor
+import com.ethossoftworks.reaperbleiem.interactor.IemInteractor
 import com.ethossoftworks.reaperbleiem.interactor.InfoMessageInteractor
 import com.ethossoftworks.reaperbleiem.lib.KmpBuildEnvironmentOverrider
+import com.ethossoftworks.reaperbleiem.service.iem.NetworkIemService
 import com.outsidesource.oskitkmp.capability.KmpCapabilities
 import org.koin.core.KoinApplication
 import org.koin.core.context.startKoin
@@ -54,9 +56,12 @@ fun commonModule() = module {
     single { KmpBuildEnvironmentOverrider(get()) }
     single { KmpCapabilities() }
 
+    single { NetworkIemService() }
+
     // App Interactors
     single { CapabilityInteractor(get()) }
     single { InfoMessageInteractor() }
+    single { IemInteractor(get()) }
 }
 
 fun mockModule() = module {}

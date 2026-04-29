@@ -14,6 +14,7 @@ import io.ktor.network.sockets.InetSocketAddress
 import io.ktor.network.sockets.aSocket
 import io.ktor.utils.io.core.buildPacket
 import io.ktor.utils.io.core.discard
+import kotlin.collections.get
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
 import kotlinx.coroutines.CompletableDeferred
@@ -31,7 +32,6 @@ import kotlinx.io.readFloat
 import kotlinx.io.readString
 import kotlinx.io.writeFloat
 import kotlinx.io.writeString
-import kotlin.collections.get
 
 class NetworkIemService(
     val restDomain: String = "http://localhost:8000",
