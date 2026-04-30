@@ -7,7 +7,8 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
-import androidx.compose.material.MaterialTheme
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
@@ -20,7 +21,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import kotlin.math.min
 
-val LocalAppColors = staticCompositionLocalOf<IAppColors> { LightAppColors }
+val LocalAppColors = staticCompositionLocalOf<AppColors> { LightAppColors }
 val LocalAppTypography = staticCompositionLocalOf<IAppTypography> { AppTypography(LightAppColors, PhoneAppDimensions) }
 val LocalAppDimensions = staticCompositionLocalOf<IAppDimensions> { PhoneAppDimensions }
 
@@ -36,7 +37,7 @@ object AppTheme {
 }
 
 @Composable
-fun AppThemeProvider(colorsOverride: IAppColors? = null, content: @Composable BoxScope.() -> Unit) {
+fun AppThemeProvider(colorsOverride: AppColors? = null, content: @Composable BoxScope.() -> Unit) {
     val windowInfo = LocalWindowInfo.current
     val colors =
         when {
@@ -72,6 +73,7 @@ fun AppThemeProvider(colorsOverride: IAppColors? = null, content: @Composable Bo
             LocalAppColors provides colors,
             LocalAppTypography provides typography,
             LocalAppDimensions provides dimensions,
+            LocalContentColor provides colors.textColor,
         ) {
             Box(modifier = Modifier.fillMaxSize().background(AppTheme.colors.primaryBgColor), content = content)
         }

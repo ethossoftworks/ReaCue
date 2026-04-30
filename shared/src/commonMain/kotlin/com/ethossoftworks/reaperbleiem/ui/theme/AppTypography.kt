@@ -4,4 +4,4 @@ import androidx.compose.runtime.Immutable
 
 @Immutable interface IAppTypography {}
 
-@Immutable data class AppTypography(val colors: IAppColors, val dimensions: IAppDimensions) : IAppTypography {}
+@Immutable data class AppTypography(val colors: AppColors, val dimensions: IAppDimensions) : IAppTypography {}

@@ -4,13 +4,15 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 
 @Immutable
-interface IAppColors {
-    val primaryAppColor: Color
-    val primaryBgColor: Color
+open class AppColors {
+    open val textColor = Color.Black
+    open val primaryAppColor = Color.Black
+    open val primaryBgColor = Color.Black
 }
 
 @Immutable
-data object LightAppColors : IAppColors {
+data object LightAppColors : AppColors() {
+    override val textColor = Color.White
     override val primaryAppColor = Color.Black
-    override val primaryBgColor = Color.White
+    override val primaryBgColor = Color(0xFF333333)
 }

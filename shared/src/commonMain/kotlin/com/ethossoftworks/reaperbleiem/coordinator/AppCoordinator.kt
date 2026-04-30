@@ -6,4 +6,4 @@ import com.outsidesource.oskitcompose.router.PushFromRightRouteTransition
 import com.outsidesource.oskitkmp.coordinator.Coordinator
 
 @OptIn(ExperimentalAnimationApi::class)
-class AppCoordinator : Coordinator(initialRoute = Route.Splash, defaultTransition = PushFromRightRouteTransition)
+class AppCoordinator : Coordinator(initialRoute = Route.Home, defaultTransition = PushFromRightRouteTransition)

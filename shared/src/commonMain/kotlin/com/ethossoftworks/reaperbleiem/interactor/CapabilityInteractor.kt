@@ -11,6 +11,10 @@ import kotlinx.coroutines.launch
 class CapabilityInteractor(private val capabilities: KmpCapabilities) :
     Interactor<CapabilityState>(initialState = CapabilityState()) {
 
+    init {
+        interactorScope.launch { fetchCapabilityStatus() }
+    }
+
     fun observeCapabilityStatus(): Flow<CapabilityState> = callbackFlow {
         launch {
             capabilities.bluetooth.status.collect {
@@ -19,10 +23,6 @@ class CapabilityInteractor(private val capabilities: KmpCapabilities) :
             }
         }
         awaitClose {}
-    }
-
-    init {
-        interactorScope.launch { fetchCapabilityStatus() }
     }
 
     suspend fun fetchCapabilityStatus() {

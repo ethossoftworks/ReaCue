@@ -3,6 +3,7 @@ package com.ethossoftworks.reaperbleiem.ui.app
 import androidx.compose.runtime.Composable
 import com.ethossoftworks.reaperbleiem.Route
 import com.ethossoftworks.reaperbleiem.coordinator.AppCoordinator
+import com.ethossoftworks.reaperbleiem.ui.home.HomeScreen
 import com.ethossoftworks.reaperbleiem.ui.theme.AppThemeProvider
 import com.outsidesource.oskitcompose.lib.rememberInject
 import com.outsidesource.oskitcompose.router.RouteSwitch
@@ -12,8 +13,7 @@ fun App(coordinator: AppCoordinator = rememberInject()) {
     AppThemeProvider {
         RouteSwitch(coordinator) {
             when (it) {
-                is Route.Splash -> {}
-                is Route.Home -> {}
+                is Route.Home -> HomeScreen()
             }
             InfoMessageContainer()
         }
