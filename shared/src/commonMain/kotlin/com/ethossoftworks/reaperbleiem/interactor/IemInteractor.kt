@@ -50,7 +50,7 @@ class IemInteractor(private val iemService: IIemService) :
                                 iems =
                                     state.iems.update {
                                         val mix = this[event.trackId] ?: return@update
-                                        this[event.trackId] = mix.copy(volume = mix.volume)
+                                        this[event.trackId] = mix.copy(volume = event.value)
                                     }
                             )
                         }
@@ -80,6 +80,28 @@ class IemInteractor(private val iemService: IIemService) :
                 }
             }
             .onCompletion { update { state -> state.copy(tracks = emptyMap(), iems = emptyMap()) } }
+
+    suspend fun setOutputVolume(trackId: Int, value: Float) {
+        iemService.setOutputVolume(trackId, value)
+        update { state ->
+            state.copy(
+                iems =
+                    state.iems.update {
+                        val mix = this[trackId] ?: return@update
+                        this[trackId] = mix.copy(volume = value)
+                    }
+            )
+        }
+    }
+
+    suspend fun setReceiveVolume(trackId: Int, receiveId: Int, value: Float) {
+        iemService.setReceiveVolume(trackId, receiveId, value)
+        updateReceive(trackId, receiveId) { it?.copy(volume = value) }
+    }
+
+    suspend fun refresh() {
+        iemService.refresh()
+    }
 
     private inline fun updateReceive(trackId: Int, receiveId: Int, crossinline block: (ReceiveData?) -> ReceiveData?) {
         update { state ->

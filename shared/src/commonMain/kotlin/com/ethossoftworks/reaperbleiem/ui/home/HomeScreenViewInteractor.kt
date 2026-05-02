@@ -12,37 +12,63 @@ import kotlinx.coroutines.launch
 data class HomeScreenViewState(
     val bluetoothStatus: CapabilityStatus = CapabilityStatus.Unknown,
     val isServerRunning: Boolean = false,
-    val iemOptions: List<IemOption> = emptyList(),
-    val selectedIem: Int? = null,
+    val iems: Map<Int, IemMix> = emptyMap(),
+    val selectedIemId: Int? = null,
+    val tracks: Map<Int, Track> = emptyMap(),
 )
-
-data class IemOption(val name: String, val trackId: Int)
 
 class HomeScreenViewInteractor(
     private val iemInteractor: IemInteractor,
     private val capabilityInteractor: CapabilityInteractor,
     private val infoMessageInteractor: InfoMessageInteractor,
-) : Interactor<HomeScreenViewState>(
-    initialState = HomeScreenViewState(),
-    dependencies = listOf(iemInteractor, capabilityInteractor),
-) {
+) :
+    Interactor<HomeScreenViewState>(
+        initialState = HomeScreenViewState(),
+        dependencies = listOf(iemInteractor, capabilityInteractor),
+    ) {
 
     override fun computed(state: HomeScreenViewState): HomeScreenViewState {
         return state.copy(
             bluetoothStatus = capabilityInteractor.state.bluetoothStatus,
-            iemOptions = iemInteractor.state.iems.values.mapNotNull {
-                val track = iemInteractor.state.tracks[it.trackId] ?: return@mapNotNull null
-                IemOption(name = track.name, trackId = it.trackId)
-            }
+            tracks = iemInteractor.state.tracks,
+            iems = iemInteractor.state.iems,
         )
     }
 
     fun onMounted() {
+        startServer()
+    }
+
+    fun onIemSelect(id: Int) {
+        update { state -> state.copy(selectedIemId = id) }
+    }
+
+    fun onRestartClick() {
+        startServer()
+    }
+
+    fun onRefreshClick() {
+        interactorScope.launch {
+            iemInteractor.refresh()
+        }
+    }
+
+    fun onOutputVolumeChange(trackId: Int, value: Float) {
+        interactorScope.launch {
+            iemInteractor.setOutputVolume(trackId, value)
+        }
+    }
+
+    fun onReceiveVolumeChange(trackId: Int, receiveId: Int, value: Float) {
+        interactorScope.launch {
+            iemInteractor.setReceiveVolume(trackId, receiveId, value)
+        }
+    }
+
+    private fun startServer() {
         interactorScope.launch {
             update { state -> state.copy(isServerRunning = true) }
-            iemInteractor.subscribe().collect {
-                println(it)
-            }
+            iemInteractor.subscribe().collect { }
             update { state -> state.copy(isServerRunning = false) }
         }
     }

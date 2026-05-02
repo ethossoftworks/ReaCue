@@ -67,7 +67,16 @@ fun AppThemeProvider(colorsOverride: AppColors? = null, content: @Composable Box
         )
     }
 
-    MaterialTheme {
+    MaterialTheme(
+        colorScheme =
+            MaterialTheme.colorScheme.copy(
+                primary = colors.primaryAppColor,
+                outline = colors.controlColor,
+                onSurface = colors.textColor,
+                surfaceContainer = colors.primaryBgColor10,
+                secondaryContainer = colors.controlColor,
+            )
+    ) {
         CompositionLocalProvider(
             LocalTextSelectionColors provides textSelectionColors,
             LocalAppColors provides colors,
