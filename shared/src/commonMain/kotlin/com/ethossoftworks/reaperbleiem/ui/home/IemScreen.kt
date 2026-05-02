@@ -30,7 +30,7 @@ import com.outsidesource.oskitcompose.lib.rememberInjectForRoute
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(interactor: HomeScreenViewInteractor = rememberInjectForRoute()) {
+fun IemScreen(interactor: IemScreenViewInteractor = rememberInjectForRoute()) {
     val state = interactor.collectAsState()
 
     LaunchedEffect(Unit) { interactor.onMounted() }

@@ -28,6 +28,7 @@ fun main() {
     app.setActivationPolicy(NSApplicationActivationPolicy.NSApplicationActivationPolicyRegular)
 
     Window("Reaper BLE IEM") {
+        // TODO: Figure out window issues on MacOS Native
 //        window.styleMask = window.styleMask or NSWindowStyleMaskFullSizeContentView
 //        window.titleVisibility = NSWindowTitleHidden
 //        window.titlebarAppearsTransparent = true

@@ -9,7 +9,7 @@ import com.outsidesource.oskitkmp.capability.CapabilityStatus
 import com.outsidesource.oskitkmp.interactor.Interactor
 import kotlinx.coroutines.launch
 
-data class HomeScreenViewState(
+data class IemScreenViewState(
     val bluetoothStatus: CapabilityStatus = CapabilityStatus.Unknown,
     val isServerRunning: Boolean = false,
     val iems: Map<Int, IemMix> = emptyMap(),
@@ -17,17 +17,17 @@ data class HomeScreenViewState(
     val tracks: Map<Int, Track> = emptyMap(),
 )
 
-class HomeScreenViewInteractor(
+class IemScreenViewInteractor(
     private val iemInteractor: IemInteractor,
     private val capabilityInteractor: CapabilityInteractor,
     private val infoMessageInteractor: InfoMessageInteractor,
 ) :
-    Interactor<HomeScreenViewState>(
-        initialState = HomeScreenViewState(),
+    Interactor<IemScreenViewState>(
+        initialState = IemScreenViewState(),
         dependencies = listOf(iemInteractor, capabilityInteractor),
     ) {
 
-    override fun computed(state: HomeScreenViewState): HomeScreenViewState {
+    override fun computed(state: IemScreenViewState): IemScreenViewState {
         return state.copy(
             bluetoothStatus = capabilityInteractor.state.bluetoothStatus,
             tracks = iemInteractor.state.tracks,
