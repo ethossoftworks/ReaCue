@@ -1,10 +1,11 @@
 package com.ethossoftworks.reaperbleiem.service.iem
 
+import com.ethossoftworks.reaperbleiem.service.bluetooth.IKmpBlePeripheralManager
 import kotlinx.coroutines.flow.Flow
 
 class BlePeripheralIemService(
     private val networkIemService: NetworkIemService,
-//    private val peripheralManager: KmpBlePeripheralManager
+    private val peripheralManager: IKmpBlePeripheralManager
 ) : IIemService {
     override fun subscribe(): Flow<IemEvent> {
         return networkIemService.subscribe()

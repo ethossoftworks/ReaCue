@@ -575,7 +575,7 @@ private inline fun NSDictionary.forEach(block: (Any, Any?) -> Unit) {
 }
 
 @OptIn(ExperimentalForeignApi::class)
-private fun NSData.toByteArray(): ByteArray {
+internal fun NSData.toByteArray(): ByteArray {
     val size = length.toInt()
     if (size <= 0) return ByteArray(0)
     if (length > Int.MAX_VALUE.toULong()) throw IllegalStateException("NSData is too large to fit into a ByteArray")
@@ -584,7 +584,7 @@ private fun NSData.toByteArray(): ByteArray {
 }
 
 @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
-fun ByteArray.toNSData(): NSData {
+internal fun ByteArray.toNSData(): NSData {
     if (isEmpty()) return NSData.data()
 
     return usePinned { pinned -> NSData.create(bytes = pinned.addressOf(0), length = size.toULong()) }

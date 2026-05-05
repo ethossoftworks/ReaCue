@@ -6,9 +6,6 @@ import kotlinx.atomicfu.AtomicRef
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
 import kotlinx.cinterop.ObjCSignatureOverride
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
@@ -19,7 +16,18 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
+import platform.CoreBluetooth.CBATTErrorInsufficientAuthentication
+import platform.CoreBluetooth.CBATTErrorInsufficientEncryption
+import platform.CoreBluetooth.CBATTErrorInvalidAttributeValueLength
+import platform.CoreBluetooth.CBATTErrorInvalidOffset
+import platform.CoreBluetooth.CBATTErrorReadNotPermitted
+import platform.CoreBluetooth.CBATTErrorRequestNotSupported
+import platform.CoreBluetooth.CBATTErrorSuccess
+import platform.CoreBluetooth.CBATTErrorUnlikelyError
+import platform.CoreBluetooth.CBATTErrorWriteNotPermitted
 import platform.CoreBluetooth.CBATTRequest
 import platform.CoreBluetooth.CBAdvertisementDataLocalNameKey
 import platform.CoreBluetooth.CBAdvertisementDataManufacturerDataKey
@@ -52,29 +60,12 @@ import platform.darwin.dispatch_queue_t
 
 val KmpBleCbPeripheralQueue: dispatch_queue_t = dispatch_queue_create("kmp-ble-peripheral-manager", attr = null)
 
-data class KmpBleAdvertisementData(
-    val name: String,
-    val services: List<KmpBleAdvertisementService> = emptyList(),
-    val manufacturerData: ByteArray? = null, // May only be 31 bytes
-)
-
-data class KmpBleAdvertisementService(
-    val uuid: String,
-    val characteristics: List<KmpBleAdvertisementCharacteristic>,
-    val isPrimaryService: Boolean,
-)
-
-data class KmpBleAdvertisementCharacteristic(
-    val uuid: String,
-    val properties: Set<KmpBleGattProperty>,
-    val permissions: Set<KmpBleGattPermission>,
-)
-
 class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripheralManager)? = null) :
-    CBPeripheralManagerDelegateProtocol, NSObject() {
-    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    CBPeripheralManagerDelegateProtocol, NSObject(), IKmpBlePeripheralManager {
     internal val events =
         MutableSharedFlow<KmpBlePeripheralManagerEvent>(replay = 0, extraBufferCapacity = Channel.UNLIMITED)
+    private val sendMutex = Mutex()
+    private val peripheralManagerIsReadyToUpdateSubscribers = Channel<Unit>(Channel.CONFLATED)
     internal val peripheralManager: CBPeripheralManager by lazy {
         val manager = cbPeripheralManagerFactory?.invoke() ?: CBPeripheralManager(null, KmpBleCbPeripheralQueue)
         manager.apply { delegate = this@AppleKmpBlePeripheralManager }
@@ -82,8 +73,15 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
 
     private val localCharacteristics: AtomicRef<Map<String, CBMutableCharacteristic>> = atomic(emptyMap())
     private val localCentrals: AtomicRef<Map<String, CBCentral>> = atomic(emptyMap())
+    private val localRequests: AtomicRef<Map<Int, CBATTRequest>> = atomic(emptyMap())
+    private val localWriteRequestsFlow =
+        MutableSharedFlow<KmpBlePeripheralWriteRequest>(extraBufferCapacity = Channel.UNLIMITED)
+    private val localReadRequestsFlow =
+        MutableSharedFlow<KmpBlePeripheralReadRequest>(extraBufferCapacity = Channel.UNLIMITED)
 
-    suspend fun advertise(advertisementData: KmpBleAdvertisementData): Flow<KmpBlePeripheralManagerEvent> =
+    private val requestIdCounter = atomic(0)
+
+    override suspend fun advertise(advertisementData: KmpBleAdvertisementData): Flow<KmpBlePeripheralManagerEvent> =
         callbackFlow {
             awaitPeripheralManagerPoweredOn() ?: return@callbackFlow
 
@@ -173,21 +171,44 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
             awaitClose { peripheralManager.stopAdvertising() }
         }
 
-    private suspend fun notify(data: ByteArray, characteristicUuid: String, centralUuids: List<String>? = null) {
-        val characteristic = localCharacteristics.value[characteristicUuid] ?: return
-        val centrals = centralUuids?.mapNotNull { localCentrals.value[it] }
-        peripheralManager.updateValue(data.toNSData(), characteristic, centrals)
-    }
-
-    private suspend fun awaitPeripheralManagerPoweredOn(): Unit? {
-        return withTimeoutOrNull(2_000.milliseconds) {
-            while (isActive) {
-                if (peripheralManager.state == CBManagerStatePoweredOn) return@withTimeoutOrNull
-                delay(16.milliseconds)
+    /** IKmpPeripheralManager */
+    override suspend fun notify(data: ByteArray, characteristicUuid: String, centralUuids: List<String>?): Unit =
+        sendMutex.withLock {
+            val characteristic = localCharacteristics.value[characteristicUuid] ?: return
+            val centrals = centralUuids?.mapNotNull { localCentrals.value[it] }
+            while (!peripheralManager.updateValue(data.toNSData(), characteristic, centrals)) {
+                peripheralManagerIsReadyToUpdateSubscribers.receive()
             }
         }
+
+    override val readRequests: Flow<KmpBlePeripheralReadRequest> = localReadRequestsFlow
+    override val writeRequests: Flow<KmpBlePeripheralWriteRequest> = localWriteRequestsFlow
+
+    override suspend fun respondToRequest(
+        central: KmpBleCentralId,
+        requestId: Int,
+        offset: Int,
+        result: KmpBlePeripheralGattResult,
+        value: ByteArray,
+    ) {
+        val request = localRequests.value[requestId] ?: return
+        localRequests.update { it.update { remove(requestId) } }
+
+        peripheralManager.respondToRequest(request = request, withResult = when (result) {
+            KmpBlePeripheralGattResult.Failure -> CBATTErrorUnlikelyError
+            KmpBlePeripheralGattResult.InsufficientAuthentication -> CBATTErrorInsufficientAuthentication
+            KmpBlePeripheralGattResult.InsufficientEncryption -> CBATTErrorInsufficientEncryption
+            KmpBlePeripheralGattResult.InvalidAttributeLength -> CBATTErrorInvalidAttributeValueLength
+            KmpBlePeripheralGattResult.InvalidOffset -> CBATTErrorInvalidOffset
+            KmpBlePeripheralGattResult.ReadNotPermitted -> CBATTErrorReadNotPermitted
+            KmpBlePeripheralGattResult.RequestNotSupported -> CBATTErrorRequestNotSupported
+            KmpBlePeripheralGattResult.Success -> CBATTErrorSuccess
+            is KmpBlePeripheralGattResult.UserDefined -> result.value.toLong()
+            KmpBlePeripheralGattResult.WriteNotPermitted -> CBATTErrorWriteNotPermitted
+        })
     }
 
+    /** NSPeripheralManager */
     override fun peripheralManagerDidUpdateState(peripheral: CBPeripheralManager) {}
 
     override fun peripheralManager(peripheral: CBPeripheralManager, didAddService: CBService, error: NSError?) {
@@ -198,9 +219,42 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
         events.tryEmit(KmpBlePeripheralManagerEvent.ServiceAdded(didAddService.UUID.UUIDString()))
     }
 
-    override fun peripheralManager(peripheral: CBPeripheralManager, didReceiveReadRequest: CBATTRequest) {}
+    override fun peripheralManager(peripheral: CBPeripheralManager, didReceiveReadRequest: CBATTRequest) {
+        val request = didReceiveReadRequest
+        val requestId = requestIdCounter.getAndIncrement()
+        val centralUuid = request.central.identifier.UUIDString()
+        localCentrals.update { it.update { this[centralUuid] = request.central } }
+        localRequests.update { it.update { this[requestId] = request } }
 
-    override fun peripheralManager(peripheral: CBPeripheralManager, didReceiveWriteRequests: List<*>) {}
+        localReadRequestsFlow.tryEmit(
+            KmpBlePeripheralReadRequest(
+                central = centralUuid,
+                characteristicUuid = request.characteristic.UUID.UUIDString(),
+                requestId = requestId,
+                offset = request.offset.toInt(),
+            )
+        )
+    }
+
+    override fun peripheralManager(peripheral: CBPeripheralManager, didReceiveWriteRequests: List<*>) {
+        didReceiveWriteRequests.forEach {
+            val request = it as? CBATTRequest ?: return@forEach
+            val requestId = requestIdCounter.getAndIncrement()
+            val centralUuid = request.central.identifier.UUIDString()
+            localCentrals.update { it.update { this[centralUuid] = request.central } }
+            localRequests.update { it.update { this[requestId] = request } }
+
+            localWriteRequestsFlow.tryEmit(
+                KmpBlePeripheralWriteRequest(
+                    central = centralUuid,
+                    characteristicUuid = request.characteristic.UUID.UUIDString(),
+                    requestId = requestId,
+                    offset = request.offset.toInt(),
+                    data = request.value?.toByteArray() ?: byteArrayOf(),
+                )
+            )
+        }
+    }
 
     @ObjCSignatureOverride
     override fun peripheralManager(
@@ -240,19 +294,17 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
         events.tryEmit(KmpBlePeripheralManagerEvent.Advertising)
     }
 
-    override fun peripheralManagerIsReadyToUpdateSubscribers(peripheral: CBPeripheralManager) {}
-}
+    override fun peripheralManagerIsReadyToUpdateSubscribers(peripheral: CBPeripheralManager) {
+        peripheralManagerIsReadyToUpdateSubscribers.trySend(Unit)
+    }
 
-sealed class KmpBlePeripheralManagerEvent {
-    data class Error(val error: KmpBleError) : KmpBlePeripheralManagerEvent()
-
-    data class ServiceAdded(val uuid: String) : KmpBlePeripheralManagerEvent()
-
-    data object Advertising : KmpBlePeripheralManagerEvent()
-
-    data class CentralSubscribedToCharacteristic(val centralId: String, val characteristicUuid: String) :
-        KmpBlePeripheralManagerEvent()
-
-    data class CentralUnsubscribedFromCharacteristic(val centralId: String, val characteristicUuid: String) :
-        KmpBlePeripheralManagerEvent()
+    /** Helpers */
+    private suspend fun awaitPeripheralManagerPoweredOn(): Unit? {
+        return withTimeoutOrNull(2_000.milliseconds) {
+            while (isActive) {
+                if (peripheralManager.state == CBManagerStatePoweredOn) return@withTimeoutOrNull
+                delay(16.milliseconds)
+            }
+        }
+    }
 }
