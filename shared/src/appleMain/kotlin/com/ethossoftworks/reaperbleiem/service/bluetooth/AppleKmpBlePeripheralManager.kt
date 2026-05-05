@@ -8,14 +8,13 @@ import kotlinx.atomicfu.update
 import kotlinx.cinterop.ObjCSignatureOverride
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
@@ -78,9 +77,12 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
         MutableSharedFlow<KmpBlePeripheralWriteRequest>(extraBufferCapacity = Channel.UNLIMITED)
     private val localReadRequestsFlow =
         MutableSharedFlow<KmpBlePeripheralReadRequest>(extraBufferCapacity = Channel.UNLIMITED)
+    private val _state = MutableStateFlow(peripheralManager.state)
 
     private val requestIdCounter = atomic(0)
 
+    // TODO: Add all services at once and wait at the end to check for count
+    // TODO: Maybe add state observable for peripheral manager. Need to check how Android handles things.
     override suspend fun advertise(advertisementData: KmpBleAdvertisementData): Flow<KmpBlePeripheralManagerEvent> =
         callbackFlow {
             awaitPeripheralManagerPoweredOn() ?: return@callbackFlow
@@ -194,22 +196,28 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
         val request = localRequests.value[requestId] ?: return
         localRequests.update { it.update { remove(requestId) } }
 
-        peripheralManager.respondToRequest(request = request, withResult = when (result) {
-            KmpBlePeripheralGattResult.Failure -> CBATTErrorUnlikelyError
-            KmpBlePeripheralGattResult.InsufficientAuthentication -> CBATTErrorInsufficientAuthentication
-            KmpBlePeripheralGattResult.InsufficientEncryption -> CBATTErrorInsufficientEncryption
-            KmpBlePeripheralGattResult.InvalidAttributeLength -> CBATTErrorInvalidAttributeValueLength
-            KmpBlePeripheralGattResult.InvalidOffset -> CBATTErrorInvalidOffset
-            KmpBlePeripheralGattResult.ReadNotPermitted -> CBATTErrorReadNotPermitted
-            KmpBlePeripheralGattResult.RequestNotSupported -> CBATTErrorRequestNotSupported
-            KmpBlePeripheralGattResult.Success -> CBATTErrorSuccess
-            is KmpBlePeripheralGattResult.UserDefined -> result.value.toLong()
-            KmpBlePeripheralGattResult.WriteNotPermitted -> CBATTErrorWriteNotPermitted
-        })
+        peripheralManager.respondToRequest(
+            request = request,
+            withResult =
+                when (result) {
+                    KmpBlePeripheralGattResult.Failure -> CBATTErrorUnlikelyError
+                    KmpBlePeripheralGattResult.InsufficientAuthentication -> CBATTErrorInsufficientAuthentication
+                    KmpBlePeripheralGattResult.InsufficientEncryption -> CBATTErrorInsufficientEncryption
+                    KmpBlePeripheralGattResult.InvalidAttributeLength -> CBATTErrorInvalidAttributeValueLength
+                    KmpBlePeripheralGattResult.InvalidOffset -> CBATTErrorInvalidOffset
+                    KmpBlePeripheralGattResult.ReadNotPermitted -> CBATTErrorReadNotPermitted
+                    KmpBlePeripheralGattResult.RequestNotSupported -> CBATTErrorRequestNotSupported
+                    KmpBlePeripheralGattResult.Success -> CBATTErrorSuccess
+                    is KmpBlePeripheralGattResult.UserDefined -> result.value.toLong()
+                    KmpBlePeripheralGattResult.WriteNotPermitted -> CBATTErrorWriteNotPermitted
+                },
+        )
     }
 
     /** NSPeripheralManager */
-    override fun peripheralManagerDidUpdateState(peripheral: CBPeripheralManager) {}
+    override fun peripheralManagerDidUpdateState(peripheral: CBPeripheralManager) {
+        _state.value = peripheral.state
+    }
 
     override fun peripheralManager(peripheral: CBPeripheralManager, didAddService: CBService, error: NSError?) {
         if (error != null) {
@@ -278,6 +286,10 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
         didUnsubscribeFromCharacteristic: CBCharacteristic,
     ) {
         localCentrals.update { it.update { remove(central.identifier.UUIDString()) } }
+        localRequests.update { currentMap ->
+            currentMap.filterValues { it.central.identifier.UUIDString() != central.identifier.UUIDString() }
+        }
+
         events.tryEmit(
             KmpBlePeripheralManagerEvent.CentralUnsubscribedFromCharacteristic(
                 centralId = central.identifier.UUIDString(),
@@ -301,10 +313,8 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
     /** Helpers */
     private suspend fun awaitPeripheralManagerPoweredOn(): Unit? {
         return withTimeoutOrNull(2_000.milliseconds) {
-            while (isActive) {
-                if (peripheralManager.state == CBManagerStatePoweredOn) return@withTimeoutOrNull
-                delay(16.milliseconds)
-            }
+            _state.first { it == CBManagerStatePoweredOn }
+            Unit
         }
     }
 }

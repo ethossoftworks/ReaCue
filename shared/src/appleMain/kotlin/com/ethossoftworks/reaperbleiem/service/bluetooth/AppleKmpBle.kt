@@ -10,9 +10,12 @@ import kotlinx.atomicfu.AtomicRef
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
 import kotlinx.cinterop.BetaInteropApi
+import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCSignatureOverride
 import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.readBytes
+import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.usePinned
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -576,6 +579,9 @@ private inline fun NSDictionary.forEach(block: (Any, Any?) -> Unit) {
 
 @OptIn(ExperimentalForeignApi::class)
 internal fun NSData.toByteArray(): ByteArray {
+    // TODO: Test this
+//    return bytes?.reinterpret<ByteVar>()?.readBytes(length.toInt()) ?: byteArrayOf()
+
     val size = length.toInt()
     if (size <= 0) return ByteArray(0)
     if (length > Int.MAX_VALUE.toULong()) throw IllegalStateException("NSData is too large to fit into a ByteArray")
