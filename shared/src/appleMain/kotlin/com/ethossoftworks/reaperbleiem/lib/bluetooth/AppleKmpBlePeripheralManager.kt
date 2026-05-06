@@ -67,9 +67,10 @@ import platform.darwin.dispatch_queue_t
 
 val KmpBleCbPeripheralQueue: dispatch_queue_t = dispatch_queue_create("kmp-ble-peripheral-manager", attr = null)
 
-// TODO: Add all services at once and wait at the end to check for count
+// TODO: Add all services at once and wait at the end to check for count. Also remove service added event
 // TODO: Maybe add state observable for peripheral manager. Need to check how Android handles things.
 // TODO: Create write mutex per characteristic
+// TODO: Add MTU size property?
 class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripheralManager)? = null) :
     CBPeripheralManagerDelegateProtocol, NSObject(), IKmpBlePeripheralManager {
     internal val events = MutableSharedFlow<KmpBlePeripheralEvent>(replay = 0, extraBufferCapacity = Channel.UNLIMITED)
