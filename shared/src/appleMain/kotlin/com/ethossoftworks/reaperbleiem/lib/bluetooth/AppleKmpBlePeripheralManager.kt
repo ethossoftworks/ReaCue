@@ -1,5 +1,13 @@
 package com.ethossoftworks.reaperbleiem.lib.bluetooth
 
+import com.ethossoftworks.reaperbleiem.service.bluetooth.IKmpBlePeripheralManager
+import com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleAdvertisementData
+import com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleCentralId
+import com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleError
+import com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleGattPermission
+import com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleGattProperty
+import com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralEvent
+import com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralGattResult
 import com.outsidesource.oskitkmp.lib.update
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.atomicfu.AtomicRef
@@ -63,10 +71,8 @@ val KmpBleCbPeripheralQueue: dispatch_queue_t = dispatch_queue_create("kmp-ble-p
 // TODO: Maybe add state observable for peripheral manager. Need to check how Android handles things.
 // TODO: Create write mutex per characteristic
 class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripheralManager)? = null) :
-    CBPeripheralManagerDelegateProtocol, NSObject(),
-    com.ethossoftworks.reaperbleiem.service.bluetooth.IKmpBlePeripheralManager {
-    internal val events =
-        MutableSharedFlow<com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralManagerEvent>(replay = 0, extraBufferCapacity = Channel.UNLIMITED)
+    CBPeripheralManagerDelegateProtocol, NSObject(), IKmpBlePeripheralManager {
+    internal val events = MutableSharedFlow<KmpBlePeripheralEvent>(replay = 0, extraBufferCapacity = Channel.UNLIMITED)
     private val sendMutex = Mutex()
     private val peripheralManagerIsReadyToUpdateSubscribers = Channel<Unit>(Channel.CONFLATED)
     internal val peripheralManager: CBPeripheralManager by lazy {
@@ -77,15 +83,11 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
     private val localCharacteristics: AtomicRef<Map<String, CBMutableCharacteristic>> = atomic(emptyMap())
     private val localCentrals: AtomicRef<Map<String, CBCentral>> = atomic(emptyMap())
     private val localRequests: AtomicRef<Map<Int, CBATTRequest>> = atomic(emptyMap())
-    private val localWriteRequestsFlow =
-        MutableSharedFlow<com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralWriteRequest>(extraBufferCapacity = Channel.UNLIMITED)
-    private val localReadRequestsFlow =
-        MutableSharedFlow<com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralReadRequest>(extraBufferCapacity = Channel.UNLIMITED)
     private val _state = MutableStateFlow(peripheralManager.state)
 
     private val requestIdCounter = atomic(0)
 
-    override suspend fun advertise(advertisementData: com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleAdvertisementData): Flow<com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralManagerEvent> =
+    override suspend fun advertise(advertisementData: KmpBleAdvertisementData): Flow<KmpBlePeripheralEvent> =
         callbackFlow {
             awaitPeripheralManagerPoweredOn() ?: return@callbackFlow
 
@@ -103,35 +105,45 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
                                                 properties =
                                                     characteristic.properties.fold(0uL) { accum, property ->
                                                         when (property) {
-                                                            _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleGattProperty.Broadcast ->
+                                                            KmpBleGattProperty.Broadcast ->
                                                                 accum or CBCharacteristicPropertyBroadcast
-                                                            _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleGattProperty.Read ->
+
+                                                            KmpBleGattProperty.Read ->
                                                                 accum or CBCharacteristicPropertyRead
-                                                            _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleGattProperty.WriteWithoutResponse ->
+
+                                                            KmpBleGattProperty.WriteWithoutResponse ->
                                                                 accum or CBCharacteristicPropertyWriteWithoutResponse
-                                                            _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleGattProperty.Write ->
+
+                                                            KmpBleGattProperty.Write ->
                                                                 accum or CBCharacteristicPropertyWrite
-                                                            _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleGattProperty.Notify ->
+
+                                                            KmpBleGattProperty.Notify ->
                                                                 accum or CBCharacteristicPropertyNotify
-                                                            _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleGattProperty.Indicate ->
+
+                                                            KmpBleGattProperty.Indicate ->
                                                                 accum or CBCharacteristicPropertyIndicate
-                                                            _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleGattProperty.SignedWrite ->
+
+                                                            KmpBleGattProperty.SignedWrite ->
                                                                 accum or
                                                                     CBCharacteristicPropertyAuthenticatedSignedWrites
-                                                            _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleGattProperty.ExtendedProps ->
+
+                                                            KmpBleGattProperty.ExtendedProps ->
                                                                 accum or CBCharacteristicPropertyExtendedProperties
                                                         }
                                                     },
                                                 permissions =
                                                     characteristic.permissions.fold(0uL) { accum, permission ->
                                                         when (permission) {
-                                                            _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleGattPermission.Readable ->
+                                                            KmpBleGattPermission.Readable ->
                                                                 accum or CBAttributePermissionsReadable
-                                                            _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleGattPermission.Writable ->
+
+                                                            KmpBleGattPermission.Writable ->
                                                                 accum or CBAttributePermissionsWriteable
-                                                            _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleGattPermission.ReadEncryptionRequired ->
+
+                                                            KmpBleGattPermission.ReadEncryptionRequired ->
                                                                 accum or CBAttributePermissionsReadEncryptionRequired
-                                                            _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleGattPermission.WriteEncryptionRequired ->
+
+                                                            KmpBleGattPermission.WriteEncryptionRequired ->
                                                                 accum or CBAttributePermissionsWriteEncryptionRequired
                                                         }
                                                     },
@@ -147,12 +159,11 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
                     peripheralManager.addService(mutableService)
 
                     val response = events.first {
-                        it is com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralManagerEvent.Error ||
-                            it == _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralManagerEvent.ServiceAdded(service.uuid)
+                        it is KmpBlePeripheralEvent.Error || it == KmpBlePeripheralEvent.ServiceAdded(service.uuid)
                     }
                     send(response)
 
-                    if (response is com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralManagerEvent.Error) close()
+                    if (response is KmpBlePeripheralEvent.Error) close()
                 }
 
                 peripheralManager.startAdvertising(
@@ -168,9 +179,7 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
 
                 events.onEach { send(it) }.launchIn(this)
             } catch (t: Throwable) {
-                send(
-                    _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralManagerEvent.Error(
-                        _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleError.Unknown(t)))
+                send(KmpBlePeripheralEvent.Error(KmpBleError.Unknown(t)))
                 close()
             }
 
@@ -178,7 +187,7 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
         }
 
     /** IKmpPeripheralManager */
-    override suspend fun notify(data: ByteArray, characteristicUuid: String, centralUuids: List<String>?): Unit =
+    override suspend fun notify(characteristicUuid: String, data: ByteArray, centralUuids: List<String>?): Unit =
         sendMutex.withLock {
             val characteristic = localCharacteristics.value[characteristicUuid] ?: return
             val centrals = centralUuids?.mapNotNull { localCentrals.value[it] }
@@ -187,14 +196,11 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
             }
         }
 
-    override val readRequests: Flow<com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralReadRequest> = localReadRequestsFlow
-    override val writeRequests: Flow<com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralWriteRequest> = localWriteRequestsFlow
-
     override suspend fun respondToRequest(
-        central: com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleCentralId,
+        central: KmpBleCentralId,
         requestId: Int,
         offset: Int,
-        result: com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralGattResult,
+        result: KmpBlePeripheralGattResult,
         value: ByteArray,
     ) {
         val request = localRequests.value[requestId] ?: return
@@ -204,16 +210,16 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
             request = request,
             withResult =
                 when (result) {
-                    _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralGattResult.Failure -> CBATTErrorUnlikelyError
-                    _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralGattResult.InsufficientAuthentication -> CBATTErrorInsufficientAuthentication
-                    _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralGattResult.InsufficientEncryption -> CBATTErrorInsufficientEncryption
-                    _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralGattResult.InvalidAttributeLength -> CBATTErrorInvalidAttributeValueLength
-                    _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralGattResult.InvalidOffset -> CBATTErrorInvalidOffset
-                    _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralGattResult.ReadNotPermitted -> CBATTErrorReadNotPermitted
-                    _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralGattResult.RequestNotSupported -> CBATTErrorRequestNotSupported
-                    _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralGattResult.Success -> CBATTErrorSuccess
-                    is com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralGattResult.UserDefined -> result.value.toLong()
-                    _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralGattResult.WriteNotPermitted -> CBATTErrorWriteNotPermitted
+                    KmpBlePeripheralGattResult.Failure -> CBATTErrorUnlikelyError
+                    KmpBlePeripheralGattResult.InsufficientAuthentication -> CBATTErrorInsufficientAuthentication
+                    KmpBlePeripheralGattResult.InsufficientEncryption -> CBATTErrorInsufficientEncryption
+                    KmpBlePeripheralGattResult.InvalidAttributeLength -> CBATTErrorInvalidAttributeValueLength
+                    KmpBlePeripheralGattResult.InvalidOffset -> CBATTErrorInvalidOffset
+                    KmpBlePeripheralGattResult.ReadNotPermitted -> CBATTErrorReadNotPermitted
+                    KmpBlePeripheralGattResult.RequestNotSupported -> CBATTErrorRequestNotSupported
+                    KmpBlePeripheralGattResult.Success -> CBATTErrorSuccess
+                    is KmpBlePeripheralGattResult.UserDefined -> result.value.toLong()
+                    KmpBlePeripheralGattResult.WriteNotPermitted -> CBATTErrorWriteNotPermitted
                 },
         )
     }
@@ -225,12 +231,10 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
 
     override fun peripheralManager(peripheral: CBPeripheralManager, didAddService: CBService, error: NSError?) {
         if (error != null) {
-            events.tryEmit(
-                _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralManagerEvent.Error(
-                    _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleError.Unknown(error)))
+            events.tryEmit(KmpBlePeripheralEvent.Error(KmpBleError.Unknown(error)))
             return
         }
-        events.tryEmit(_root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralManagerEvent.ServiceAdded(didAddService.UUID.UUIDString()))
+        events.tryEmit(KmpBlePeripheralEvent.ServiceAdded(didAddService.UUID.UUIDString()))
     }
 
     override fun peripheralManager(peripheral: CBPeripheralManager, didReceiveReadRequest: CBATTRequest) {
@@ -240,8 +244,8 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
         localCentrals.update { it.update { this[centralUuid] = request.central } }
         localRequests.update { it.update { this[requestId] = request } }
 
-        localReadRequestsFlow.tryEmit(
-            _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralReadRequest(
+        events.tryEmit(
+            KmpBlePeripheralEvent.ReadRequest(
                 central = centralUuid,
                 characteristicUuid = request.characteristic.UUID.UUIDString(),
                 requestId = requestId,
@@ -258,8 +262,8 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
             localCentrals.update { it.update { this[centralUuid] = request.central } }
             localRequests.update { it.update { this[requestId] = request } }
 
-            localWriteRequestsFlow.tryEmit(
-                _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralWriteRequest(
+            events.tryEmit(
+                KmpBlePeripheralEvent.WriteRequest(
                     central = centralUuid,
                     characteristicUuid = request.characteristic.UUID.UUIDString(),
                     requestId = requestId,
@@ -278,7 +282,7 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
     ) {
         localCentrals.update { it.update { this[central.identifier.UUIDString()] = central } }
         events.tryEmit(
-            _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralManagerEvent.CentralSubscribedToCharacteristic(
+            KmpBlePeripheralEvent.CentralSubscribed(
                 centralId = central.identifier.UUIDString(),
                 didSubscribeToCharacteristic.UUID.UUIDString(),
             )
@@ -297,7 +301,7 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
         }
 
         events.tryEmit(
-            _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralManagerEvent.CentralUnsubscribedFromCharacteristic(
+            KmpBlePeripheralEvent.CentralUnsubscribed(
                 centralId = central.identifier.UUIDString(),
                 didUnsubscribeFromCharacteristic.UUID.UUIDString(),
             )
@@ -306,12 +310,10 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
 
     override fun peripheralManagerDidStartAdvertising(peripheral: CBPeripheralManager, error: NSError?) {
         if (error != null) {
-            events.tryEmit(
-                _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralManagerEvent.Error(
-                    _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleError.Unknown(error)))
+            events.tryEmit(KmpBlePeripheralEvent.Error(KmpBleError.Unknown(error)))
             return
         }
-        events.tryEmit(_root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralManagerEvent.Advertising)
+        events.tryEmit(KmpBlePeripheralEvent.Advertising)
     }
 
     override fun peripheralManagerIsReadyToUpdateSubscribers(peripheral: CBPeripheralManager) {

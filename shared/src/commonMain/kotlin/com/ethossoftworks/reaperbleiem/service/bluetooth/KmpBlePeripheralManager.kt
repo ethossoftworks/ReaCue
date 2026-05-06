@@ -3,12 +3,9 @@ package com.ethossoftworks.reaperbleiem.service.bluetooth
 import kotlinx.coroutines.flow.Flow
 
 interface IKmpBlePeripheralManager {
-    suspend fun advertise(advertisementData: KmpBleAdvertisementData): Flow<KmpBlePeripheralManagerEvent>
+    suspend fun advertise(advertisementData: KmpBleAdvertisementData): Flow<KmpBlePeripheralEvent>
 
-    suspend fun notify(data: ByteArray, characteristicUuid: String, centralUuids: List<String>? = null)
-
-    val writeRequests: Flow<KmpBlePeripheralWriteRequest>
-    val readRequests: Flow<KmpBlePeripheralReadRequest>
+    suspend fun notify(characteristicUuid: String, data: ByteArray, centralUuids: List<String>? = null)
 
     suspend fun respondToRequest(
         central: KmpBleCentralId,
@@ -18,21 +15,6 @@ interface IKmpBlePeripheralManager {
         value: ByteArray,
     )
 }
-
-data class KmpBlePeripheralReadRequest(
-    val central: KmpBleCentralId,
-    val characteristicUuid: String,
-    val requestId: Int,
-    val offset: Int,
-)
-
-data class KmpBlePeripheralWriteRequest(
-    val central: KmpBleCentralId,
-    val characteristicUuid: String,
-    val requestId: Int,
-    val offset: Int,
-    val data: ByteArray,
-)
 
 sealed class KmpBlePeripheralGattResult {
     data object Success : KmpBlePeripheralGattResult()
@@ -66,18 +48,33 @@ data class KmpBleAdvertisementCharacteristic(
     val permissions: Set<KmpBleGattPermission>,
 )
 
-sealed class KmpBlePeripheralManagerEvent {
-    data class Error(val error: KmpBleError) : KmpBlePeripheralManagerEvent()
+sealed class KmpBlePeripheralEvent {
+    data class Error(val error: KmpBleError) : KmpBlePeripheralEvent()
 
-    data class ServiceAdded(val uuid: String) : KmpBlePeripheralManagerEvent()
+    data class ServiceAdded(val uuid: String) : KmpBlePeripheralEvent()
 
-    data object Advertising : KmpBlePeripheralManagerEvent()
+    data object Advertising : KmpBlePeripheralEvent()
 
-    data class CentralSubscribedToCharacteristic(val centralId: KmpBleCentralId, val characteristicUuid: String) :
-        KmpBlePeripheralManagerEvent()
+    data class CentralSubscribed(val centralId: KmpBleCentralId, val characteristicUuid: String) :
+        KmpBlePeripheralEvent()
 
-    data class CentralUnsubscribedFromCharacteristic(val centralId: KmpBleCentralId, val characteristicUuid: String) :
-        KmpBlePeripheralManagerEvent()
+    data class CentralUnsubscribed(val centralId: KmpBleCentralId, val characteristicUuid: String) :
+        KmpBlePeripheralEvent()
+
+    data class ReadRequest(
+        val central: KmpBleCentralId,
+        val characteristicUuid: String,
+        val requestId: Int,
+        val offset: Int,
+    ) : KmpBlePeripheralEvent()
+
+    data class WriteRequest(
+        val central: KmpBleCentralId,
+        val characteristicUuid: String,
+        val requestId: Int,
+        val offset: Int,
+        val data: ByteArray,
+    ) : KmpBlePeripheralEvent()
 }
 
 typealias KmpBleCentralId = String
