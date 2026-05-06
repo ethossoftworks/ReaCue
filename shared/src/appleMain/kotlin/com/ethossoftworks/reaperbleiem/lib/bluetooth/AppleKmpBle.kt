@@ -1,5 +1,6 @@
-package com.ethossoftworks.reaperbleiem.service.bluetooth
+package com.ethossoftworks.reaperbleiem.lib.bluetooth
 
+import com.ethossoftworks.reaperbleiem.service.bluetooth.awaitBond
 import com.outsidesource.oskitkmp.concurrency.filterIsInstance
 import com.outsidesource.oskitkmp.concurrency.flowIn
 import com.outsidesource.oskitkmp.outcome.Outcome
@@ -81,11 +82,12 @@ import platform.darwin.dispatch_queue_t
 import platform.posix.memcpy
 
 @Suppress("FunctionNaming")
-fun KmpBle(cbCentralFactory: (() -> CBCentralManager)? = null): IKmpBle = AppleKmpBle(cbCentralFactory)
+fun KmpBle(cbCentralFactory: (() -> CBCentralManager)? = null): com.ethossoftworks.reaperbleiem.service.bluetooth.IKmpBle = AppleKmpBle(cbCentralFactory)
 
 val KmpBleCbCentralQueue: dispatch_queue_t = dispatch_queue_create("kmp-ble-central-manager", attr = null)
 
-internal class AppleKmpBle(cbCentralManagerFactory: (() -> CBCentralManager)? = null) : IKmpBle {
+internal class AppleKmpBle(cbCentralManagerFactory: (() -> CBCentralManager)? = null) :
+    com.ethossoftworks.reaperbleiem.service.bluetooth.IKmpBle {
 
     private val centralManagerScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     internal val centralEvents =
@@ -96,7 +98,7 @@ internal class AppleKmpBle(cbCentralManagerFactory: (() -> CBCentralManager)? = 
     }
     private val centralManagerDelegate = AppleCBCentralDelegate(centralManagerScope, centralEvents)
 
-    override fun scan(): Flow<KmpBleScanRecord> = callbackFlow {
+    override fun scan(): Flow<com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleScanRecord> = callbackFlow {
         awaitCentralManagerPoweredOn() ?: return@callbackFlow
         centralManager.scanForPeripheralsWithServices(null, null)
         centralEvents
@@ -107,15 +109,15 @@ internal class AppleKmpBle(cbCentralManagerFactory: (() -> CBCentralManager)? = 
     }
 
     override suspend fun connect(
-        identifier: KmpBleIdentifier,
+        identifier: com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleIdentifier,
         scope: CoroutineScope,
-    ): Outcome<IKmpBlePeripheral, KmpBleError> {
-        awaitCentralManagerPoweredOn() ?: return Outcome.Error(KmpBleError.PlatformHandlerNotReady)
+    ): Outcome<com.ethossoftworks.reaperbleiem.service.bluetooth.IKmpBlePeripheral, com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleError> {
+        awaitCentralManagerPoweredOn() ?: return Outcome.Error(_root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleError.PlatformHandlerNotReady)
 
         val uuid = NSUUID(identifier)
         val peripherals = centralManager.retrievePeripheralsWithIdentifiers(listOf(uuid))
         val peripheral =
-            peripherals.firstOrNull() as? CBPeripheral ?: return Outcome.Error(KmpBleError.InvalidIdentifier)
+            peripherals.firstOrNull() as? CBPeripheral ?: return Outcome.Error(_root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleError.InvalidIdentifier)
 
         centralManager.connectPeripheral(peripheral, null)
 
@@ -128,7 +130,7 @@ internal class AppleKmpBle(cbCentralManagerFactory: (() -> CBCentralManager)? = 
 
         if (result == null) {
             centralManager.cancelPeripheralConnection(peripheral)
-            return Outcome.Error(KmpBleError.Unknown(Unit))
+            return Outcome.Error(_root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleError.Unknown(Unit))
         }
 
         if (result.outcome is Outcome.Error) return result.outcome
@@ -184,7 +186,7 @@ private class AppleCBCentralDelegate(
             }
 
             val record =
-                KmpBleScanRecord(
+                _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleScanRecord(
                     name = didDiscoverPeripheral.name ?: "",
                     rssi = RSSI.intValue,
                     identifier = didDiscoverPeripheral.identifier.UUIDString,
@@ -206,9 +208,9 @@ private class AppleCBCentralDelegate(
                     identifier = didFailToConnectPeripheral.identifier.UUIDString,
                     outcome =
                         if (error?.code == 14L) {
-                            Outcome.Error(KmpBleError.PeerRemovedPairingInfo)
+                            Outcome.Error(_root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleError.PeerRemovedPairingInfo)
                         } else {
-                            Outcome.Error(KmpBleError.Unknown(error?.localizedDescription ?: ""))
+                            Outcome.Error(_root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleError.Unknown(error?.localizedDescription ?: ""))
                         },
                 )
             events.emit(event)
@@ -238,49 +240,50 @@ private class AppleCBCentralDelegate(
 }
 
 internal sealed class CentralManagerEvent {
-    data class ConnectionResult(val identifier: KmpBleIdentifier, val outcome: Outcome<Unit, KmpBleError>) :
+    data class ConnectionResult(val identifier: com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleIdentifier, val outcome: Outcome<Unit, com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleError>) :
         CentralManagerEvent()
 
     data class Disconnected(val peripheral: CBPeripheral) : CentralManagerEvent()
 
-    data class ScanRecord(val record: KmpBleScanRecord) : CentralManagerEvent()
+    data class ScanRecord(val record: com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleScanRecord) : CentralManagerEvent()
 }
 
 private class AppleKmpBlePeripheral(
     override val scope: CoroutineScope,
     private val appleKmpBle: AppleKmpBle,
     private val peripheral: CBPeripheral,
-) : IKmpBlePeripheral {
+) : com.ethossoftworks.reaperbleiem.service.bluetooth.IKmpBlePeripheral {
 
     private val events = MutableSharedFlow<PeripheralEvent>(replay = 0, extraBufferCapacity = Channel.UNLIMITED)
     private val canSendWriteWithoutResponseFlow = MutableStateFlow(peripheral.canSendWriteWithoutResponse)
     private val delegate = ApplePeripheralDelegate(scope, canSendWriteWithoutResponseFlow, events)
     private val localServices: AtomicRef<Map<String, AppleKmpBleService>> = atomic(emptyMap())
     private val localCharacteristics: AtomicRef<Map<String, AppleKmpBleCharacteristic>> = atomic(emptyMap())
-    private val localConnectionFlow = MutableStateFlow<KmpBleConnectionStatus>(KmpBleConnectionStatus.Connected)
+    private val localConnectionFlow = MutableStateFlow<com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleConnectionStatus>(
+        _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleConnectionStatus.Connected)
 
-    override val services: Map<String, IKmpBleService> = localServices.value
-    override val characteristics: Map<String, IKmpBleCharacteristic> = localCharacteristics.value
-    override val connectionStatus: StateFlow<KmpBleConnectionStatus> = localConnectionFlow.asStateFlow()
+    override val services: Map<String, com.ethossoftworks.reaperbleiem.service.bluetooth.IKmpBleService> = localServices.value
+    override val characteristics: Map<String, com.ethossoftworks.reaperbleiem.service.bluetooth.IKmpBleCharacteristic> = localCharacteristics.value
+    override val connectionStatus: StateFlow<com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleConnectionStatus> = localConnectionFlow.asStateFlow()
 
     init {
         peripheral.delegate = delegate
 
         scope.launch {
             appleKmpBle.centralEvents.filterIsInstance<CentralManagerEvent.Disconnected>().collect {
-                localConnectionFlow.value = KmpBleConnectionStatus.Disconnected
-                scope.coroutineContext.cancelChildren(KmpBlePeripheralDisconnect())
+                localConnectionFlow.value = _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleConnectionStatus.Disconnected
+                scope.coroutineContext.cancelChildren(_root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralDisconnect())
             }
         }
     }
 
-    override fun mtu(mode: KmpBleWriteMode): Int = peripheral.maximumWriteValueLengthForType(mode.toCbType()).toInt()
+    override fun mtu(mode: com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleWriteMode): Int = peripheral.maximumWriteValueLengthForType(mode.toCbType()).toInt()
 
-    override suspend fun requestMtu(size: Int): Outcome<Int, KmpBleError> =
-        Outcome.Ok(mtu(mode = KmpBleWriteMode.WithResponse))
+    override suspend fun requestMtu(size: Int): Outcome<Int, com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleError> =
+        Outcome.Ok(mtu(mode = _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleWriteMode.WithResponse))
 
-    override suspend fun disconnect(): Outcome<Unit, KmpBleError> =
-        withScope(scope) {
+    override suspend fun disconnect(): Outcome<Unit, com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleError> =
+        _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.withScope(scope) {
             appleKmpBle.centralManager.cancelPeripheralConnection(peripheral)
             appleKmpBle.centralEvents
                 .filterIsInstance<CentralManagerEvent.Disconnected> {
@@ -290,34 +293,38 @@ private class AppleKmpBlePeripheral(
             Outcome.Ok(Unit)
         }
 
-    override suspend fun discoverServices(): Outcome<Map<String, IKmpBleService>, KmpBleError> =
-        withScope(scope) {
+    override suspend fun discoverServices(): Outcome<Map<String, com.ethossoftworks.reaperbleiem.service.bluetooth.IKmpBleService>, com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleError> =
+        _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.withScope(scope) {
             peripheral.discoverServices(null)
             val event = events.filterIsInstance<PeripheralEvent.DiscoveredOrModifiedServices>().first()
-            if (event.error != null) return@withScope Outcome.Error(KmpBleError.Unknown(event.error))
+            if (event.error != null) return@withScope Outcome.Error(
+                _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleError.Unknown(
+                    event.error
+                )
+            )
 
             // Discover characteristics
             coroutineScope {
-                    val results =
-                        peripheral.services
-                            ?.mapNotNull { service ->
-                                if (service !is CBService) return@mapNotNull null
-                                async {
-                                    peripheral.discoverCharacteristics(null, forService = service)
-                                    events
-                                        .filterIsInstance<PeripheralEvent.DiscoveredCharacteristics> {
-                                            it.service == service
-                                        }
-                                        .first()
-                                }
+                val results =
+                    peripheral.services
+                        ?.mapNotNull { service ->
+                            if (service !is CBService) return@mapNotNull null
+                            async {
+                                peripheral.discoverCharacteristics(null, forService = service)
+                                events
+                                    .filterIsInstance<PeripheralEvent.DiscoveredCharacteristics> {
+                                        it.service == service
+                                    }
+                                    .first()
                             }
-                            ?.awaitAll()
+                        }
+                        ?.awaitAll()
 
-                    if (results?.any { it.error != null } == true) {
-                        return@coroutineScope Outcome.Error(KmpBleError.CouldNotDiscoverCharacteristics)
-                    }
-                    Outcome.Ok(Unit)
+                if (results?.any { it.error != null } == true) {
+                    return@coroutineScope Outcome.Error(_root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleError.CouldNotDiscoverCharacteristics)
                 }
+                Outcome.Ok(Unit)
+            }
                 .unwrapOrReturn {
                     return@withScope it
                 }
@@ -344,14 +351,14 @@ private class AppleKmpBlePeripheral(
             return@withScope Outcome.Ok(serviceMap)
         }
 
-    override suspend fun awaitBond(encryptedReadCharacteristicUuid: String): Outcome<Unit, KmpBleError> =
+    override suspend fun awaitBond(encryptedReadCharacteristicUuid: String): Outcome<Unit, com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleError> =
         awaitBond(encryptedReadCharacteristicUuid, scope)
 
-    override suspend fun read(characteristicUuid: String): Outcome<ByteArray, KmpBleError> =
-        withScope(scope) {
+    override suspend fun read(characteristicUuid: String): Outcome<ByteArray, com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleError> =
+        _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.withScope(scope) {
             val characteristic =
                 localCharacteristics.value[characteristicUuid]
-                    ?: return@withScope Outcome.Error(KmpBleError.UnknownCharacteristic)
+                    ?: return@withScope Outcome.Error(_root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleError.UnknownCharacteristic)
 
             peripheral.readValueForCharacteristic(characteristic.characteristic)
             val event =
@@ -360,7 +367,11 @@ private class AppleKmpBlePeripheral(
                         it.characteristic == characteristic.characteristic
                     }
                     .first()
-            if (event.error != null) return@withScope Outcome.Error(KmpBleError.Unknown(event.error))
+            if (event.error != null) return@withScope Outcome.Error(
+                _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleError.Unknown(
+                    event.error
+                )
+            )
 
             Outcome.Ok(characteristic.characteristic.value?.toByteArray() ?: byteArrayOf())
         }
@@ -368,28 +379,29 @@ private class AppleKmpBlePeripheral(
     override suspend fun write(
         characteristicUuid: String,
         data: ByteArray,
-        mode: KmpBleWriteMode,
-    ): Outcome<Unit, KmpBleError> =
-        withScope(scope) {
+        mode: com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleWriteMode,
+    ): Outcome<Unit, com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleError> =
+        _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.withScope(scope) {
             val characteristic =
                 localCharacteristics.value[characteristicUuid]
-                    ?: return@withScope Outcome.Error(KmpBleError.UnknownCharacteristic)
+                    ?: return@withScope Outcome.Error(_root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleError.UnknownCharacteristic)
 
             val platformMode =
                 when (mode) {
-                    KmpBleWriteMode.WithoutResponse -> CBCharacteristicWriteWithoutResponse
-                    KmpBleWriteMode.WithResponse -> CBCharacteristicWriteWithResponse
+                    _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleWriteMode.WithoutResponse -> CBCharacteristicWriteWithoutResponse
+                    _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleWriteMode.WithResponse -> CBCharacteristicWriteWithResponse
                 }
 
             when (mode) {
-                KmpBleWriteMode.WithoutResponse -> {
+                _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleWriteMode.WithoutResponse -> {
                     if (!canSendWriteWithoutResponseFlow.updateAndGet { peripheral.canSendWriteWithoutResponse }) {
                         canSendWriteWithoutResponseFlow.first { it }
                     }
                     peripheral.writeValue(data.toNSData(), characteristic.characteristic, platformMode)
                     return@withScope Outcome.Ok(Unit)
                 }
-                KmpBleWriteMode.WithResponse -> {
+
+                _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleWriteMode.WithResponse -> {
                     characteristic.lock.withLock {
                         peripheral.writeValue(data.toNSData(), characteristic.characteristic, platformMode)
                         val event =
@@ -399,7 +411,11 @@ private class AppleKmpBlePeripheral(
                                 }
                                 .first()
 
-                        if (event.error != null) return@withScope Outcome.Error(KmpBleError.Unknown(event.error))
+                        if (event.error != null) return@withScope Outcome.Error(
+                            _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleError.Unknown(
+                                event.error
+                            )
+                        )
                     }
                     Outcome.Ok(Unit)
                 }
@@ -439,7 +455,7 @@ private class AppleKmpBlePeripheral(
                     .launchIn(this)
 
                 awaitClose {
-                    if (connectionStatus.value == KmpBleConnectionStatus.Disconnected) return@awaitClose
+                    if (connectionStatus.value == _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleConnectionStatus.Disconnected) return@awaitClose
                     peripheral.setNotifyValue(false, characteristic.characteristic)
                 }
             }
@@ -521,9 +537,9 @@ private sealed class PeripheralEvent {
 }
 
 private class AppleKmpBleService(private val service: CBService, private val peripheral: AppleKmpBlePeripheral) :
-    IKmpBleService {
+    com.ethossoftworks.reaperbleiem.service.bluetooth.IKmpBleService {
     override val uuid: String = formatCbUuid(service.UUID)
-    override val characteristics: Map<String, IKmpBleCharacteristic> = buildMap {
+    override val characteristics: Map<String, com.ethossoftworks.reaperbleiem.service.bluetooth.IKmpBleCharacteristic> = buildMap {
         service.characteristics?.forEach {
             if (it !is CBCharacteristic) return@forEach
             put(formatCbUuid(it.UUID), AppleKmpBleCharacteristic(it, peripheral))
@@ -534,26 +550,26 @@ private class AppleKmpBleService(private val service: CBService, private val per
 private class AppleKmpBleCharacteristic(
     internal val characteristic: CBCharacteristic,
     private val peripheral: AppleKmpBlePeripheral,
-) : IKmpBleCharacteristic {
+) : com.ethossoftworks.reaperbleiem.service.bluetooth.IKmpBleCharacteristic {
 
     override val uuid = formatCbUuid(characteristic.UUID)
     internal val lock = Mutex()
 
-    override val properties: List<KmpBleGattProperty> = buildList {
+    override val properties: List<com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleGattProperty> = buildList {
         val props = characteristic.properties
-        if ((props and CBCharacteristicPropertyBroadcast) > 0u) add(KmpBleGattProperty.Broadcast)
-        if ((props and CBCharacteristicPropertyRead) > 0u) add(KmpBleGattProperty.Read)
-        if ((props and CBCharacteristicPropertyWriteWithoutResponse) > 0u) add(KmpBleGattProperty.WriteWithoutResponse)
-        if ((props and CBCharacteristicPropertyWrite) > 0u) add(KmpBleGattProperty.Write)
-        if ((props and CBCharacteristicPropertyNotify) > 0u) add(KmpBleGattProperty.Notify)
-        if ((props and CBCharacteristicPropertyIndicate) > 0u) add(KmpBleGattProperty.Indicate)
-        if ((props and CBCharacteristicPropertyAuthenticatedSignedWrites) > 0u) add(KmpBleGattProperty.SignedWrite)
-        if ((props and CBCharacteristicPropertyExtendedProperties) > 0u) add(KmpBleGattProperty.ExtendedProps)
+        if ((props and CBCharacteristicPropertyBroadcast) > 0u) add(_root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleGattProperty.Broadcast)
+        if ((props and CBCharacteristicPropertyRead) > 0u) add(_root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleGattProperty.Read)
+        if ((props and CBCharacteristicPropertyWriteWithoutResponse) > 0u) add(_root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleGattProperty.WriteWithoutResponse)
+        if ((props and CBCharacteristicPropertyWrite) > 0u) add(_root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleGattProperty.Write)
+        if ((props and CBCharacteristicPropertyNotify) > 0u) add(_root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleGattProperty.Notify)
+        if ((props and CBCharacteristicPropertyIndicate) > 0u) add(_root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleGattProperty.Indicate)
+        if ((props and CBCharacteristicPropertyAuthenticatedSignedWrites) > 0u) add(_root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleGattProperty.SignedWrite)
+        if ((props and CBCharacteristicPropertyExtendedProperties) > 0u) add(_root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleGattProperty.ExtendedProps)
     }
 
-    override suspend fun read(): Outcome<ByteArray, KmpBleError> = peripheral.read(uuid)
+    override suspend fun read(): Outcome<ByteArray, com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleError> = peripheral.read(uuid)
 
-    override suspend fun write(data: ByteArray, mode: KmpBleWriteMode): Outcome<Unit, KmpBleError> =
+    override suspend fun write(data: ByteArray, mode: com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleWriteMode): Outcome<Unit, com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleError> =
         peripheral.write(uuid, data, mode)
 
     override suspend fun notifications(bufferSize: Int, bufferOverflow: BufferOverflow): Flow<ByteArray> =
@@ -596,10 +612,10 @@ internal fun ByteArray.toNSData(): NSData {
     return usePinned { pinned -> NSData.create(bytes = pinned.addressOf(0), length = size.toULong()) }
 }
 
-private fun KmpBleWriteMode.toCbType(): Long =
+private fun com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleWriteMode.toCbType(): Long =
     when (this) {
-        KmpBleWriteMode.WithResponse -> CBCharacteristicWriteWithResponse
-        KmpBleWriteMode.WithoutResponse -> CBCharacteristicWriteWithoutResponse
+        _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleWriteMode.WithResponse -> CBCharacteristicWriteWithResponse
+        _root_ide_package_.com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleWriteMode.WithoutResponse -> CBCharacteristicWriteWithoutResponse
     }
 
 private fun formatCbUuid(uuid: CBUUID): String {

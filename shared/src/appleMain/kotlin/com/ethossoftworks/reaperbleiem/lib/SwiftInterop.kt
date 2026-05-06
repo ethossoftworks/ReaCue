@@ -1,4 +1,4 @@
-package com.ethossoftworks.reaperbleiem.service
+package com.ethossoftworks.reaperbleiem.lib
 
 import com.outsidesource.oskitkmp.outcome.Outcome
 import kotlin.coroutines.cancellation.CancellationException
