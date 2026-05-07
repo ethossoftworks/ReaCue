@@ -55,11 +55,13 @@ import platform.CoreBluetooth.CBCharacteristicPropertyNotify
 import platform.CoreBluetooth.CBCharacteristicPropertyRead
 import platform.CoreBluetooth.CBCharacteristicPropertyWrite
 import platform.CoreBluetooth.CBCharacteristicPropertyWriteWithoutResponse
-import platform.CoreBluetooth.CBManagerStatePoweredOn
 import platform.CoreBluetooth.CBMutableCharacteristic
 import platform.CoreBluetooth.CBMutableService
 import platform.CoreBluetooth.CBPeripheralManager
 import platform.CoreBluetooth.CBPeripheralManagerDelegateProtocol
+import platform.CoreBluetooth.CBPeripheralManagerState
+import platform.CoreBluetooth.CBPeripheralManagerStatePoweredOn
+import platform.CoreBluetooth.CBPeripheralManagerStateUnknown
 import platform.CoreBluetooth.CBService
 import platform.CoreBluetooth.CBUUID
 import platform.Foundation.NSError
@@ -69,41 +71,58 @@ import platform.darwin.dispatch_queue_t
 
 val KmpBleCbPeripheralQueue: dispatch_queue_t = dispatch_queue_create("kmp-ble-peripheral-manager", attr = null)
 
-// TODO: Add all services at once and wait at the end to check for count. Also remove service added event
-// TODO: Maybe add state observable for peripheral manager. Need to check how Android handles things.
 // TODO: Create write mutex per characteristic
+// TODO: Maybe add state observable for peripheral manager. Need to check how Android handles things.
 // TODO: Add MTU size property?
 class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripheralManager)? = null) :
-    CBPeripheralManagerDelegateProtocol, NSObject(), IKmpBlePeripheralManager {
-    internal val events = MutableSharedFlow<KmpBlePeripheralEvent>(replay = 0, extraBufferCapacity = Channel.UNLIMITED)
+    IKmpBlePeripheralManager {
     private val sendMutex = Mutex()
+    private val events = MutableSharedFlow<KmpBlePeripheralEvent>(extraBufferCapacity = Channel.UNLIMITED)
+    private val serviceAddedEvents = Channel<ServiceAddedEvent>(Channel.CONFLATED)
     private val peripheralManagerIsReadyToUpdateSubscribers = Channel<Unit>(Channel.CONFLATED)
-    internal val peripheralManager: CBPeripheralManager by lazy {
-        val manager = cbPeripheralManagerFactory?.invoke() ?: CBPeripheralManager(null, KmpBleCbPeripheralQueue)
-        manager.apply { delegate = this@AppleKmpBlePeripheralManager }
-    }
-
     private val localCharacteristics: AtomicRef<Map<String, CBMutableCharacteristic>> = atomic(emptyMap())
     private val localCentrals: AtomicRef<Map<String, CBCentral>> = atomic(emptyMap())
     private val localRequests: AtomicRef<Map<Int, CBATTRequest>> = atomic(emptyMap())
-    private val _state = MutableStateFlow(peripheralManager.state)
+    private val _state: MutableStateFlow<CBPeripheralManagerState> = MutableStateFlow(CBPeripheralManagerStateUnknown)
 
-    private val requestIdCounter = atomic(0)
+    private val peripheralManager: CBPeripheralManager by lazy {
+        val manager = cbPeripheralManagerFactory?.invoke() ?: CBPeripheralManager(null, KmpBleCbPeripheralQueue)
+        _state.tryEmit(manager.state)
+        manager.apply {
+            delegate =
+                PeripheralManagerDelegate(
+                    events = events,
+                    localCentrals = localCentrals,
+                    localRequests = localRequests,
+                    serviceAddedEvents = serviceAddedEvents,
+                    state = _state,
+                    peripheralManagerIsReadyToUpdateSubscribers = peripheralManagerIsReadyToUpdateSubscribers,
+                )
+        }
+    }
 
     override suspend fun advertise(advertisementData: KmpBleAdvertisementData): Flow<KmpBlePeripheralEvent> =
         callbackFlow {
-            awaitPeripheralManagerPoweredOn() ?: return@callbackFlow
+            awaitPeripheralManagerPoweredOn()
+                ?: run {
+                    send(KmpBlePeripheralEvent.Error(KmpBleError.Unknown("Bluetooth not turned on")))
+                    close()
+                }
 
             try {
-                advertisementData.services.forEach { service ->
-                    peripheralManager.addService(service.toMutableService())
+                while (serviceAddedEvents.tryReceive().isSuccess) {
+                    // Drain any stale events. This should happen in typical usage, but conflated channels will hold on
+                    // to old data if advertise is stopped
+                }
 
-                    val response = events.first {
-                        it is KmpBlePeripheralEvent.Error || it == KmpBlePeripheralEvent.ServiceAdded(service.uuid)
+                for (service in advertisementData.services) {
+                    peripheralManager.addService(createMutableService(service))
+
+                    val response = serviceAddedEvents.receive()
+                    if (response.error != null) {
+                        send(KmpBlePeripheralEvent.Error(KmpBleError.Unknown("Error adding service ${response.error}")))
+                        close()
                     }
-                    send(response)
-
-                    if (response is KmpBlePeripheralEvent.Error) close()
                 }
 
                 peripheralManager.startAdvertising(
@@ -123,20 +142,25 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
                 close()
             }
 
-            awaitClose { peripheralManager.stopAdvertising() }
+            awaitClose {
+                peripheralManager.stopAdvertising()
+                localCharacteristics.update { emptyMap() }
+                localCentrals.update { emptyMap() }
+                localRequests.update { emptyMap() }
+            }
         }
 
-    private fun KmpBleAdvertisementService.toMutableService() =
-        CBMutableService(type = CBUUID.UUIDWithString(uuid), primary = isPrimaryService).apply {
+    private fun createMutableService(service: KmpBleAdvertisementService): CBMutableService {
+        return CBMutableService(type = CBUUID.UUIDWithString(service.uuid), primary = service.isPrimaryService).apply {
             val characteristics =
-                this@toMutableService.characteristics.map { characteristic ->
-                    val mutableCharacteristic = localCharacteristics.update {
-                        it.update { this[characteristic.uuid] = characteristic.toMutableCharacteristic() }
-                    }
+                service.characteristics.map { characteristic ->
+                    val mutableCharacteristic = characteristic.toMutableCharacteristic()
+                    localCharacteristics.update { it.update { this[characteristic.uuid] = mutableCharacteristic } }
                     mutableCharacteristic
                 }
             setCharacteristics(characteristics)
         }
+    }
 
     private fun KmpBleAdvertisementCharacteristic.toMutableCharacteristic() =
         CBMutableCharacteristic(
@@ -216,17 +240,32 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
         )
     }
 
-    /** NSPeripheralManager */
+    /** Helpers */
+    private suspend fun awaitPeripheralManagerPoweredOn(): Unit? {
+        return withTimeoutOrNull(2_000.milliseconds) {
+            _state.first { it == CBPeripheralManagerStatePoweredOn }
+            Unit
+        }
+    }
+}
+
+/** NSPeripheralManager */
+private class PeripheralManagerDelegate(
+    private val events: MutableSharedFlow<KmpBlePeripheralEvent>,
+    private val localCentrals: AtomicRef<Map<String, CBCentral>>,
+    private val localRequests: AtomicRef<Map<Int, CBATTRequest>>,
+    private val serviceAddedEvents: Channel<ServiceAddedEvent>,
+    private val state: MutableStateFlow<CBPeripheralManagerState>,
+    private val peripheralManagerIsReadyToUpdateSubscribers: Channel<Unit>,
+) : CBPeripheralManagerDelegateProtocol, NSObject() {
+    private val requestIdCounter = atomic(0)
+
     override fun peripheralManagerDidUpdateState(peripheral: CBPeripheralManager) {
-        _state.value = peripheral.state
+        state.value = peripheral.state
     }
 
     override fun peripheralManager(peripheral: CBPeripheralManager, didAddService: CBService, error: NSError?) {
-        if (error != null) {
-            events.tryEmit(KmpBlePeripheralEvent.Error(KmpBleError.Unknown(error)))
-            return
-        }
-        events.tryEmit(KmpBlePeripheralEvent.ServiceAdded(didAddService.UUID.UUIDString()))
+        serviceAddedEvents.trySend(ServiceAddedEvent(uuid = didAddService.UUID.UUIDString(), error = error))
     }
 
     override fun peripheralManager(peripheral: CBPeripheralManager, didReceiveReadRequest: CBATTRequest) {
@@ -311,12 +350,6 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
     override fun peripheralManagerIsReadyToUpdateSubscribers(peripheral: CBPeripheralManager) {
         peripheralManagerIsReadyToUpdateSubscribers.trySend(Unit)
     }
-
-    /** Helpers */
-    private suspend fun awaitPeripheralManagerPoweredOn(): Unit? {
-        return withTimeoutOrNull(2_000.milliseconds) {
-            _state.first { it == CBManagerStatePoweredOn }
-            Unit
-        }
-    }
 }
+
+private data class ServiceAddedEvent(val uuid: String, val error: NSError? = null)

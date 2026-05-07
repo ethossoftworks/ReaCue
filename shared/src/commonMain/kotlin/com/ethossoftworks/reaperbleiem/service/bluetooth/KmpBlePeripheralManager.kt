@@ -51,8 +51,6 @@ data class KmpBleAdvertisementCharacteristic(
 sealed class KmpBlePeripheralEvent {
     data class Error(val error: KmpBleError) : KmpBlePeripheralEvent()
 
-    data class ServiceAdded(val uuid: String) : KmpBlePeripheralEvent()
-
     data object Advertising : KmpBlePeripheralEvent()
 
     data class CentralSubscribed(val centralId: KmpBleCentralId, val characteristicUuid: String) :

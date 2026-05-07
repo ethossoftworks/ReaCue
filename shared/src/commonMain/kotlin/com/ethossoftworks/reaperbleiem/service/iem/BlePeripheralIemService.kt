@@ -57,7 +57,6 @@ class BlePeripheralIemService(
                 .onEach { event ->
                     when (event) {
                         is KmpBlePeripheralEvent.Error -> cancel()
-                        is KmpBlePeripheralEvent.ServiceAdded -> {}
                         KmpBlePeripheralEvent.Advertising -> isAdvertising.complete(Unit)
                         is KmpBlePeripheralEvent.CentralSubscribed -> onCentralSubscribe(event)
                         is KmpBlePeripheralEvent.CentralUnsubscribed -> onCentralUnsubscribe(event)
