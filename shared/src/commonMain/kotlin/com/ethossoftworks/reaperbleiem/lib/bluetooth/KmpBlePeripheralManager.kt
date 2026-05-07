@@ -1,4 +1,4 @@
-package com.ethossoftworks.reaperbleiem.service.bluetooth
+package com.ethossoftworks.reaperbleiem.lib.bluetooth
 
 import kotlinx.coroutines.flow.Flow
 

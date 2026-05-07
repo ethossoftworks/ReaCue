@@ -1,4 +1,4 @@
-package com.ethossoftworks.reaperbleiem.service.bluetooth
+package com.ethossoftworks.reaperbleiem.lib.bluetooth
 
 import com.outsidesource.oskitkmp.concurrency.KmpDispatchers
 import com.outsidesource.oskitkmp.lib.containsAny

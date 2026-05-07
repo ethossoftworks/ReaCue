@@ -1,4 +1,4 @@
-package com.ethossoftworks.reaperbleiem.service.bluetooth
+package com.ethossoftworks.reaperbleiem.lib.bluetooth
 
 import com.outsidesource.oskitkmp.outcome.Outcome
 import kotlinx.coroutines.CompletableDeferred
