@@ -1,12 +1,12 @@
 package com.ethossoftworks.reaperbleiem.service.iem
 
-import com.ethossoftworks.reaperbleiem.service.bluetooth.IKmpBlePeripheralManager
-import com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleAdvertisementCharacteristic
-import com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleAdvertisementData
-import com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleAdvertisementService
-import com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleGattPermission
-import com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleGattProperty
-import com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralEvent
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBlePeripheralManager
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleAdvertisementCharacteristic
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleAdvertisementData
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleAdvertisementService
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattPermission
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattProperty
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralEvent
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope

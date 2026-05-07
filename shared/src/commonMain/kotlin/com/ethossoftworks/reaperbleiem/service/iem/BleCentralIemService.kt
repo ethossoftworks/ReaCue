@@ -1,6 +1,6 @@
 package com.ethossoftworks.reaperbleiem.service.iem
 
-import com.ethossoftworks.reaperbleiem.service.bluetooth.IKmpBle
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBle
 import kotlinx.coroutines.flow.Flow
 
 class BleCentralIemService(

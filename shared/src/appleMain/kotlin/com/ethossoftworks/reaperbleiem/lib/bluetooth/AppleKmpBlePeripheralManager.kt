@@ -1,15 +1,5 @@
 package com.ethossoftworks.reaperbleiem.lib.bluetooth
 
-import com.ethossoftworks.reaperbleiem.service.bluetooth.IKmpBlePeripheralManager
-import com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleAdvertisementCharacteristic
-import com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleAdvertisementData
-import com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleAdvertisementService
-import com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleCentralId
-import com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleError
-import com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleGattPermission
-import com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleGattProperty
-import com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralEvent
-import com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBlePeripheralGattResult
 import com.outsidesource.oskitkmp.lib.update
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.atomicfu.AtomicRef
@@ -206,6 +196,7 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
         )
 
     /** IKmpPeripheralManager */
+    // TODO: I'm not a fan of the silent error here, even though this should never happen
     override suspend fun notify(characteristicUuid: String, data: ByteArray, centralUuids: List<String>?): Unit =
         sendMutexes.value[characteristicUuid]?.withLock {
             val characteristic = localCharacteristics.value[characteristicUuid] ?: return
