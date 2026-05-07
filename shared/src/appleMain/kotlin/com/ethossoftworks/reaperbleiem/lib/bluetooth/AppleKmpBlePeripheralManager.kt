@@ -71,15 +71,14 @@ import platform.darwin.dispatch_queue_t
 
 val KmpBleCbPeripheralQueue: dispatch_queue_t = dispatch_queue_create("kmp-ble-peripheral-manager", attr = null)
 
-// TODO: Create write mutex per characteristic
 // TODO: Maybe add state observable for peripheral manager. Need to check how Android handles things.
 // TODO: Add MTU size property?
 class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripheralManager)? = null) :
     IKmpBlePeripheralManager {
-    private val sendMutex = Mutex()
+    private val sendMutexes = atomic<Map<String, Mutex>>(emptyMap())
     private val events = MutableSharedFlow<KmpBlePeripheralEvent>(extraBufferCapacity = Channel.UNLIMITED)
     private val serviceAddedEvents = Channel<ServiceAddedEvent>(Channel.CONFLATED)
-    private val peripheralManagerIsReadyToUpdateSubscribers = Channel<Unit>(Channel.CONFLATED)
+    private val peripheralManagerIsReadyToUpdateSubscribers = MutableSharedFlow<Unit>(extraBufferCapacity = Channel.UNLIMITED)
     private val localCharacteristics: AtomicRef<Map<String, CBMutableCharacteristic>> = atomic(emptyMap())
     private val localCentrals: AtomicRef<Map<String, CBCentral>> = atomic(emptyMap())
     private val localRequests: AtomicRef<Map<Int, CBATTRequest>> = atomic(emptyMap())
@@ -116,6 +115,9 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
                 }
 
                 for (service in advertisementData.services) {
+                    for (characteristic in service.characteristics) {
+                        sendMutexes.update { it + (characteristic.uuid to Mutex()) }
+                    }
                     peripheralManager.addService(createMutableService(service))
 
                     val response = serviceAddedEvents.receive()
@@ -147,6 +149,7 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
                 localCharacteristics.update { emptyMap() }
                 localCentrals.update { emptyMap() }
                 localRequests.update { emptyMap() }
+                sendMutexes.update { emptyMap() }
             }
         }
 
@@ -204,13 +207,13 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
 
     /** IKmpPeripheralManager */
     override suspend fun notify(characteristicUuid: String, data: ByteArray, centralUuids: List<String>?): Unit =
-        sendMutex.withLock {
+        sendMutexes.value[characteristicUuid]?.withLock {
             val characteristic = localCharacteristics.value[characteristicUuid] ?: return
             val centrals = centralUuids?.mapNotNull { localCentrals.value[it] }
             while (!peripheralManager.updateValue(data.toNSData(), characteristic, centrals)) {
-                peripheralManagerIsReadyToUpdateSubscribers.receive()
+                peripheralManagerIsReadyToUpdateSubscribers.first()
             }
-        }
+        } ?: Unit
 
     override suspend fun respondToRequest(
         central: KmpBleCentralId,
@@ -256,7 +259,7 @@ private class PeripheralManagerDelegate(
     private val localRequests: AtomicRef<Map<Int, CBATTRequest>>,
     private val serviceAddedEvents: Channel<ServiceAddedEvent>,
     private val state: MutableStateFlow<CBPeripheralManagerState>,
-    private val peripheralManagerIsReadyToUpdateSubscribers: Channel<Unit>,
+    private val peripheralManagerIsReadyToUpdateSubscribers: MutableSharedFlow<Unit>,
 ) : CBPeripheralManagerDelegateProtocol, NSObject() {
     private val requestIdCounter = atomic(0)
 
@@ -348,7 +351,7 @@ private class PeripheralManagerDelegate(
     }
 
     override fun peripheralManagerIsReadyToUpdateSubscribers(peripheral: CBPeripheralManager) {
-        peripheralManagerIsReadyToUpdateSubscribers.trySend(Unit)
+        peripheralManagerIsReadyToUpdateSubscribers.tryEmit(Unit)
     }
 }
 
