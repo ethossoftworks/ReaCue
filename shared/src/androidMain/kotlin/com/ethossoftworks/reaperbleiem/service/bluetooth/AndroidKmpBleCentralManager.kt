@@ -17,8 +17,8 @@ import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBleService
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleConnectionStatus
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleError
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattProperty
-import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralId
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralDisconnect
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralId
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleScanRecord
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleWriteMode
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.awaitBond
@@ -54,7 +54,8 @@ import no.nordicsemi.android.support.v18.scanner.ScanCallback
 import no.nordicsemi.android.support.v18.scanner.ScanResult
 import no.nordicsemi.android.support.v18.scanner.ScanSettings
 
-@Suppress("FunctionNaming") fun KmpBle(context: Context): IKmpBleCentralManager = AndroidKmpBleCentralManager(context)
+@Suppress("FunctionNaming")
+fun KmpBleCentralManager(context: Context): IKmpBleCentralManager = AndroidKmpBleCentralManager(context)
 
 internal class AndroidKmpBleCentralManager(private val context: Context) : IKmpBleCentralManager {
     override fun scan(): Flow<KmpBleScanRecord> = callbackFlow {
