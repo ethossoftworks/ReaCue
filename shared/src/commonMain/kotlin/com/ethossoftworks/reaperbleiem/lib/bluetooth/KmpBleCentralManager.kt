@@ -6,6 +6,7 @@ import com.outsidesource.oskitkmp.outcome.Outcome
 import io.ktor.utils.io.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelChildren
@@ -124,7 +125,7 @@ interface IKmpBleCharacteristic {
     ): Flow<ByteArray>
 }
 
-private class KmpBlePeripheralDisconnect : CancellationException("The peripheral has disconnected")
+internal class KmpBlePeripheralDisconnect : CancellationException("The peripheral has disconnected")
 
 internal suspend fun IKmpBlePeripheral.awaitBond(
     encryptedReadCharacteristicUuid: String,
@@ -157,11 +158,21 @@ internal suspend fun IKmpBlePeripheral.awaitBond(
 internal suspend inline fun <T> withScope(
     scope: CoroutineScope,
     crossinline block: suspend () -> Outcome<T, KmpBleError>,
-): Outcome<T, KmpBleError> =
-    try {
-        withContext(scope.coroutineContext) { block() }
-    } catch (t: KmpBlePeripheralDisconnect) {
+): Outcome<T, KmpBleError> {
+    val task = scope.async(start = CoroutineStart.UNDISPATCHED) {
+        block()
+    }
+
+    return try {
+        task.await()
+    } catch (e: KmpBlePeripheralDisconnect) {
         Outcome.Error(KmpBleError.PeripheralDisconnected)
+    } catch (e: CancellationException) {
+        task.cancel()
+        throw e
     } catch (t: Throwable) {
         Outcome.Error(KmpBleError.Unknown(t))
+    } finally {
+        task.cancel()
     }
+}
