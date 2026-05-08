@@ -1,10 +1,10 @@
 package com.ethossoftworks.reaperbleiem.service.iem
 
-import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBle
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBleCentralManager
 import kotlinx.coroutines.flow.Flow
 
 class BleCentralIemService(
-    private val bleService: IKmpBle
+    private val bleService: IKmpBleCentralManager
 ) : IIemService {
     override fun subscribe(): Flow<IemEvent> {
         TODO("Not yet implemented")

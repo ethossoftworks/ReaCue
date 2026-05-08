@@ -16,6 +16,8 @@ interface IKmpBlePeripheralManager {
     )
 }
 
+typealias KmpBleCentralId = String
+
 sealed class KmpBlePeripheralGattResult {
     data object Success : KmpBlePeripheralGattResult()
     data object ReadNotPermitted : KmpBlePeripheralGattResult()
@@ -74,5 +76,3 @@ sealed class KmpBlePeripheralEvent {
         val data: ByteArray,
     ) : KmpBlePeripheralEvent()
 }
-
-typealias KmpBleCentralId = String

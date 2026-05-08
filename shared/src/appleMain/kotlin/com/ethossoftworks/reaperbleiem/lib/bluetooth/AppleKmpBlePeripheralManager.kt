@@ -36,6 +36,7 @@ import platform.CoreBluetooth.CBAttributePermissionsReadable
 import platform.CoreBluetooth.CBAttributePermissionsWriteEncryptionRequired
 import platform.CoreBluetooth.CBAttributePermissionsWriteable
 import platform.CoreBluetooth.CBCentral
+import platform.CoreBluetooth.CBCentralManager
 import platform.CoreBluetooth.CBCharacteristic
 import platform.CoreBluetooth.CBCharacteristicPropertyAuthenticatedSignedWrites
 import platform.CoreBluetooth.CBCharacteristicPropertyBroadcast
@@ -59,7 +60,11 @@ import platform.darwin.NSObject
 import platform.darwin.dispatch_queue_create
 import platform.darwin.dispatch_queue_t
 
-val KmpBleCbPeripheralQueue: dispatch_queue_t = dispatch_queue_create("kmp-ble-peripheral-manager", attr = null)
+@Suppress("FunctionNaming")
+fun KmpBlePeripheralManager(cbPeripheralFactory: (() -> CBPeripheralManager)? = null): IKmpBlePeripheralManager =
+    AppleKmpBlePeripheralManager(cbPeripheralFactory)
+
+private val KmpBleCbPeripheralQueue: dispatch_queue_t = dispatch_queue_create("kmp-ble-peripheral-manager", attr = null)
 
 // TODO: Maybe add state observable for peripheral manager. Need to check how Android handles things.
 // TODO: Add MTU size property?

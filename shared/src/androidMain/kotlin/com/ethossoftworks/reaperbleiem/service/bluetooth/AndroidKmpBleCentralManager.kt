@@ -10,14 +10,14 @@ import android.bluetooth.BluetoothGattService
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import androidx.core.util.forEach
-import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBle
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBleCentralManager
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBleCharacteristic
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBlePeripheral
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBleService
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleConnectionStatus
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleError
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattProperty
-import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleIdentifier
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralId
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralDisconnect
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleScanRecord
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleWriteMode
@@ -54,9 +54,9 @@ import no.nordicsemi.android.support.v18.scanner.ScanCallback
 import no.nordicsemi.android.support.v18.scanner.ScanResult
 import no.nordicsemi.android.support.v18.scanner.ScanSettings
 
-@Suppress("FunctionNaming") fun KmpBle(context: Context): IKmpBle = AndroidKmpBle(context)
+@Suppress("FunctionNaming") fun KmpBle(context: Context): IKmpBleCentralManager = AndroidKmpBleCentralManager(context)
 
-internal class AndroidKmpBle(private val context: Context) : IKmpBle {
+internal class AndroidKmpBleCentralManager(private val context: Context) : IKmpBleCentralManager {
     override fun scan(): Flow<KmpBleScanRecord> = callbackFlow {
         val scanner = BluetoothLeScannerCompat.getScanner()
         val settings =
@@ -97,7 +97,7 @@ internal class AndroidKmpBle(private val context: Context) : IKmpBle {
     }
 
     override suspend fun connect(
-        identifier: KmpBleIdentifier,
+        identifier: KmpBlePeripheralId,
         scope: CoroutineScope,
     ): Outcome<IKmpBlePeripheral, KmpBleError> {
         return try {

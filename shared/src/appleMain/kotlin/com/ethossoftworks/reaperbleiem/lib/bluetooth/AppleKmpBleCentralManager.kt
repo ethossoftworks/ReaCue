@@ -78,18 +78,20 @@ import platform.darwin.dispatch_queue_t
 import platform.posix.memcpy
 
 @Suppress("FunctionNaming")
-fun KmpBle(cbCentralFactory: (() -> CBCentralManager)? = null): IKmpBle = AppleKmpBle(cbCentralFactory)
+fun KmpBleCentralManager(cbCentralFactory: (() -> CBCentralManager)? = null): IKmpBleCentralManager =
+    AppleKmpBleCentralManager(cbCentralFactory)
 
 val KmpBleCbCentralQueue: dispatch_queue_t = dispatch_queue_create("kmp-ble-central-manager", attr = null)
 
-internal class AppleKmpBle(cbCentralManagerFactory: (() -> CBCentralManager)? = null) : IKmpBle {
+internal class AppleKmpBleCentralManager(cbCentralManagerFactory: (() -> CBCentralManager)? = null) :
+    IKmpBleCentralManager {
 
     private val centralManagerScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     internal val centralEvents =
         MutableSharedFlow<CentralManagerEvent>(replay = 0, extraBufferCapacity = Channel.UNLIMITED)
     internal val centralManager: CBCentralManager by lazy {
         val manager = (cbCentralManagerFactory?.invoke() ?: CBCentralManager(null, KmpBleCbCentralQueue))
-        manager.apply { delegate = this@AppleKmpBle.centralManagerDelegate }
+        manager.apply { delegate = this@AppleKmpBleCentralManager.centralManagerDelegate }
     }
     private val centralManagerDelegate = AppleCBCentralDelegate(centralManagerScope, centralEvents)
 
@@ -104,7 +106,7 @@ internal class AppleKmpBle(cbCentralManagerFactory: (() -> CBCentralManager)? = 
     }
 
     override suspend fun connect(
-        identifier: KmpBleIdentifier,
+        identifier: KmpBlePeripheralId,
         scope: CoroutineScope,
     ): Outcome<IKmpBlePeripheral, KmpBleError> {
         awaitCentralManagerPoweredOn() ?: return Outcome.Error(KmpBleError.PlatformHandlerNotReady)
@@ -235,7 +237,7 @@ private class AppleCBCentralDelegate(
 }
 
 internal sealed class CentralManagerEvent {
-    data class ConnectionResult(val identifier: KmpBleIdentifier, val outcome: Outcome<Unit, KmpBleError>) :
+    data class ConnectionResult(val identifier: KmpBlePeripheralId, val outcome: Outcome<Unit, KmpBleError>) :
         CentralManagerEvent()
 
     data class Disconnected(val peripheral: CBPeripheral) : CentralManagerEvent()
@@ -245,7 +247,7 @@ internal sealed class CentralManagerEvent {
 
 private class AppleKmpBlePeripheral(
     override val scope: CoroutineScope,
-    private val appleKmpBle: AppleKmpBle,
+    private val appleKmpBle: AppleKmpBleCentralManager,
     private val peripheral: CBPeripheral,
 ) : IKmpBlePeripheral {
 
