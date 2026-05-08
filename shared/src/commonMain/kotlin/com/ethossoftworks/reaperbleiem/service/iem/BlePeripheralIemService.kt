@@ -15,13 +15,14 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
+val REAPER_BLE_IEM_SERVICE_UUID = "FA6E666C-2C23-43F1-84E4-4653EBF930F4"
+val REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID = "319893CA-5FA2-4C21-9F51-BC2B1116A352"
+val REAPER_BLE_IEM_COMMAND_CHARACTERISTIC_UUID = "AA57C9CE-ADA3-4779-88BB-EFCE418A297E"
+
 class BlePeripheralIemService(
     private val networkIemService: NetworkIemService,
     private val peripheralManager: IKmpBlePeripheralManager,
 ) : IIemService {
-    val REAPER_BLE_IEM_SERVICE_UUID = "FA6E666C-2C23-43F1-84E4-4653EBF930F4"
-    val REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID = "319893CA-5FA2-4C21-9F51-BC2B1116A352"
-    val REAPER_BLE_IEM_COMMAND_CHARACTERISTIC_UUID = "AA57C9CE-ADA3-4779-88BB-EFCE418A297E"
 
     val advertisementData =
         KmpBleAdvertisementData(

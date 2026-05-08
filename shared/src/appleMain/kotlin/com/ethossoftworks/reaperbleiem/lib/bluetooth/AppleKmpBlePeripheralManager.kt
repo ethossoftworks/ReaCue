@@ -36,7 +36,6 @@ import platform.CoreBluetooth.CBAttributePermissionsReadable
 import platform.CoreBluetooth.CBAttributePermissionsWriteEncryptionRequired
 import platform.CoreBluetooth.CBAttributePermissionsWriteable
 import platform.CoreBluetooth.CBCentral
-import platform.CoreBluetooth.CBCentralManager
 import platform.CoreBluetooth.CBCharacteristic
 import platform.CoreBluetooth.CBCharacteristicPropertyAuthenticatedSignedWrites
 import platform.CoreBluetooth.CBCharacteristicPropertyBroadcast
@@ -46,19 +45,20 @@ import platform.CoreBluetooth.CBCharacteristicPropertyNotify
 import platform.CoreBluetooth.CBCharacteristicPropertyRead
 import platform.CoreBluetooth.CBCharacteristicPropertyWrite
 import platform.CoreBluetooth.CBCharacteristicPropertyWriteWithoutResponse
+import platform.CoreBluetooth.CBManagerState
+import platform.CoreBluetooth.CBManagerStatePoweredOn
+import platform.CoreBluetooth.CBManagerStateUnknown
 import platform.CoreBluetooth.CBMutableCharacteristic
 import platform.CoreBluetooth.CBMutableService
 import platform.CoreBluetooth.CBPeripheralManager
 import platform.CoreBluetooth.CBPeripheralManagerDelegateProtocol
-import platform.CoreBluetooth.CBPeripheralManagerState
-import platform.CoreBluetooth.CBPeripheralManagerStatePoweredOn
-import platform.CoreBluetooth.CBPeripheralManagerStateUnknown
 import platform.CoreBluetooth.CBService
 import platform.CoreBluetooth.CBUUID
 import platform.Foundation.NSError
 import platform.darwin.NSObject
 import platform.darwin.dispatch_queue_create
 import platform.darwin.dispatch_queue_t
+import kotlin.time.Duration.Companion.seconds
 
 @Suppress("FunctionNaming")
 fun KmpBlePeripheralManager(cbPeripheralFactory: (() -> CBPeripheralManager)? = null): IKmpBlePeripheralManager =
@@ -73,11 +73,12 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
     private val sendMutexes = atomic<Map<String, Mutex>>(emptyMap())
     private val events = MutableSharedFlow<KmpBlePeripheralEvent>(extraBufferCapacity = Channel.UNLIMITED)
     private val serviceAddedEvents = Channel<ServiceAddedEvent>(Channel.CONFLATED)
-    private val peripheralManagerIsReadyToUpdateSubscribers = MutableSharedFlow<Unit>(extraBufferCapacity = Channel.UNLIMITED)
+    private val peripheralManagerIsReadyToUpdateSubscribers =
+        MutableSharedFlow<Unit>(extraBufferCapacity = Channel.UNLIMITED)
     private val localCharacteristics: AtomicRef<Map<String, CBMutableCharacteristic>> = atomic(emptyMap())
     private val localCentrals: AtomicRef<Map<String, CBCentral>> = atomic(emptyMap())
     private val localRequests: AtomicRef<Map<Int, CBATTRequest>> = atomic(emptyMap())
-    private val _state: MutableStateFlow<CBPeripheralManagerState> = MutableStateFlow(CBPeripheralManagerStateUnknown)
+    private val _state: MutableStateFlow<CBManagerState> = MutableStateFlow(CBManagerStateUnknown)
 
     private val peripheralManager: CBPeripheralManager by lazy {
         val manager = cbPeripheralManagerFactory?.invoke() ?: CBPeripheralManager(null, KmpBleCbPeripheralQueue)
@@ -241,8 +242,10 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
 
     /** Helpers */
     private suspend fun awaitPeripheralManagerPoweredOn(): Unit? {
-        return withTimeoutOrNull(2_000.milliseconds) {
-            _state.first { it == CBPeripheralManagerStatePoweredOn }
+        if (peripheralManager.state == CBManagerStatePoweredOn) return Unit
+
+        return withTimeoutOrNull(2.seconds) {
+            _state.first { it == CBManagerStatePoweredOn }
             Unit
         }
     }
@@ -254,7 +257,7 @@ private class PeripheralManagerDelegate(
     private val localCentrals: AtomicRef<Map<String, CBCentral>>,
     private val localRequests: AtomicRef<Map<Int, CBATTRequest>>,
     private val serviceAddedEvents: Channel<ServiceAddedEvent>,
-    private val state: MutableStateFlow<CBPeripheralManagerState>,
+    private val state: MutableStateFlow<CBManagerState>,
     private val peripheralManagerIsReadyToUpdateSubscribers: MutableSharedFlow<Unit>,
 ) : CBPeripheralManagerDelegateProtocol, NSObject() {
     private val requestIdCounter = atomic(0)

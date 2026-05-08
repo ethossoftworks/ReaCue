@@ -6,7 +6,9 @@ import com.ethossoftworks.reaperbleiem.interactor.IemInteractor
 import com.ethossoftworks.reaperbleiem.interactor.InfoMessageInteractor
 import com.ethossoftworks.reaperbleiem.lib.KmpBuildEnvironmentOverrider
 import com.ethossoftworks.reaperbleiem.service.iem.NetworkIemService
-import com.ethossoftworks.reaperbleiem.ui.home.IemScreenViewInteractor
+import com.ethossoftworks.reaperbleiem.ui.iem.IemScreenViewInteractor
+import com.ethossoftworks.reaperbleiem.ui.scan.ScanScreenViewInteractor
+import com.outsidesource.oskitkmp.capability.BluetoothCapabilityFlags
 import com.outsidesource.oskitkmp.capability.KmpCapabilities
 import org.koin.core.KoinApplication
 import org.koin.core.context.startKoin
@@ -55,7 +57,9 @@ fun initKoin(
 fun commonModule() = module {
     // Libraries
     single { KmpBuildEnvironmentOverrider(get()) }
-    single { KmpCapabilities() }
+    single {
+        KmpCapabilities(bluetoothFlags = arrayOf(BluetoothCapabilityFlags.Scan, BluetoothCapabilityFlags.Connect))
+    }
 
     // Coordinator
     single { AppCoordinator() }
@@ -70,6 +74,7 @@ fun commonModule() = module {
 
     // View Interactors
     factory { IemScreenViewInteractor(get(), get(), get()) }
+    factory { ScanScreenViewInteractor(get(), get()) }
 }
 
 fun mockModule() = module {}

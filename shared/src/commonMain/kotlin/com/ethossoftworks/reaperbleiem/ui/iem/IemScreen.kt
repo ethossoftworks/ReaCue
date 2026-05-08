@@ -1,10 +1,13 @@
-package com.ethossoftworks.reaperbleiem.ui.home
+package com.ethossoftworks.reaperbleiem.ui.iem
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -33,10 +36,11 @@ import com.outsidesource.oskitcompose.lib.rememberInjectForRoute
 fun IemScreen(interactor: IemScreenViewInteractor = rememberInjectForRoute()) {
     val state = interactor.collectAsState()
 
-    LaunchedEffect(Unit) { interactor.onMounted() }
+    LaunchedEffect(Unit) { interactor.onMount() }
 
     Column(
-        modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState()),
+        modifier =
+            Modifier.windowInsetsPadding(WindowInsets.systemBars).padding(16.dp).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -67,7 +71,7 @@ fun IemScreen(interactor: IemScreenViewInteractor = rememberInjectForRoute()) {
 
             Spacer(Modifier.weight(1f))
 
-            if (!state.isServerRunning) {
+            if (!state.isServiceRunning) {
                 Button(onClick = interactor::onRestartClick) { Text(text = "Restart") }
             }
 

@@ -1,4 +1,4 @@
-package com.ethossoftworks.reaperbleiem.ui.home
+package com.ethossoftworks.reaperbleiem.ui.iem
 
 import com.ethossoftworks.reaperbleiem.interactor.CapabilityInteractor
 import com.ethossoftworks.reaperbleiem.interactor.IemInteractor
@@ -11,7 +11,7 @@ import kotlinx.coroutines.launch
 
 data class IemScreenViewState(
     val bluetoothStatus: CapabilityStatus = CapabilityStatus.Unknown,
-    val isServerRunning: Boolean = false,
+    val isServiceRunning: Boolean = false,
     val iems: Map<Int, IemMix> = emptyMap(),
     val selectedIemId: Int? = null,
     val tracks: Map<Int, Track> = emptyMap(),
@@ -35,8 +35,8 @@ class IemScreenViewInteractor(
         )
     }
 
-    fun onMounted() {
-        startServer()
+    fun onMount() {
+        start()
     }
 
     fun onIemSelect(id: Int) {
@@ -44,7 +44,7 @@ class IemScreenViewInteractor(
     }
 
     fun onRestartClick() {
-        startServer()
+        start()
     }
 
     fun onRefreshClick() {
@@ -65,11 +65,11 @@ class IemScreenViewInteractor(
         }
     }
 
-    private fun startServer() {
+    private fun start() {
         interactorScope.launch {
-            update { state -> state.copy(isServerRunning = true) }
+            update { state -> state.copy(isServiceRunning = true) }
             iemInteractor.subscribe().collect { }
-            update { state -> state.copy(isServerRunning = false) }
+            update { state -> state.copy(isServiceRunning = false) }
         }
     }
 }
