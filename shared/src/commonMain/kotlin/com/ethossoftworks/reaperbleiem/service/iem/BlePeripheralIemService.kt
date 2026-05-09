@@ -4,12 +4,14 @@ import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBlePeripheralManager
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleAdvertisementCharacteristic
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleAdvertisementData
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleAdvertisementService
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleCentralId
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattPermission
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattProperty
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralEvent
 import kotlin.math.ceil
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.getAndUpdate
+import kotlinx.atomicfu.update
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
@@ -21,7 +23,6 @@ import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
 import kotlinx.io.writeUShort
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.cbor.Cbor
 import kotlinx.serialization.encodeToByteArray
 
@@ -35,13 +36,14 @@ class BlePeripheralIemService(
     private val peripheralManager: IKmpBlePeripheralManager,
 ) : IIemService {
 
-    val notificationId = atomic<UShort>(0u)
-    val cbor = Cbor {
+    private val lastRefreshedEvent = atomic<IemEvent.Refreshed?>(null)
+    private val notificationId = atomic<UShort>(0u)
+    private val cbor = Cbor {
         ignoreUnknownKeys = true
         preferCborLabelsOverNames = true
     }
 
-    val advertisementData =
+    private val advertisementData =
         KmpBleAdvertisementData(
             name = "",
             services =
@@ -78,7 +80,7 @@ class BlePeripheralIemService(
                         KmpBlePeripheralEvent.Advertising -> isAdvertising.complete(Unit)
                         is KmpBlePeripheralEvent.CentralSubscribed -> onCentralSubscribe(event)
                         is KmpBlePeripheralEvent.CentralUnsubscribed -> {}
-                        is KmpBlePeripheralEvent.ReadRequest -> onReadRequest(event)
+                        is KmpBlePeripheralEvent.ReadRequest -> {}
                         is KmpBlePeripheralEvent.WriteRequest -> onWriteRequest(event)
                     }
                 }
@@ -87,14 +89,46 @@ class BlePeripheralIemService(
             isAdvertising.await()
             networkIemService.subscribe().collect { event ->
                 emit(event)
+                if (event is IemEvent.Refreshed) lastRefreshedEvent.update { event }
                 sendBleNotification(event)
             }
         }
     }
 
-    private suspend fun sendBleNotification(event: IemEvent) {
-        val payload = cbor.encodeToByteArray(event.serializer(), event)
-        val centrals = peripheralManager.subscribedCentrals(REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID)
+    // TODO: Ideally we would only refresh the device that connected
+    private suspend fun onCentralSubscribe(event: KmpBlePeripheralEvent.CentralSubscribed) {
+        networkIemService.refresh()
+    }
+
+    private fun onWriteRequest(request: KmpBlePeripheralEvent.WriteRequest) {}
+
+    override suspend fun refresh() {
+        return networkIemService.refresh()
+    }
+
+    override suspend fun setOutputVolume(trackId: Int, value: Float) {
+        networkIemService.setOutputVolume(trackId, value)
+        sendBleNotification(IemEvent.OutputVolumeUpdated(trackId, value))
+    }
+
+    override suspend fun setReceiveVolume(trackId: Int, receiveId: Int, value: Float) {
+        networkIemService.setReceiveVolume(trackId, receiveId, value)
+        sendBleNotification(IemEvent.ReceiveVolumeUpdated(trackId, receiveId, value))
+    }
+
+    override suspend fun setReceivePan(trackId: Int, receiveId: Int, value: Float) {
+        networkIemService.setReceivePan(trackId, receiveId, value)
+        sendBleNotification(IemEvent.ReceivePanUpdated(trackId, receiveId, value))
+    }
+
+    override suspend fun setReceiveMute(trackId: Int, receiveId: Int, isMuted: Boolean) {
+        networkIemService.setReceiveMute(trackId, receiveId, isMuted)
+        // TODO: Notify receive mute
+    }
+
+    private suspend fun sendBleNotification(event: IemEvent, centralList: Set<KmpBleCentralId>? = null) {
+        val payload = cbor.encodeToByteArray(IemEvent.serializer(), event)
+        val centrals = centralList ?: peripheralManager.subscribedCentrals(REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID)
         val requestId = notificationId.getAndUpdate { it.inc() }
 
         for (central in centrals) {
@@ -107,7 +141,6 @@ class BlePeripheralIemService(
                         writeUShort(requestId)
                         writeUShort(packetId.toUShort())
                         writeUShort(packetCount.toUShort())
-                        writeByte(event.typeByte())
                         val startIndex = (packetId * packetSize).toInt()
                         write(payload, startIndex, minOf(startIndex + packetSize.toInt(), payload.size))
                     }
@@ -116,64 +149,7 @@ class BlePeripheralIemService(
             }
         }
     }
-
-    private fun onCentralSubscribe(event: KmpBlePeripheralEvent.CentralSubscribed) {
-        // TODO: Send current tracks
-        println("Central subscribed")
-    }
-
-    private fun onReadRequest(request: KmpBlePeripheralEvent.ReadRequest) {}
-
-    private fun onWriteRequest(request: KmpBlePeripheralEvent.WriteRequest) {}
-
-    override suspend fun refresh() {
-        return networkIemService.refresh()
-    }
-
-    override suspend fun setOutputVolume(trackId: Int, value: Float) {
-        return networkIemService.setOutputVolume(trackId, value)
-    }
-
-    override suspend fun setReceiveVolume(trackId: Int, receiveId: Int, value: Float) {
-        return networkIemService.setReceiveVolume(trackId, receiveId, value)
-    }
-
-    override suspend fun setReceivePan(trackId: Int, receiveId: Int, value: Float) {
-        return networkIemService.setReceivePan(trackId, receiveId, value)
-    }
-
-    override suspend fun setReceiveMute(trackId: Int, receiveId: Int, isMuted: Boolean) {
-        return networkIemService.setReceiveMute(trackId, receiveId, isMuted)
-    }
 }
 
-/** Header Format: Request Id (UInt16), Packet Id (Uint16), Packet Count (UInt16), Type (UInt8) */
-val headerSize = 7u
-
-fun IemEvent.typeByte(): Byte =
-    when (this) {
-        IemEvent.Refreshing -> 0x00
-        is IemEvent.Refreshed -> 0x01
-        is IemEvent.TrackNameUpdated -> 0x02
-        is IemEvent.OutputVolumeUpdated -> 0x03
-        is IemEvent.ReceivePanUpdated -> 0x04
-        is IemEvent.ReceiveRegistered -> 0x05
-        is IemEvent.ReceiveVolumeUpdated -> 0x06
-        is IemEvent.Error -> 0x07
-    }
-
-fun <T> IemEvent.serializer(): KSerializer<T> =
-    when (this) {
-        is IemEvent.Error -> IemEvent.Error.serializer()
-        is IemEvent.OutputVolumeUpdated -> IemEvent.OutputVolumeUpdated.serializer()
-        is IemEvent.ReceivePanUpdated -> IemEvent.ReceivePanUpdated.serializer()
-        is IemEvent.ReceiveRegistered -> IemEvent.ReceiveRegistered.serializer()
-        is IemEvent.ReceiveVolumeUpdated -> IemEvent.ReceiveVolumeUpdated.serializer()
-        is IemEvent.Refreshed -> IemEvent.Refreshed.serializer()
-        IemEvent.Refreshing -> IemEvent.Refreshing.serializer()
-        is IemEvent.TrackNameUpdated -> IemEvent.TrackNameUpdated.serializer()
-    } as KSerializer<T>
-
-fun IemEvent.Companion.fromBlePackets(data: ByteArray): IemEvent? {
-    return null
-}
+/** Header Format: Request Id (UInt16), Packet Id (Uint16), Packet Count (UInt16) */
+val headerSize = 6u

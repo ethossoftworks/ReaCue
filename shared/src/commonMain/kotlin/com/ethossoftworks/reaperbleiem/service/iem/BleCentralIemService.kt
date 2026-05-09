@@ -13,10 +13,19 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.io.Buffer
+import kotlinx.io.readByteArray
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.cbor.Cbor
 
+@OptIn(ExperimentalSerializationApi::class)
 class BleCentralIemService(private val bleCentralManager: IKmpBleCentralManager) : IIemService {
 
-    val peripheral = atomic<IKmpBlePeripheral?>(null)
+    private val peripheral = atomic<IKmpBlePeripheral?>(null)
+    private val cbor = Cbor {
+        ignoreUnknownKeys = true
+        preferCborLabelsOverNames = true
+    }
 
     fun scan() = bleCentralManager.scan().filter { it.serviceUuids.contains(REAPER_BLE_IEM_SERVICE_UUID) }
 
@@ -50,7 +59,18 @@ class BleCentralIemService(private val bleCentralManager: IKmpBleCentralManager)
         val job =
             peripheral.value
                 ?.notifications(REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID)
-                ?.onEach { event -> println("Receiving bytes - ${event.toHexString()}") }
+                ?.onEach { notification ->
+                    // TODO: Assemble packages. BLE guarantees in order packets
+                    val buffer = Buffer()
+                    buffer.write(notification, headerSize.toInt() - 1, notification.size)
+                    println("Receiving bytes - ${notification.toHexString()}")
+                    try {
+                        println(cbor.decodeFromByteArray(IemEvent.serializer(), buffer.readByteArray()))
+                    } catch (e: Exception) {
+
+                    }
+
+                }
                 ?.launchIn(this)
 
         awaitClose { job?.cancel() }
