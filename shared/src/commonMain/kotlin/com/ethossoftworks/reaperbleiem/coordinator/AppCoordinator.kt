@@ -12,4 +12,7 @@ class AppCoordinator :
     Coordinator(
         initialRoute = if (Platform.current.isMobile) Route.Scan else Route.Iem,
         defaultTransition = PushFromRightRouteTransition,
-    )
+    ) {
+
+    fun deviceConnected() = push(Route.Iem)
+}

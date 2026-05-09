@@ -205,8 +205,12 @@ private class AndroidKmpBlePeripheral(
     private val localServices: AtomicRef<Map<String, AndroidKmpBleService>> = atomic(emptyMap())
     private val localCharacteristics: AtomicRef<Map<String, AndroidKmpBleCharacteristic>> = atomic(emptyMap())
 
-    override val services: Map<String, IKmpBleService> = localServices.value
-    override val characteristics: Map<String, IKmpBleCharacteristic> = localCharacteristics.value
+    override val services: Map<String, IKmpBleService>
+        get() = localServices.value
+
+    override val characteristics: Map<String, IKmpBleCharacteristic>
+        get() = localCharacteristics.value
+
     override val connectionStatus: StateFlow<KmpBleConnectionStatus> = nordicManager.connectionStatus.asStateFlow()
 
     init {

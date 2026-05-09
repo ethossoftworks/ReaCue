@@ -74,7 +74,7 @@ fun commonModule() = module {
 
     // View Interactors
     factory { IemScreenViewInteractor(get(), get(), get()) }
-    factory { ScanScreenViewInteractor(get(), get()) }
+    factory { ScanScreenViewInteractor(get(), get(), get()) }
 }
 
 fun mockModule() = module {}

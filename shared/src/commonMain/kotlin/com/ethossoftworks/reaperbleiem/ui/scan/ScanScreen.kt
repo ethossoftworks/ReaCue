@@ -1,5 +1,6 @@
 package com.ethossoftworks.reaperbleiem.ui.scan
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -33,31 +34,37 @@ fun ScanScreen(interactor: ScanScreenViewInteractor = rememberInjectForRoute()) 
         verticalArrangement = Arrangement.spacedBy(8.dp, alignment = Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        when (val bleStatus = state.bluetoothStatus) {
-            is CapabilityStatus.NoPermission -> {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    if (bleStatus.reason == NoPermissionReason.NotRequested) {
-                        Button(onClick = interactor::onRequestBlePermissionClick) { Text("Request") }
-                        Text("Request BLE Permission")
-                    } else {
-                        Text("BLE permission denied. Add permission in Settings")
-                    }
+        if (state.bluetoothStatus is CapabilityStatus.NoPermission) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                if (state.bluetoothStatus.reason == NoPermissionReason.NotRequested) {
+                    Button(onClick = interactor::onRequestBlePermissionClick) { Text("Request") }
+                    Text("Request BLE Permission")
+                } else {
+                    Text("BLE permission denied. Add permission in Settings")
                 }
             }
-            is CapabilityStatus.NotEnabled -> {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text("Enable BLE Permissions in Settings")
+        }
+        if (state.bluetoothStatus == CapabilityStatus.NotEnabled) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text("Enable BLE Permissions in Settings")
+            }
+        }
+
+        if (state.bluetoothStatus == CapabilityStatus.Ready) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                for (device in state.devices.values) {
+                    Text(
+                        modifier = Modifier.clickable(onClick = { interactor.onDeviceClick(device) }),
+                        text = "${device.identifier} - ${device.name}",
+                    )
                 }
             }
-            CapabilityStatus.Ready -> {}
-            CapabilityStatus.Unknown -> {}
-            is CapabilityStatus.Unsupported -> {}
         }
     }
 }

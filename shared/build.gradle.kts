@@ -87,6 +87,7 @@ kotlin {
             implementation(libs.material.icons)
             implementation(libs.navigationEvent)
             implementation(libs.navigationEvent.compose)
+            implementation(libs.kotlinxSerializationCbor)
         }
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)

@@ -1,19 +1,59 @@
 package com.ethossoftworks.reaperbleiem.service.iem
 
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBleCentralManager
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBlePeripheral
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralId
+import com.outsidesource.oskitkmp.outcome.Outcome
+import com.outsidesource.oskitkmp.outcome.unwrapOrReturn
+import kotlinx.atomicfu.atomic
+import kotlinx.atomicfu.update
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 
-class BleCentralIemService(private val bleService: IKmpBleCentralManager) : IIemService {
+class BleCentralIemService(private val bleCentralManager: IKmpBleCentralManager) : IIemService {
 
-    fun scan() = bleService.scan()
-        .filter { it.serviceUuids.contains(REAPER_BLE_IEM_SERVICE_UUID.lowercase()) }
+    val peripheral = atomic<IKmpBlePeripheral?>(null)
 
-    suspend fun connect(id: KmpBlePeripheralId) = bleService.connect(id)
+    fun scan() = bleCentralManager.scan().filter { it.serviceUuids.contains(REAPER_BLE_IEM_SERVICE_UUID) }
 
-    override fun subscribe(): Flow<IemEvent> {
-        TODO("Not yet implemented")
+    suspend fun connect(id: KmpBlePeripheralId): Outcome<Unit, Any> {
+        val connectedPeripheral =
+            bleCentralManager.connect(id).unwrapOrReturn {
+                return it
+            }
+
+        connectedPeripheral.requestMtu(517).unwrapOrReturn {
+            return it
+        }
+        connectedPeripheral.discoverServices().unwrapOrReturn {
+            return it
+        }
+
+        peripheral.update { connectedPeripheral }
+
+        return Outcome.Ok(Unit)
+    }
+
+    suspend fun disconnect(): Outcome<Unit, Any> {
+        peripheral.value?.disconnect()?.unwrapOrReturn {
+            return it
+        }
+        peripheral.update { null }
+        return Outcome.Ok(Unit)
+    }
+
+    override fun subscribe(): Flow<IemEvent> = callbackFlow {
+        val job =
+            peripheral.value
+                ?.notifications(REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID)
+                ?.onEach { event -> println("Receiving bytes - ${event.toHexString()}") }
+                ?.launchIn(this)
+
+        awaitClose { job?.cancel() }
     }
 
     override suspend fun refresh() {

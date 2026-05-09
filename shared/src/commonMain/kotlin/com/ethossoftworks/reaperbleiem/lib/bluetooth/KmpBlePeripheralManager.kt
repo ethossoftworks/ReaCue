@@ -3,6 +3,9 @@ package com.ethossoftworks.reaperbleiem.lib.bluetooth
 import kotlinx.coroutines.flow.Flow
 
 interface IKmpBlePeripheralManager {
+    fun maximumUpdateValueLengthForCentral(central: KmpBleCentralId): UInt
+    fun subscribedCentrals(characteristicUuid: String): Set<String>
+
     suspend fun advertise(advertisementData: KmpBleAdvertisementData): Flow<KmpBlePeripheralEvent>
 
     suspend fun notify(characteristicUuid: String, data: ByteArray, centralUuids: List<String>? = null)

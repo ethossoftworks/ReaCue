@@ -1,6 +1,5 @@
 package com.ethossoftworks.reaperbleiem.interactor
 
-import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBlePeripheral
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralId
 import com.ethossoftworks.reaperbleiem.service.iem.BleCentralIemService
 import com.ethossoftworks.reaperbleiem.service.iem.IIemService
@@ -17,7 +16,6 @@ import kotlinx.coroutines.flow.onEach
 data class IemState(
     val tracks: Map<Int, Track> = emptyMap(),
     val iems: Map<Int, IemMix> = emptyMap(),
-    val peripheral: IKmpBlePeripheral? = null,
 )
 
 data class IemMix(val trackId: Int, val volume: Float, val receives: Map<Int, ReceiveData>)
@@ -34,18 +32,17 @@ data class ReceiveData(
 class IemInteractor(private val iemService: IIemService) :
     Interactor<IemState>(dependencies = emptyList(), initialState = IemState()) {
 
-    fun scan() = (iemService as? BleCentralIemService)?.scan() ?: emptyFlow()
+    fun scanPeripherals() = (iemService as? BleCentralIemService)?.scan() ?: emptyFlow()
 
-    suspend fun connect(peripheralId: KmpBlePeripheralId): Outcome<Unit, Any> {
+    suspend fun connectPeripheral(peripheralId: KmpBlePeripheralId): Outcome<Unit, Any> {
         val service = (iemService as? BleCentralIemService) ?: return Outcome.Error("Not supported")
-        val peripheral = service.connect(peripheralId).unwrapOrReturn { return it }
-        update { state -> state.copy(peripheral = peripheral) }
+        service.connect(peripheralId).unwrapOrReturn { return it }
         return Outcome.Ok(Unit)
     }
 
-    suspend fun disconnect() {
-        state.peripheral?.disconnect() ?: Outcome.Error("Not supported")
-        update { state -> state.copy(peripheral = null) }
+    suspend fun disconnectPeripheral() {
+        val service = (iemService as? BleCentralIemService) ?: return
+        service.disconnect()
     }
 
     fun subscribe() =
