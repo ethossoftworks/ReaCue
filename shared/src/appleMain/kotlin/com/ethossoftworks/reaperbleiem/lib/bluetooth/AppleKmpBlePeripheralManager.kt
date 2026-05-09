@@ -98,6 +98,7 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
         manager
     }
 
+    /** IKmpPeripheralManager */
     override fun maximumUpdateValueLengthForCentral(central: KmpBleCentralId): UInt {
         return localCentrals.value[central]?.maximumUpdateValueLength()?.toUInt() ?: 20u
     }
@@ -212,7 +213,6 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
                 },
         )
 
-    /** IKmpPeripheralManager */
     // TODO: I'm not a fan of the silent error here, even though this should never happen
     override suspend fun notify(characteristicUuid: String, data: ByteArray, centralUuids: List<String>?): Unit =
         sendMutexes.value[characteristicUuid]?.withLock {
