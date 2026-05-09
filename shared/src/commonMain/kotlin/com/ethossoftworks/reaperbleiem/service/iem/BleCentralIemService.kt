@@ -3,6 +3,7 @@ package com.ethossoftworks.reaperbleiem.service.iem
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBleCentralManager
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBlePeripheral
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralId
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleWriteMode
 import com.outsidesource.oskitkmp.outcome.Outcome
 import com.outsidesource.oskitkmp.outcome.unwrapOrReturn
 import kotlinx.atomicfu.atomic
@@ -66,10 +67,7 @@ class BleCentralIemService(private val bleCentralManager: IKmpBleCentralManager)
                     println("Receiving bytes - ${notification.toHexString()}")
                     try {
                         println(cbor.decodeFromByteArray(IemEvent.serializer(), buffer.readByteArray()))
-                    } catch (e: Exception) {
-
-                    }
-
+                    } catch (e: Exception) {}
                 }
                 ?.launchIn(this)
 
@@ -77,19 +75,25 @@ class BleCentralIemService(private val bleCentralManager: IKmpBleCentralManager)
     }
 
     override suspend fun refresh() {
-        TODO("Not yet implemented")
+        val payload = cbor.encodeToByteArray(IemEvent.serializer(), IemEvent.Refreshing)
+        peripheral.value?.write(REAPER_BLE_IEM_COMMAND_CHARACTERISTIC_UUID, payload, KmpBleWriteMode.WithoutResponse)
     }
 
     override suspend fun setOutputVolume(trackId: Int, value: Float) {
-        TODO("Not yet implemented")
+        val payload = cbor.encodeToByteArray(IemEvent.serializer(), IemEvent.OutputVolumeUpdated(trackId, value))
+        peripheral.value?.write(REAPER_BLE_IEM_COMMAND_CHARACTERISTIC_UUID, payload, KmpBleWriteMode.WithoutResponse)
     }
 
     override suspend fun setReceiveVolume(trackId: Int, receiveId: Int, value: Float) {
-        TODO("Not yet implemented")
+        val payload =
+            cbor.encodeToByteArray(IemEvent.serializer(), IemEvent.ReceiveVolumeUpdated(trackId, receiveId, value))
+        peripheral.value?.write(REAPER_BLE_IEM_COMMAND_CHARACTERISTIC_UUID, payload, KmpBleWriteMode.WithoutResponse)
     }
 
     override suspend fun setReceivePan(trackId: Int, receiveId: Int, value: Float) {
-        TODO("Not yet implemented")
+        val payload =
+            cbor.encodeToByteArray(IemEvent.serializer(), IemEvent.ReceivePanUpdated(trackId, receiveId, value))
+        peripheral.value?.write(REAPER_BLE_IEM_COMMAND_CHARACTERISTIC_UUID, payload, KmpBleWriteMode.WithoutResponse)
     }
 
     override suspend fun setReceiveMute(trackId: Int, receiveId: Int, isMuted: Boolean) {

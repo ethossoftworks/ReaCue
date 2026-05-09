@@ -1,5 +1,6 @@
 package com.ethossoftworks.reaperbleiem.service.iem
 
+import co.touchlab.kermit.Logger
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBlePeripheralManager
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleAdvertisementCharacteristic
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleAdvertisementData
@@ -24,7 +25,6 @@ import kotlinx.io.readByteArray
 import kotlinx.io.writeUShort
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
-import kotlinx.serialization.encodeToByteArray
 
 val REAPER_BLE_IEM_SERVICE_UUID = "fa6e666c-2c23-43f1-84e4-4653ebf930f4"
 val REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID = "319893ca-5fa2-4c21-9f51-bc2b1116a352"
@@ -100,7 +100,28 @@ class BlePeripheralIemService(
         networkIemService.refresh()
     }
 
-    private fun onWriteRequest(request: KmpBlePeripheralEvent.WriteRequest) {}
+    private suspend fun onWriteRequest(request: KmpBlePeripheralEvent.WriteRequest) {
+        try {
+            val event = cbor.decodeFromByteArray(IemEvent.serializer(), request.data)
+            when (event) {
+                IemEvent.Refreshing -> networkIemService.refresh()
+                is IemEvent.OutputVolumeUpdated -> networkIemService.setOutputVolume(event.trackId, event.value)
+                is IemEvent.ReceivePanUpdated ->
+                    networkIemService.setReceivePan(event.trackId, event.receiveId, event.value)
+                is IemEvent.ReceiveVolumeUpdated ->
+                    networkIemService.setReceiveVolume(event.trackId, event.receiveId, event.value)
+                is IemEvent.Error,
+                is IemEvent.ReceiveRegistered,
+                is IemEvent.Refreshed,
+                is IemEvent.TrackNameUpdated -> return
+            }
+            val centrals =
+                peripheralManager.subscribedCentrals(REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID) - request.central
+            sendBleNotification(event, centrals)
+        } catch (t: Throwable) {
+            Logger.e { "Could not decode request ${t.message}" }
+        }
+    }
 
     override suspend fun refresh() {
         return networkIemService.refresh()
