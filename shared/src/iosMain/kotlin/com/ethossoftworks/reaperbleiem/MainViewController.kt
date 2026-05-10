@@ -8,6 +8,7 @@ import platform.UIKit.UIViewController
 
 @Suppress("FunctionNaming")
 fun MainViewController(): UIViewController {
+    initKoinIos()
     KmpAppLifecycleObserver.init(KmpAppLifecycleObserverContext())
 
     return OSComposeUIViewController { App() }

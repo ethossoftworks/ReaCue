@@ -181,7 +181,7 @@ private class AppleCBCentralDelegate(
                 val companyId = ((bytes[1].toInt() and 0xFF) shl 8) or (bytes[0].toInt() and 0xFF)
                 put(companyId, bytes.copyOfRange(2, bytes.size))
             }
-
+            
             val record =
                 KmpBleScanRecord(
                     name = didDiscoverPeripheral.name ?: "",

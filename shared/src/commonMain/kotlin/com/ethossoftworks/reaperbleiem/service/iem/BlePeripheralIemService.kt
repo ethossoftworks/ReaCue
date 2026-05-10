@@ -123,6 +123,7 @@ class BlePeripheralIemService(
                 is IemEvent.Refreshed,
                 is IemEvent.TrackNameUpdated -> return
             }
+
             val centrals =
                 peripheralManager.subscribedCentrals(REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID) - request.central
             sendBleNotification(event, centrals)

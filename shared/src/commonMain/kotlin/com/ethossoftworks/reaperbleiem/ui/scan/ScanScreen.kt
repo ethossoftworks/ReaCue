@@ -64,6 +64,7 @@ fun ScanScreen(interactor: ScanScreenViewInteractor = rememberInjectForRoute()) 
                         text = "${device.identifier} - ${device.name}",
                     )
                 }
+                Button(onClick = interactor::onScan) { Text("Scan") }
             }
         }
     }

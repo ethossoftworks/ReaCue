@@ -3,10 +3,6 @@ import Shared
 
 @main
 struct iOSApp: App {
-    init() {
-        doInitKoinIos()
-    }
-
 	var body: some Scene {
 		WindowGroup {
 			ContentView()
