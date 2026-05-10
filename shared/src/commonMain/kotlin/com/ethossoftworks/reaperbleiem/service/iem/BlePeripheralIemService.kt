@@ -9,6 +9,7 @@ import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleCentralId
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattPermission
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattProperty
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralEvent
+import com.outsidesource.oskitkmp.lib.toInt
 import kotlin.math.ceil
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.getAndUpdate
@@ -28,7 +29,7 @@ import kotlinx.serialization.cbor.Cbor
 
 val REAPER_BLE_IEM_SERVICE_UUID = "fa6e666c-2c23-43f1-84e4-4653ebf930f4"
 val REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID = "319893ca-5fa2-4c21-9f51-bc2b1116a352"
-val REAPER_BLE_IEM_COMMAND_CHARACTERISTIC_UUID = "aa57C9ce-ada3-4779-88bb-efce418a297e"
+val REAPER_BLE_IEM_COMMAND_CHARACTERISTIC_UUID = "aa57c9ce-ada3-4779-88bb-efce418a297e"
 
 @OptIn(ExperimentalSerializationApi::class)
 class BlePeripheralIemService(
@@ -87,7 +88,11 @@ class BlePeripheralIemService(
                 .launchIn(this)
 
             isAdvertising.await()
+
+            Logger.i { "Advertising started" }
+
             networkIemService.subscribe().collect { event ->
+                Logger.i { "Received event from Reaper - $event" }
                 emit(event)
                 if (event is IemEvent.Refreshed) lastRefreshedEvent.update { event }
                 sendBleNotification(event)
@@ -97,12 +102,15 @@ class BlePeripheralIemService(
 
     // TODO: Ideally we would only refresh the device that connected
     private suspend fun onCentralSubscribe(event: KmpBlePeripheralEvent.CentralSubscribed) {
+        Logger.i { "Central subscribed - ${event.centralId}" }
         networkIemService.refresh()
     }
 
     private suspend fun onWriteRequest(request: KmpBlePeripheralEvent.WriteRequest) {
         try {
             val event = cbor.decodeFromByteArray(IemEvent.serializer(), request.data)
+            Logger.i { "Received command - $event" }
+
             when (event) {
                 IemEvent.Refreshing -> networkIemService.refresh()
                 is IemEvent.OutputVolumeUpdated -> networkIemService.setOutputVolume(event.trackId, event.value)
@@ -119,7 +127,7 @@ class BlePeripheralIemService(
                 peripheralManager.subscribedCentrals(REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID) - request.central
             sendBleNotification(event, centrals)
         } catch (t: Throwable) {
-            Logger.e { "Could not decode request ${t.message}" }
+            Logger.e { "Could not decode write request ${t.message}" }
         }
     }
 
@@ -152,25 +160,27 @@ class BlePeripheralIemService(
         val centrals = centralList ?: peripheralManager.subscribedCentrals(REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID)
         val requestId = notificationId.getAndUpdate { it.inc() }
 
+        Logger.i { "Sending notification to ${centrals.size} centrals" }
+
         for (central in centrals) {
             val packetSize = peripheralManager.maximumUpdateValueLengthForCentral(central) - headerSize
             val packetCount = ceil(payload.size.toDouble() / packetSize.toDouble()).toUInt()
 
-            for (packetId in 0u until packetCount) {
+            for (packetIndex in 0u until packetCount) {
                 val buffer =
                     Buffer().apply {
                         writeUShort(requestId)
-                        writeUShort(packetId.toUShort())
-                        writeUShort(packetCount.toUShort())
-                        val startIndex = (packetId * packetSize).toInt()
+                        writeUShort((packetCount - 1u - packetIndex).toUShort())
+                        val startIndex = (packetIndex * packetSize).toInt()
                         write(payload, startIndex, minOf(startIndex + packetSize.toInt(), payload.size))
                     }
 
+                Logger.i { "Sending notification packet $requestId - ${packetIndex.toInt() + 1}/$packetCount" }
                 peripheralManager.notify(REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID, buffer.readByteArray())
             }
         }
     }
 }
 
-/** Header Format: Request Id (UInt16), Packet Id (Uint16), Packet Count (UInt16) */
-val headerSize = 6u
+/** Header Format: Request Id (UInt16), Packets remaining (UInt16) */
+val headerSize = 4u

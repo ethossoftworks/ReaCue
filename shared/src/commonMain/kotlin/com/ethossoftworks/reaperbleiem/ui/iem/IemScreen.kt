@@ -40,7 +40,7 @@ fun IemScreen(interactor: IemScreenViewInteractor = rememberInjectForRoute()) {
 
     Column(
         modifier =
-            Modifier.windowInsetsPadding(WindowInsets.systemBars).padding(16.dp).verticalScroll(rememberScrollState()),
+            Modifier.windowInsetsPadding(WindowInsets.systemBars).padding(24.dp).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {

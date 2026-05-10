@@ -7,6 +7,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.window.Window
+import co.touchlab.kermit.CommonWriter
+import co.touchlab.kermit.Logger
 import com.ethossoftworks.reaperbleiem.PlatformContext
 import com.ethossoftworks.reaperbleiem.initKoin
 import com.ethossoftworks.reaperbleiem.macOsDiModule
@@ -15,8 +17,6 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import platform.AppKit.NSApplication
 import platform.AppKit.NSApplicationActivationPolicy
 import platform.AppKit.NSWindowDidChangeBackingPropertiesNotification
-import platform.AppKit.NSWindowStyleMaskFullSizeContentView
-import platform.AppKit.NSWindowTitleHidden
 import platform.Foundation.NSNotificationCenter
 import platform.Foundation.NSOperationQueue
 
@@ -24,14 +24,16 @@ import platform.Foundation.NSOperationQueue
 fun main() {
     initKoin(platformContext = PlatformContext(), extraModules = arrayOf(macOsDiModule)).koin
 
+    Logger.setLogWriters(CommonWriter())
+
     val app = NSApplication.sharedApplication()
     app.setActivationPolicy(NSApplicationActivationPolicy.NSApplicationActivationPolicyRegular)
 
     Window("Reaper BLE IEM") {
         // TODO: Figure out window issues on MacOS Native
-//        window.styleMask = window.styleMask or NSWindowStyleMaskFullSizeContentView
-//        window.titleVisibility = NSWindowTitleHidden
-//        window.titlebarAppearsTransparent = true
+        //        window.styleMask = window.styleMask or NSWindowStyleMaskFullSizeContentView
+        //        window.titleVisibility = NSWindowTitleHidden
+        //        window.titlebarAppearsTransparent = true
 
         var density by remember { mutableStateOf(Density(window.backingScaleFactor.toFloat())) }
 

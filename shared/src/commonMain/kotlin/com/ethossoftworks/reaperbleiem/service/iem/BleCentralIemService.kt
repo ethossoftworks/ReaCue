@@ -1,9 +1,12 @@
 package com.ethossoftworks.reaperbleiem.service.iem
 
+import co.touchlab.kermit.Logger
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBleCentralManager
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBlePeripheral
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralId
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleWriteMode
+import com.outsidesource.oskitkmp.lib.toUShort
+import com.outsidesource.oskitkmp.lib.update
 import com.outsidesource.oskitkmp.outcome.Outcome
 import com.outsidesource.oskitkmp.outcome.unwrapOrReturn
 import kotlinx.atomicfu.atomic
@@ -23,6 +26,7 @@ import kotlinx.serialization.cbor.Cbor
 class BleCentralIemService(private val bleCentralManager: IKmpBleCentralManager) : IIemService {
 
     private val peripheral = atomic<IKmpBlePeripheral?>(null)
+    private val requestBuffers = atomic<Map<UShort, Buffer>>(emptyMap())
     private val cbor = Cbor {
         ignoreUnknownKeys = true
         preferCborLabelsOverNames = true
@@ -61,13 +65,26 @@ class BleCentralIemService(private val bleCentralManager: IKmpBleCentralManager)
             peripheral.value
                 ?.notifications(REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID)
                 ?.onEach { notification ->
-                    // TODO: Assemble packages. BLE guarantees in order packets
-                    val buffer = Buffer()
-                    buffer.write(notification, headerSize.toInt() - 1, notification.size)
-                    println("Receiving bytes - ${notification.toHexString()}")
                     try {
-                        println(cbor.decodeFromByteArray(IemEvent.serializer(), buffer.readByteArray()))
-                    } catch (e: Exception) {}
+                        val requestId = notification.toUShort(0)
+                        val packetsRemaining = notification.toUShort(2)
+                        Logger.i { "Received notification - $requestId - packets remaining $packetsRemaining" }
+
+                        val buffer = requestBuffers.value[requestId] ?: Buffer()
+                        buffer.write(notification, headerSize.toInt(), notification.size)
+
+                        if (packetsRemaining > 0u.toUShort()) {
+                            requestBuffers.update { it.update { this[requestId] = buffer } }
+                            return@onEach
+                        }
+
+                        requestBuffers.update { it.update { remove(requestId) } }
+                        val event = cbor.decodeFromByteArray(IemEvent.serializer(), buffer.readByteArray())
+                        send(event)
+                        Logger.i { "Received message - $event" }
+                    } catch (e: Exception) {
+                        Logger.e(e) { "Error while assembling packets: ${notification.toHexString()}" }
+                    }
                 }
                 ?.launchIn(this)
 
