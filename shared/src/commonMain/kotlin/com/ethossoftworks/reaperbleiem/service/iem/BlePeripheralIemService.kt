@@ -9,18 +9,19 @@ import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleCentralId
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattPermission
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattProperty
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralEvent
-import com.outsidesource.oskitkmp.lib.toInt
 import kotlin.math.ceil
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.getAndUpdate
 import kotlinx.atomicfu.update
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
 import kotlinx.io.writeUShort
@@ -38,6 +39,7 @@ class BlePeripheralIemService(
 ) : IIemService {
 
     private val lastRefreshedEvent = atomic<IemEvent.Refreshed?>(null)
+    private val bleNotificationChannel = Channel<IemEvent>(capacity = Channel.UNLIMITED)
     private val notificationId = atomic<UShort>(0u)
     private val cbor = Cbor {
         ignoreUnknownKeys = true
@@ -69,10 +71,16 @@ class BlePeripheralIemService(
                 ),
         )
 
-    override fun subscribe(): Flow<IemEvent> = flow {
-        coroutineScope {
-            val isAdvertising = CompletableDeferred<Unit>()
+    override fun subscribe(): Flow<IemEvent> = channelFlow {
+        val isAdvertising = CompletableDeferred<Unit>()
 
+        val bleChannelJob = launch {
+            for (event in bleNotificationChannel) {
+                sendBleNotification(event)
+            }
+        }
+
+        val advertiseJob =
             peripheralManager
                 .advertise(advertisementData)
                 .onEach { event ->
@@ -87,16 +95,24 @@ class BlePeripheralIemService(
                 }
                 .launchIn(this)
 
-            isAdvertising.await()
+        isAdvertising.await()
+        Logger.i { "Advertising started" }
 
-            Logger.i { "Advertising started" }
+        val networkJob =
+            networkIemService
+                .subscribe()
+                .onEach { event ->
+                    Logger.i { "Received event from Reaper - $event" }
+                    send(event)
+                    if (event is IemEvent.Refreshed) lastRefreshedEvent.update { event }
+                    bleNotificationChannel.trySend(event)
+                }
+                .launchIn(this)
 
-            networkIemService.subscribe().collect { event ->
-                Logger.i { "Received event from Reaper - $event" }
-                emit(event)
-                if (event is IemEvent.Refreshed) lastRefreshedEvent.update { event }
-                sendBleNotification(event)
-            }
+        awaitClose {
+            bleChannelJob.cancel()
+            advertiseJob.cancel()
+            networkJob.cancel()
         }
     }
 

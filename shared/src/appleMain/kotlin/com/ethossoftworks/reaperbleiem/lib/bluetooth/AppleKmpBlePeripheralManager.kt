@@ -71,8 +71,7 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
     private val sendMutexes = atomic<Map<String, Mutex>>(emptyMap())
     private val events = MutableSharedFlow<KmpBlePeripheralEvent>(extraBufferCapacity = Channel.UNLIMITED)
     private val serviceAddedEvents = Channel<ServiceAddedEvent>(Channel.CONFLATED)
-    private val peripheralManagerIsReadyToUpdateSubscribers =
-        MutableSharedFlow<Unit>(extraBufferCapacity = Channel.UNLIMITED)
+    private val peripheralManagerIsReadyToUpdateSubscribers = Channel<Unit>(Channel.CONFLATED)
     private val localCharacteristics: AtomicRef<Map<String, CBMutableCharacteristic>> = atomic(emptyMap())
     private val localCentrals: AtomicRef<Map<String, CBCentral>> = atomic(emptyMap())
     private val localCentralSubscriptions: AtomicRef<Map<String, Set<String>>> = atomic(emptyMap())
@@ -214,14 +213,21 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
         )
 
     // TODO: I'm not a fan of the silent error here, even though this should never happen
-    override suspend fun notify(characteristicUuid: String, data: ByteArray, centralUuids: List<String>?): Unit =
-        sendMutexes.value[characteristicUuid]?.withLock {
-            val characteristic = localCharacteristics.value[characteristicUuid] ?: return
-            val centrals = centralUuids?.mapNotNull { localCentrals.value[it] }
-            while (!peripheralManager.updateValue(data.toNSData(), characteristic, centrals)) {
-                peripheralManagerIsReadyToUpdateSubscribers.first()
+    override suspend fun notify(characteristicUuid: String, data: ByteArray, centralUuids: List<String>?) {
+        val mutex = sendMutexes.value[characteristicUuid] ?: return
+        val characteristic = localCharacteristics.value[characteristicUuid] ?: return
+        val centrals = centralUuids?.mapNotNull { localCentrals.value[it] }
+
+        mutex.withLock {
+            while (peripheralManagerIsReadyToUpdateSubscribers.tryReceive().isSuccess) {
+                // Drain ready signal
             }
-        } ?: Unit
+
+            while (!peripheralManager.updateValue(data.toNSData(), characteristic, centrals)) {
+                peripheralManagerIsReadyToUpdateSubscribers.receive()
+            }
+        }
+    }
 
     override suspend fun respondToRequest(
         central: KmpBleCentralId,
@@ -270,7 +276,7 @@ private class PeripheralManagerDelegate(
     private val localRequests: AtomicRef<Map<Int, CBATTRequest>>,
     private val serviceAddedEvents: Channel<ServiceAddedEvent>,
     private val state: MutableStateFlow<CBManagerState>,
-    private val peripheralManagerIsReadyToUpdateSubscribers: MutableSharedFlow<Unit>,
+    private val peripheralManagerIsReadyToUpdateSubscribers: Channel<Unit>,
 ) : CBPeripheralManagerDelegateProtocol, NSObject() {
     private val requestIdCounter = atomic(0)
 
@@ -374,7 +380,7 @@ private class PeripheralManagerDelegate(
     }
 
     override fun peripheralManagerIsReadyToUpdateSubscribers(peripheral: CBPeripheralManager) {
-        peripheralManagerIsReadyToUpdateSubscribers.tryEmit(Unit)
+        peripheralManagerIsReadyToUpdateSubscribers.trySend(Unit)
     }
 }
 
