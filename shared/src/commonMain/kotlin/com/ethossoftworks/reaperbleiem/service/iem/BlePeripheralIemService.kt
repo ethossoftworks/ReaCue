@@ -87,7 +87,7 @@ class BlePeripheralIemService(
                     when (event) {
                         is KmpBlePeripheralEvent.Error -> cancel()
                         KmpBlePeripheralEvent.Advertising -> isAdvertising.complete(Unit)
-                        is KmpBlePeripheralEvent.CentralSubscribed -> onCentralSubscribe(event)
+                        is KmpBlePeripheralEvent.CentralSubscribed -> {}
                         is KmpBlePeripheralEvent.CentralUnsubscribed -> {}
                         is KmpBlePeripheralEvent.ReadRequest -> {}
                         is KmpBlePeripheralEvent.WriteRequest -> onWriteRequest(event)
@@ -114,12 +114,6 @@ class BlePeripheralIemService(
             advertiseJob.cancel()
             networkJob.cancel()
         }
-    }
-
-    // TODO: Ideally we would only refresh the device that connected
-    private suspend fun onCentralSubscribe(event: KmpBlePeripheralEvent.CentralSubscribed) {
-        Logger.i { "Central subscribed - ${event.centralId}" }
-        networkIemService.refresh()
     }
 
     private suspend fun onWriteRequest(request: KmpBlePeripheralEvent.WriteRequest) {

@@ -12,15 +12,18 @@ import com.outsidesource.oskitkmp.outcome.unwrapOrReturn
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalSerializationApi::class)
 class BleCentralIemService(private val bleCentralManager: IKmpBleCentralManager) : IIemService {
@@ -61,10 +64,12 @@ class BleCentralIemService(private val bleCentralManager: IKmpBleCentralManager)
     }
 
     override fun subscribe(): Flow<IemEvent> = callbackFlow {
+        val localPeripheral = peripheral.value ?: return@callbackFlow
+
         val job =
-            peripheral.value
-                ?.notifications(REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID)
-                ?.onEach { notification ->
+            localPeripheral
+                .notifications(REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID)
+                .onEach { notification ->
                     try {
                         val requestId = notification.toUShort(0)
                         val packetsRemaining = notification.toUShort(2)
@@ -86,9 +91,15 @@ class BleCentralIemService(private val bleCentralManager: IKmpBleCentralManager)
                         Logger.e(e) { "Error while assembling packets: ${notification.toHexString()}" }
                     }
                 }
-                ?.launchIn(this)
+                .launchIn(this)
 
-        awaitClose { job?.cancel() }
+        // Wait for collector to be ready to send refresh command
+        launch {
+            delay(16.milliseconds)
+            refresh()
+        }
+
+        awaitClose { job.cancel() }
     }
 
     override suspend fun refresh() {
