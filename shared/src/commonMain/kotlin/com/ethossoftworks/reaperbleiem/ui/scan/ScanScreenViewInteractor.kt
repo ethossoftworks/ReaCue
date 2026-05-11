@@ -11,6 +11,7 @@ import com.outsidesource.oskitkmp.outcome.unwrapOrReturn
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 
@@ -38,7 +39,11 @@ class ScanScreenViewInteractor(
             return
         }
 
-        observeJob = capabilityInteractor.observeCapabilityState().launchIn(interactorScope)
+        observeJob =
+            capabilityInteractor
+                .observeCapabilityState()
+                .onEach { if (it == CapabilityStatus.Ready) onScan() }
+                .launchIn(interactorScope)
     }
 
     fun onDispose() {

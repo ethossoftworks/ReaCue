@@ -134,6 +134,8 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
                     }
                 }
 
+                events.onEach { send(it) }.launchIn(this)
+
                 peripheralManager.startAdvertising(
                     buildMap {
                         this[CBAdvertisementDataLocalNameKey] = advertisementData.name
@@ -144,8 +146,6 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
                         }
                     }
                 )
-
-                events.onEach { send(it) }.launchIn(this)
             } catch (t: Throwable) {
                 send(KmpBlePeripheralEvent.Error(KmpBleError.Unknown(t)))
                 close()

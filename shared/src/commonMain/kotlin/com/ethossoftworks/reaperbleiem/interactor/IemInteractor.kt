@@ -13,10 +13,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 
-data class IemState(
-    val tracks: Map<Int, Track> = emptyMap(),
-    val iems: Map<Int, IemMix> = emptyMap(),
-)
+data class IemState(val tracks: Map<Int, Track> = emptyMap(), val iems: Map<Int, IemMix> = emptyMap())
 
 data class IemMix(val trackId: Int, val volume: Float, val receives: Map<Int, ReceiveData>)
 
@@ -36,7 +33,9 @@ class IemInteractor(private val iemService: IIemService) :
 
     suspend fun connectPeripheral(peripheralId: KmpBlePeripheralId): Outcome<Unit, Any> {
         val service = (iemService as? BleCentralIemService) ?: return Outcome.Error("Not supported")
-        service.connect(peripheralId).unwrapOrReturn { return it }
+        service.connect(peripheralId).unwrapOrReturn {
+            return it
+        }
         return Outcome.Ok(Unit)
     }
 
@@ -50,6 +49,9 @@ class IemInteractor(private val iemService: IIemService) :
             .subscribe()
             .onEach { event ->
                 when (event) {
+                    IemEvent.Refresh -> {
+                        // Do Nothing. This is a command sent from the central.
+                    }
                     IemEvent.Refreshing -> update { state -> state.copy(tracks = emptyMap(), iems = emptyMap()) }
                     is IemEvent.Refreshed ->
                         update { state ->

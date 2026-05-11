@@ -181,7 +181,7 @@ private class AppleCBCentralDelegate(
                 val companyId = ((bytes[1].toInt() and 0xFF) shl 8) or (bytes[0].toInt() and 0xFF)
                 put(companyId, bytes.copyOfRange(2, bytes.size))
             }
-            
+
             val record =
                 KmpBleScanRecord(
                     name = didDiscoverPeripheral.name ?: "",
@@ -361,7 +361,7 @@ private class AppleKmpBlePeripheral(
                     .first()
             if (event.error != null) return@withScope Outcome.Error(KmpBleError.Unknown(event.error))
 
-            Outcome.Ok(characteristic.characteristic.value?.toByteArray() ?: byteArrayOf())
+            Outcome.Ok(event.data ?: byteArrayOf())
         }
 
     override suspend fun write(
@@ -434,7 +434,7 @@ private class AppleKmpBlePeripheral(
                     .filterIsInstance<PeripheralEvent.ValueChanged> {
                         it.characteristic == characteristic.characteristic
                     }
-                    .mapNotNull { it.characteristic.value?.toByteArray() }
+                    .mapNotNull { it.data }
                     .onEach { send(it) }
                     .launchIn(this)
 
@@ -453,11 +453,11 @@ private class ApplePeripheralDelegate(
 ) : CBPeripheralDelegateProtocol, NSObject() {
 
     override fun peripheral(peripheral: CBPeripheral, didDiscoverServices: NSError?) {
-        scope.launch { events.emit(PeripheralEvent.DiscoveredOrModifiedServices(peripheral, didDiscoverServices)) }
+        events.tryEmit(PeripheralEvent.DiscoveredOrModifiedServices(peripheral, didDiscoverServices))
     }
 
     override fun peripheral(peripheral: CBPeripheral, didModifyServices: List<*>) {
-        scope.launch { events.emit(PeripheralEvent.DiscoveredOrModifiedServices(peripheral, null)) }
+        events.tryEmit(PeripheralEvent.DiscoveredOrModifiedServices(peripheral, null))
     }
 
     @ObjCSignatureOverride
@@ -466,11 +466,8 @@ private class ApplePeripheralDelegate(
         didDiscoverCharacteristicsForService: CBService,
         error: NSError?,
     ) {
-        scope.launch {
-            val event =
-                PeripheralEvent.DiscoveredCharacteristics(peripheral, didDiscoverCharacteristicsForService, error)
-            events.emit(event)
-        }
+        val event = PeripheralEvent.DiscoveredCharacteristics(peripheral, didDiscoverCharacteristicsForService, error)
+        events.tryEmit(event)
     }
 
     @ObjCSignatureOverride
@@ -479,7 +476,7 @@ private class ApplePeripheralDelegate(
         didWriteValueForCharacteristic: CBCharacteristic,
         error: NSError?,
     ) {
-        scope.launch { events.emit(PeripheralEvent.WriteWithResponse(didWriteValueForCharacteristic, error)) }
+        events.tryEmit(PeripheralEvent.WriteWithResponse(didWriteValueForCharacteristic, error))
     }
 
     @ObjCSignatureOverride
@@ -488,7 +485,15 @@ private class ApplePeripheralDelegate(
         didUpdateValueForCharacteristic: CBCharacteristic,
         error: NSError?,
     ) {
-        scope.launch { events.emit(PeripheralEvent.ValueChanged(didUpdateValueForCharacteristic, error)) }
+        events.tryEmit(
+            PeripheralEvent.ValueChanged(
+                didUpdateValueForCharacteristic,
+                didUpdateValueForCharacteristic.value
+                    ?.toByteArray(), // Make sure to send the current data because the characteristic value may update
+                                     // before the value is handled in the flow
+                error,
+            )
+        )
     }
 
     @ObjCSignatureOverride
@@ -497,9 +502,7 @@ private class ApplePeripheralDelegate(
         didUpdateNotificationStateForCharacteristic: CBCharacteristic,
         error: NSError?,
     ) {
-        scope.launch {
-            events.emit(PeripheralEvent.NotificationStateChanged(didUpdateNotificationStateForCharacteristic, error))
-        }
+        events.tryEmit(PeripheralEvent.NotificationStateChanged(didUpdateNotificationStateForCharacteristic, error))
     }
 
     override fun peripheralIsReadyToSendWriteWithoutResponse(peripheral: CBPeripheral) {
@@ -515,7 +518,8 @@ private sealed class PeripheralEvent {
 
     data class WriteWithResponse(val characteristic: CBCharacteristic, val error: NSError?) : PeripheralEvent()
 
-    data class ValueChanged(val characteristic: CBCharacteristic, val error: NSError?) : PeripheralEvent()
+    data class ValueChanged(val characteristic: CBCharacteristic, val data: ByteArray?, val error: NSError?) :
+        PeripheralEvent()
 
     data class NotificationStateChanged(val characteristic: CBCharacteristic, val error: NSError?) : PeripheralEvent()
 }

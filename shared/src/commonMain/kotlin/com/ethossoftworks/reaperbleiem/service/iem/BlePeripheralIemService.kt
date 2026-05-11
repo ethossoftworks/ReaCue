@@ -112,7 +112,7 @@ class BlePeripheralIemService(
             Logger.i { "Received command - $event" }
 
             when (event) {
-                IemEvent.Refreshing -> networkIemService.refresh()
+                IemEvent.Refresh -> networkIemService.refresh()
                 is IemEvent.OutputVolumeUpdated -> networkIemService.setOutputVolume(event.trackId, event.value)
                 is IemEvent.ReceivePanUpdated ->
                     networkIemService.setReceivePan(event.trackId, event.receiveId, event.value)
@@ -120,6 +120,7 @@ class BlePeripheralIemService(
                     networkIemService.setReceiveVolume(event.trackId, event.receiveId, event.value)
                 is IemEvent.Error,
                 is IemEvent.ReceiveRegistered,
+                IemEvent.Refreshing,
                 is IemEvent.Refreshed,
                 is IemEvent.TrackNameUpdated -> return
             }
