@@ -4,5 +4,9 @@
 <dict>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSBluetoothPeripheralUsageDescription</key>
+    <string>This app requires Bluetooth access to connect to nearby devices.</string>
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>This app requires Bluetooth access to connect to nearby devices.</string>
     </dict>
 </plist>
