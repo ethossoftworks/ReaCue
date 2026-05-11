@@ -75,8 +75,8 @@ class BlePeripheralIemService(
         val isAdvertising = CompletableDeferred<Unit>()
 
         val bleChannelJob = launch {
-            for (event in bleNotificationChannel) {
-                sendBleNotification(event)
+            for (notification in bleNotificationChannel) {
+                sendBleNotification(notification)
             }
         }
 
@@ -194,7 +194,11 @@ class BlePeripheralIemService(
                     }
 
                 Logger.i { "Sending notification packet $requestId - ${packetIndex.toInt() + 1}/$packetCount" }
-                peripheralManager.notify(REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID, buffer.readByteArray())
+                peripheralManager.notify(
+                    REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID,
+                    buffer.readByteArray(),
+                    centrals = listOf(central),
+                )
             }
         }
     }
