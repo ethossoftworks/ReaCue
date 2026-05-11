@@ -52,6 +52,19 @@ kotlin {
             executable {
                 entryPoint = "main"
                 linkerOpts("-lsqlite3")
+
+                // Link Info.plist
+                freeCompilerArgs +=
+                    listOf(
+                        "-linker-option",
+                        "-sectcreate",
+                        "-linker-option",
+                        "__TEXT",
+                        "-linker-option",
+                        "__info_plist",
+                        "-linker-option",
+                        "${projectDir}/src/macosMain/resources/Info.plist",
+                    )
             }
         }
     }
