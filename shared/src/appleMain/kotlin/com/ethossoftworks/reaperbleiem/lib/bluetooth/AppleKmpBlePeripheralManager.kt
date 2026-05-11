@@ -213,17 +213,17 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
         )
 
     // TODO: I'm not a fan of the silent error here, even though this should never happen
-    override suspend fun notify(characteristicUuid: String, data: ByteArray, centralUuids: List<String>?) {
+    override suspend fun notify(characteristicUuid: String, data: ByteArray, centrals: List<KmpBleCentralId>?) {
         val mutex = sendMutexes.value[characteristicUuid] ?: return
         val characteristic = localCharacteristics.value[characteristicUuid] ?: return
-        val centrals = centralUuids?.mapNotNull { localCentrals.value[it] }
+        val centralsRefs = centrals?.mapNotNull { localCentrals.value[it] }
 
         mutex.withLock {
             while (peripheralManagerIsReadyToUpdateSubscribers.tryReceive().isSuccess) {
                 // Drain ready signal
             }
 
-            while (!peripheralManager.updateValue(data.toNSData(), characteristic, centrals)) {
+            while (!peripheralManager.updateValue(data.toNSData(), characteristic, centralsRefs)) {
                 peripheralManagerIsReadyToUpdateSubscribers.receive()
             }
         }
