@@ -92,7 +92,7 @@ class BleCentralIemService(private val bleCentralManager: IKmpBleCentralManager)
     }
 
     override suspend fun refresh() {
-        val payload = cbor.encodeToByteArray(IemEvent.serializer(), IemEvent.Refreshing)
+        val payload = cbor.encodeToByteArray(IemEvent.serializer(), IemEvent.Refresh)
         peripheral.value?.write(REAPER_BLE_IEM_COMMAND_CHARACTERISTIC_UUID, payload, KmpBleWriteMode.WithoutResponse)
     }
 
