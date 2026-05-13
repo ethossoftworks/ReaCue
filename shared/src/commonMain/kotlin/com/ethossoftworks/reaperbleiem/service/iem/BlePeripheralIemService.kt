@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package com.ethossoftworks.reaperbleiem.service.iem
 
 import co.touchlab.kermit.Logger
@@ -27,10 +29,12 @@ import kotlinx.io.readByteArray
 import kotlinx.io.writeUShort
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
-val REAPER_BLE_IEM_SERVICE_UUID = "fa6e666c-2c23-43f1-84e4-4653ebf930f4"
-val REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID = "319893ca-5fa2-4c21-9f51-bc2b1116a352"
-val REAPER_BLE_IEM_COMMAND_CHARACTERISTIC_UUID = "aa57c9ce-ada3-4779-88bb-efce418a297e"
+val REAPER_BLE_IEM_SERVICE_UUID = Uuid.parseHexDash("fa6e666c-2c23-43f1-84e4-4653ebf930f4")
+val REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID = Uuid.parseHexDash("319893ca-5fa2-4c21-9f51-bc2b1116a352")
+val REAPER_BLE_IEM_COMMAND_CHARACTERISTIC_UUID = Uuid.parseHexDash("aa57c9ce-ada3-4779-88bb-efce418a297e")
 
 @OptIn(ExperimentalSerializationApi::class)
 class BlePeripheralIemService(

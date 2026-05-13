@@ -1,7 +1,11 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package com.ethossoftworks.reaperbleiem.lib.bluetooth
 
 import com.outsidesource.oskitkmp.lib.update
 import kotlin.time.Duration.Companion.seconds
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 import kotlinx.atomicfu.AtomicRef
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
@@ -71,9 +75,9 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
     private val serviceAddedEvents = Channel<ServiceAddedEvent>(Channel.CONFLATED)
     private val peripheralManagerIsReadyToUpdateSubscribers = Channel<Unit>(Channel.CONFLATED)
     private val notificationQueue: Channel<BleNotification> = Channel(Channel.UNLIMITED)
-    private val localCharacteristics: AtomicRef<Map<String, CBMutableCharacteristic>> = atomic(emptyMap())
+    private val localCharacteristics: AtomicRef<Map<Uuid, CBMutableCharacteristic>> = atomic(emptyMap())
     private val localCentrals: AtomicRef<Map<String, CBCentral>> = atomic(emptyMap())
-    private val localCentralSubscriptions: AtomicRef<Map<String, Set<String>>> = atomic(emptyMap())
+    private val localCentralSubscriptions: AtomicRef<Map<Uuid, Set<KmpBleCentralId>>> = atomic(emptyMap())
     private val localRequests: AtomicRef<Map<Int, CBATTRequest>> = atomic(emptyMap())
     private val _state: MutableStateFlow<CBManagerState> = MutableStateFlow(CBManagerStateUnknown)
 
@@ -101,8 +105,8 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
         return localCentrals.value[central]?.maximumUpdateValueLength()?.toUInt() ?: 20u
     }
 
-    override fun subscribedCentrals(characteristicUuid: String): Set<String> {
-        return localCentralSubscriptions.value[characteristicUuid] ?: emptySet()
+    override fun subscribedCentrals(characteristic: Uuid): Set<KmpBleCentralId> {
+        return localCentralSubscriptions.value[characteristic] ?: emptySet()
     }
 
     override suspend fun advertise(advertisementData: KmpBleAdvertisementData): Flow<KmpBlePeripheralEvent> =
@@ -132,7 +136,7 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
                     buildMap {
                         this[CBAdvertisementDataLocalNameKey] = advertisementData.name
                         this[CBAdvertisementDataServiceUUIDsKey] =
-                            advertisementData.services.map { CBUUID.UUIDWithString(it.uuid) }
+                            advertisementData.services.map { CBUUID.UUIDWithData(it.uuid.toByteArray().toNSData()) }
                         if (advertisementData.manufacturerData != null) {
                             this[CBAdvertisementDataManufacturerDataKey] = advertisementData.manufacturerData
                         }
@@ -157,20 +161,24 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
         }
 
     private fun createMutableService(service: KmpBleAdvertisementService): CBMutableService {
-        return CBMutableService(type = CBUUID.UUIDWithString(service.uuid), primary = service.isPrimaryService).apply {
-            val characteristics =
-                service.characteristics.map { characteristic ->
-                    val mutableCharacteristic = characteristic.toMutableCharacteristic()
-                    localCharacteristics.update { it.update { this[characteristic.uuid] = mutableCharacteristic } }
-                    mutableCharacteristic
-                }
-            setCharacteristics(characteristics)
-        }
+        return CBMutableService(
+                type = CBUUID.UUIDWithData(service.uuid.toByteArray().toNSData()),
+                primary = service.isPrimaryService,
+            )
+            .apply {
+                val characteristics =
+                    service.characteristics.map { characteristic ->
+                        val mutableCharacteristic = characteristic.toMutableCharacteristic()
+                        localCharacteristics.update { it.update { this[characteristic.uuid] = mutableCharacteristic } }
+                        mutableCharacteristic
+                    }
+                setCharacteristics(characteristics)
+            }
     }
 
     private fun KmpBleAdvertisementCharacteristic.toMutableCharacteristic() =
         CBMutableCharacteristic(
-            type = CBUUID.UUIDWithString(uuid),
+            type = CBUUID.UUIDWithData(uuid.toByteArray().toNSData()),
             value = null,
             properties =
                 properties.fold(0uL) { accum, property ->
@@ -208,13 +216,13 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
                 },
         )
 
-    override fun notify(characteristicUuid: String, data: ByteArray, centrals: List<KmpBleCentralId>?) {
-        notificationQueue.trySend(BleNotification(characteristicUuid, data, centrals))
+    override fun notify(characteristic: Uuid, data: ByteArray, centrals: List<KmpBleCentralId>?) {
+        notificationQueue.trySend(BleNotification(characteristic, data, centrals))
     }
 
     private suspend fun processNotificationQueue() {
         for (notification in notificationQueue) {
-            val characteristic = localCharacteristics.value[notification.characteristicUuid] ?: return
+            val characteristic = localCharacteristics.value[notification.characteristic] ?: return
             val centralsRefs = notification.centrals?.mapNotNull { localCentrals.value[it] }
 
             while (peripheralManagerIsReadyToUpdateSubscribers.tryReceive().isSuccess) {
@@ -269,8 +277,8 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
 /** NSPeripheralManager */
 private class PeripheralManagerDelegate(
     private val events: MutableSharedFlow<KmpBlePeripheralEvent>,
-    private val localCentrals: AtomicRef<Map<String, CBCentral>>,
-    private val localCentralSubscriptions: AtomicRef<Map<String, Set<String>>>,
+    private val localCentrals: AtomicRef<Map<KmpBleCentralId, CBCentral>>,
+    private val localCentralSubscriptions: AtomicRef<Map<Uuid, Set<KmpBleCentralId>>>,
     private val localRequests: AtomicRef<Map<Int, CBATTRequest>>,
     private val serviceAddedEvents: Channel<ServiceAddedEvent>,
     private val state: MutableStateFlow<CBManagerState>,
@@ -283,7 +291,9 @@ private class PeripheralManagerDelegate(
     }
 
     override fun peripheralManager(peripheral: CBPeripheralManager, didAddService: CBService, error: NSError?) {
-        serviceAddedEvents.trySend(ServiceAddedEvent(uuid = didAddService.UUID.UUIDString().lowercase(), error = error))
+        serviceAddedEvents.trySend(
+            ServiceAddedEvent(uuid = Uuid.fromByteArray(didAddService.UUID.data.toByteArray()), error = error)
+        )
     }
 
     override fun peripheralManager(peripheral: CBPeripheralManager, didReceiveReadRequest: CBATTRequest) {
@@ -296,7 +306,7 @@ private class PeripheralManagerDelegate(
         events.tryEmit(
             KmpBlePeripheralEvent.ReadRequest(
                 central = centralUuid,
-                characteristicUuid = request.characteristic.UUID.UUIDString().lowercase(),
+                characteristic = Uuid.fromByteArray(request.characteristic.UUID.data.toByteArray()),
                 requestId = requestId,
                 offset = request.offset.toInt(),
             )
@@ -314,7 +324,7 @@ private class PeripheralManagerDelegate(
             events.tryEmit(
                 KmpBlePeripheralEvent.WriteRequest(
                     central = centralUuid,
-                    characteristicUuid = request.characteristic.UUID.UUIDString().lowercase(),
+                    characteristic = Uuid.fromByteArray(request.characteristic.UUID.data.toByteArray()),
                     requestId = requestId,
                     offset = request.offset.toInt(),
                     data = request.value?.toByteArray() ?: byteArrayOf(),
@@ -332,14 +342,14 @@ private class PeripheralManagerDelegate(
         localCentrals.update { it.update { this[central.identifier.UUIDString()] = central } }
         localCentralSubscriptions.update {
             it.update {
-                val characteristicUuid = didSubscribeToCharacteristic.UUID.UUIDString().lowercase()
+                val characteristicUuid = Uuid.fromByteArray(didSubscribeToCharacteristic.UUID.data.toByteArray())
                 this[characteristicUuid] = (this[characteristicUuid] ?: emptySet()) + central.identifier.UUIDString()
             }
         }
         events.tryEmit(
             KmpBlePeripheralEvent.CentralSubscribed(
                 centralId = central.identifier.UUIDString(),
-                didSubscribeToCharacteristic.UUID.UUIDString().lowercase(),
+                characteristic = Uuid.fromByteArray(didSubscribeToCharacteristic.UUID.data.toByteArray()),
             )
         )
     }
@@ -356,7 +366,7 @@ private class PeripheralManagerDelegate(
         }
         localCentralSubscriptions.update {
             it.update {
-                val characteristicUuid = didUnsubscribeFromCharacteristic.UUID.UUIDString().lowercase()
+                val characteristicUuid = Uuid.fromByteArray(didUnsubscribeFromCharacteristic.UUID.data.toByteArray())
                 this[characteristicUuid] = (this[characteristicUuid] ?: emptySet()) - central.identifier.UUIDString()
             }
         }
@@ -364,7 +374,7 @@ private class PeripheralManagerDelegate(
         events.tryEmit(
             KmpBlePeripheralEvent.CentralUnsubscribed(
                 centralId = central.identifier.UUIDString(),
-                didUnsubscribeFromCharacteristic.UUID.UUIDString().lowercase(),
+                characteristic = Uuid.fromByteArray(didUnsubscribeFromCharacteristic.UUID.data.toByteArray()),
             )
         )
     }
@@ -382,10 +392,6 @@ private class PeripheralManagerDelegate(
     }
 }
 
-private data class ServiceAddedEvent(val uuid: String, val error: NSError? = null)
+private data class ServiceAddedEvent(val uuid: Uuid, val error: NSError? = null)
 
-private data class BleNotification(
-    val characteristicUuid: String,
-    val data: ByteArray,
-    val centrals: List<KmpBleCentralId>?,
-)
+private data class BleNotification(val characteristic: Uuid, val data: ByteArray, val centrals: List<KmpBleCentralId>?)

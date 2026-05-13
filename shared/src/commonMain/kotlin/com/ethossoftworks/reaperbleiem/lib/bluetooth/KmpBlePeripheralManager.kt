@@ -1,14 +1,18 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package com.ethossoftworks.reaperbleiem.lib.bluetooth
 
 import kotlinx.coroutines.flow.Flow
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 interface IKmpBlePeripheralManager {
     fun maximumUpdateValueLengthForCentral(central: KmpBleCentralId): UInt
-    fun subscribedCentrals(characteristicUuid: String): Set<String>
+    fun subscribedCentrals(characteristic: Uuid): Set<KmpBleCentralId>
 
     suspend fun advertise(advertisementData: KmpBleAdvertisementData): Flow<KmpBlePeripheralEvent>
 
-    fun notify(characteristicUuid: String, data: ByteArray, centrals: List<KmpBleCentralId>? = null)
+    fun notify(characteristic: Uuid, data: ByteArray, centrals: List<KmpBleCentralId>? = null)
 
     suspend fun respondToRequest(
         central: KmpBleCentralId,
@@ -42,13 +46,13 @@ data class KmpBleAdvertisementData(
 )
 
 data class KmpBleAdvertisementService(
-    val uuid: String,
+    val uuid: Uuid,
     val characteristics: List<KmpBleAdvertisementCharacteristic>,
     val isPrimaryService: Boolean,
 )
 
 data class KmpBleAdvertisementCharacteristic(
-    val uuid: String,
+    val uuid: Uuid,
     val properties: Set<KmpBleGattProperty>,
     val permissions: Set<KmpBleGattPermission>,
 )
@@ -58,22 +62,22 @@ sealed class KmpBlePeripheralEvent {
 
     data object Advertising : KmpBlePeripheralEvent()
 
-    data class CentralSubscribed(val centralId: KmpBleCentralId, val characteristicUuid: String) :
+    data class CentralSubscribed(val centralId: KmpBleCentralId, val characteristic: Uuid) :
         KmpBlePeripheralEvent()
 
-    data class CentralUnsubscribed(val centralId: KmpBleCentralId, val characteristicUuid: String) :
+    data class CentralUnsubscribed(val centralId: KmpBleCentralId, val characteristic: Uuid) :
         KmpBlePeripheralEvent()
 
     data class ReadRequest(
         val central: KmpBleCentralId,
-        val characteristicUuid: String,
+        val characteristic: Uuid,
         val requestId: Int,
         val offset: Int,
     ) : KmpBlePeripheralEvent()
 
     data class WriteRequest(
         val central: KmpBleCentralId,
-        val characteristicUuid: String,
+        val characteristic: Uuid,
         val requestId: Int,
         val offset: Int,
         val data: ByteArray,

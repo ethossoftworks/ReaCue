@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package com.ethossoftworks.reaperbleiem.service.bluetooth
 
 import android.annotation.SuppressLint
@@ -25,6 +27,8 @@ import com.ethossoftworks.reaperbleiem.lib.bluetooth.awaitBond
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.withScope
 import com.outsidesource.oskitkmp.concurrency.flowIn
 import com.outsidesource.oskitkmp.outcome.Outcome
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 import kotlinx.atomicfu.AtomicRef
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
@@ -76,12 +80,22 @@ internal class AndroidKmpBleCentralManager(private val context: Context) : IKmpB
                             name = result.device.name ?: "",
                             identifier = result.device.address,
                             rssi = result.rssi,
-                            serviceUuids =
-                                result.scanRecord?.serviceUuids?.map { it.uuid.toString().lowercase() } ?: emptyList(),
+                            services =
+                                result.scanRecord?.serviceUuids?.map {
+                                    Uuid.fromLongs(it.uuid.mostSignificantBits, it.uuid.leastSignificantBits)
+                                } ?: emptyList(),
                             serviceData =
                                 buildMap {
                                     val data = result.scanRecord?.serviceData ?: return@buildMap
-                                    data.forEach { uuid, bytes -> put(uuid.uuid.toString(), bytes) }
+                                    data.forEach { uuid, bytes ->
+                                        put(
+                                            Uuid.fromLongs(
+                                                uuid.uuid.mostSignificantBits,
+                                                uuid.uuid.leastSignificantBits,
+                                            ),
+                                            bytes,
+                                        )
+                                    }
                                 },
                             manufacturerData =
                                 buildMap {
@@ -202,13 +216,13 @@ private class AndroidKmpBlePeripheral(
     override val scope: CoroutineScope,
 ) : IKmpBlePeripheral {
 
-    private val localServices: AtomicRef<Map<String, AndroidKmpBleService>> = atomic(emptyMap())
-    private val localCharacteristics: AtomicRef<Map<String, AndroidKmpBleCharacteristic>> = atomic(emptyMap())
+    private val localServices: AtomicRef<Map<Uuid, AndroidKmpBleService>> = atomic(emptyMap())
+    private val localCharacteristics: AtomicRef<Map<Uuid, AndroidKmpBleCharacteristic>> = atomic(emptyMap())
 
-    override val services: Map<String, IKmpBleService>
+    override val services: Map<Uuid, IKmpBleService>
         get() = localServices.value
 
-    override val characteristics: Map<String, IKmpBleCharacteristic>
+    override val characteristics: Map<Uuid, IKmpBleCharacteristic>
         get() = localCharacteristics.value
 
     override val connectionStatus: StateFlow<KmpBleConnectionStatus> = nordicManager.connectionStatus.asStateFlow()
@@ -229,11 +243,12 @@ private class AndroidKmpBlePeripheral(
     override suspend fun disconnect(): Outcome<Unit, KmpBleError> =
         withScope(scope) { Outcome.Ok(nordicManager.disconnect().suspend()) }
 
-    override suspend fun discoverServices(): Outcome<Map<String, IKmpBleService>, KmpBleError> =
+    override suspend fun discoverServices(): Outcome<Map<Uuid, IKmpBleService>, KmpBleError> =
         withScope(scope) {
             val serviceMap = buildMap {
                 nordicManager.getDiscoveredServicesExternal().forEach {
-                    put(it.uuid.toString(), AndroidKmpBleService(it, nordicManager, scope))
+                    val uuid = Uuid.fromLongs(it.uuid.mostSignificantBits, it.uuid.leastSignificantBits)
+                    put(uuid, AndroidKmpBleService(it, nordicManager, scope))
                 }
             }
             val characteristicMap = buildMap {
@@ -250,33 +265,33 @@ private class AndroidKmpBlePeripheral(
             Outcome.Ok(services)
         }
 
-    override suspend fun awaitBond(encryptedReadCharacteristicUuid: String): Outcome<Unit, KmpBleError> =
-        awaitBond(encryptedReadCharacteristicUuid, scope)
+    override suspend fun awaitBond(encryptedReadCharacteristic: Uuid): Outcome<Unit, KmpBleError> =
+        awaitBond(encryptedReadCharacteristic, scope)
 
     @SuppressLint("MissingPermission")
-    override suspend fun read(characteristicUuid: String): Outcome<ByteArray, KmpBleError> {
+    override suspend fun read(characteristic: Uuid): Outcome<ByteArray, KmpBleError> {
         val characteristic =
-            localCharacteristics.value[characteristicUuid] ?: return Outcome.Error(KmpBleError.UnknownCharacteristic)
+            localCharacteristics.value[characteristic] ?: return Outcome.Error(KmpBleError.UnknownCharacteristic)
         return characteristic.read()
     }
 
     @SuppressLint("MissingPermission")
     override suspend fun write(
-        characteristicUuid: String,
+        characteristic: Uuid,
         data: ByteArray,
         mode: KmpBleWriteMode,
     ): Outcome<Unit, KmpBleError> {
         val characteristic =
-            localCharacteristics.value[characteristicUuid] ?: return Outcome.Error(KmpBleError.UnknownCharacteristic)
+            localCharacteristics.value[characteristic] ?: return Outcome.Error(KmpBleError.UnknownCharacteristic)
         return characteristic.write(data, mode)
     }
 
     override suspend fun notifications(
-        characteristicUuid: String,
+        characteristic: Uuid,
         bufferSize: Int,
         bufferOverflow: BufferOverflow,
     ): Flow<ByteArray> {
-        val characteristic = localCharacteristics.value[characteristicUuid] ?: return emptyFlow()
+        val characteristic = localCharacteristics.value[characteristic] ?: return emptyFlow()
         return characteristic.notifications(bufferSize, bufferOverflow)
     }
 }
@@ -286,9 +301,14 @@ private class AndroidKmpBleService(
     val manager: NordicManagerProxy,
     scope: CoroutineScope,
 ) : IKmpBleService {
-    override val uuid: String = service.uuid.toString()
-    override val characteristics: Map<String, IKmpBleCharacteristic> = buildMap {
-        service.characteristics.forEach { put(it.uuid.toString(), AndroidKmpBleCharacteristic(it, manager, scope)) }
+    override val uuid: Uuid = Uuid.fromLongs(service.uuid.mostSignificantBits, service.uuid.leastSignificantBits)
+    override val characteristics: Map<Uuid, IKmpBleCharacteristic> = buildMap {
+        service.characteristics.forEach {
+            put(
+                Uuid.fromLongs(it.uuid.mostSignificantBits, it.uuid.leastSignificantBits),
+                AndroidKmpBleCharacteristic(it, manager, scope),
+            )
+        }
     }
 }
 
@@ -297,7 +317,8 @@ private class AndroidKmpBleCharacteristic(
     private val manager: NordicManagerProxy,
     private val scope: CoroutineScope,
 ) : IKmpBleCharacteristic {
-    override val uuid: String = characteristic.uuid.toString()
+    override val uuid: Uuid =
+        Uuid.fromLongs(characteristic.uuid.mostSignificantBits, characteristic.uuid.leastSignificantBits)
     override val properties: List<KmpBleGattProperty> = buildList {
         val props = characteristic.properties
         if ((props and BluetoothGattCharacteristic.PROPERTY_BROADCAST) > 0) add(KmpBleGattProperty.Broadcast)

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package com.ethossoftworks.reaperbleiem.lib.bluetooth
 
 import com.outsidesource.oskitkmp.concurrency.filterIsInstance
@@ -6,6 +8,8 @@ import com.outsidesource.oskitkmp.outcome.Outcome
 import com.outsidesource.oskitkmp.outcome.unwrapOrReturn
 import kotlin.getValue
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 import kotlinx.atomicfu.AtomicRef
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
@@ -189,7 +193,7 @@ private class AppleCBCentralDelegate(
                     identifier = didDiscoverPeripheral.identifier.UUIDString,
                     manufacturerData = manufacturerData,
                     serviceData = serviceData,
-                    serviceUuids = serviceUUIDs,
+                    services = serviceUUIDs,
                 )
 
             events.emit(CentralManagerEvent.ScanRecord(record))
@@ -254,17 +258,16 @@ private class AppleKmpBlePeripheral(
     private val events = MutableSharedFlow<PeripheralEvent>(replay = 0, extraBufferCapacity = Channel.UNLIMITED)
     private val canSendWriteWithoutResponseFlow = MutableStateFlow(peripheral.canSendWriteWithoutResponse)
     private val delegate = ApplePeripheralDelegate(scope, canSendWriteWithoutResponseFlow, events)
-    private val localServices: AtomicRef<Map<String, AppleKmpBleService>> = atomic(emptyMap())
-    private val localCharacteristics: AtomicRef<Map<String, AppleKmpBleCharacteristic>> = atomic(emptyMap())
+    private val localServices: AtomicRef<Map<Uuid, AppleKmpBleService>> = atomic(emptyMap())
+    private val localCharacteristics: AtomicRef<Map<Uuid, AppleKmpBleCharacteristic>> = atomic(emptyMap())
     private val localConnectionFlow = MutableStateFlow<KmpBleConnectionStatus>(KmpBleConnectionStatus.Connected)
 
-    override val services: Map<String, IKmpBleService> = localServices.value
-    override val characteristics: Map<String, IKmpBleCharacteristic> = localCharacteristics.value
+    override val services: Map<Uuid, IKmpBleService> = localServices.value
+    override val characteristics: Map<Uuid, IKmpBleCharacteristic> = localCharacteristics.value
     override val connectionStatus: StateFlow<KmpBleConnectionStatus> = localConnectionFlow.asStateFlow()
 
     init {
         peripheral.delegate = delegate
-
         scope.launch {
             appleKmpBle.centralEvents.filterIsInstance<CentralManagerEvent.Disconnected>().collect {
                 localConnectionFlow.value = KmpBleConnectionStatus.Disconnected
@@ -289,7 +292,7 @@ private class AppleKmpBlePeripheral(
             Outcome.Ok(Unit)
         }
 
-    override suspend fun discoverServices(): Outcome<Map<String, IKmpBleService>, KmpBleError> =
+    override suspend fun discoverServices(): Outcome<Map<Uuid, IKmpBleService>, KmpBleError> =
         withScope(scope) {
             peripheral.discoverServices(null)
             val event = events.filterIsInstance<PeripheralEvent.DiscoveredOrModifiedServices>().first()
@@ -343,13 +346,13 @@ private class AppleKmpBlePeripheral(
             return@withScope Outcome.Ok(serviceMap)
         }
 
-    override suspend fun awaitBond(encryptedReadCharacteristicUuid: String): Outcome<Unit, KmpBleError> =
-        awaitBond(encryptedReadCharacteristicUuid, scope)
+    override suspend fun awaitBond(encryptedReadCharacteristic: Uuid): Outcome<Unit, KmpBleError> =
+        awaitBond(encryptedReadCharacteristic, scope)
 
-    override suspend fun read(characteristicUuid: String): Outcome<ByteArray, KmpBleError> =
+    override suspend fun read(characteristic: Uuid): Outcome<ByteArray, KmpBleError> =
         withScope(scope) {
             val characteristic =
-                localCharacteristics.value[characteristicUuid]
+                localCharacteristics.value[characteristic]
                     ?: return@withScope Outcome.Error(KmpBleError.UnknownCharacteristic)
 
             peripheral.readValueForCharacteristic(characteristic.characteristic)
@@ -365,13 +368,13 @@ private class AppleKmpBlePeripheral(
         }
 
     override suspend fun write(
-        characteristicUuid: String,
+        characteristic: Uuid,
         data: ByteArray,
         mode: KmpBleWriteMode,
     ): Outcome<Unit, KmpBleError> =
         withScope(scope) {
             val characteristic =
-                localCharacteristics.value[characteristicUuid]
+                localCharacteristics.value[characteristic]
                     ?: return@withScope Outcome.Error(KmpBleError.UnknownCharacteristic)
 
             val platformMode =
@@ -407,13 +410,13 @@ private class AppleKmpBlePeripheral(
         }
 
     override suspend fun notifications(
-        characteristicUuid: String,
+        characteristic: Uuid,
         bufferSize: Int,
         bufferOverflow: BufferOverflow,
     ): Flow<ByteArray> =
         callbackFlow<ByteArray> {
                 val characteristic =
-                    localCharacteristics.value[characteristicUuid]
+                    localCharacteristics.value[characteristic]
                         ?: run {
                             close()
                             return@callbackFlow
@@ -490,7 +493,7 @@ private class ApplePeripheralDelegate(
                 didUpdateValueForCharacteristic,
                 didUpdateValueForCharacteristic.value
                     ?.toByteArray(), // Make sure to send the current data because the characteristic value may update
-                                     // before the value is handled in the flow
+                // before the value is handled in the flow
                 error,
             )
         )
@@ -526,8 +529,8 @@ private sealed class PeripheralEvent {
 
 private class AppleKmpBleService(private val service: CBService, private val peripheral: AppleKmpBlePeripheral) :
     IKmpBleService {
-    override val uuid: String = formatCbUuid(service.UUID)
-    override val characteristics: Map<String, IKmpBleCharacteristic> = buildMap {
+    override val uuid: Uuid = formatCbUuid(service.UUID)
+    override val characteristics: Map<Uuid, IKmpBleCharacteristic> = buildMap {
         service.characteristics?.forEach {
             if (it !is CBCharacteristic) return@forEach
             put(formatCbUuid(it.UUID), AppleKmpBleCharacteristic(it, peripheral))
@@ -606,11 +609,10 @@ private fun KmpBleWriteMode.toCbType(): Long =
         KmpBleWriteMode.WithoutResponse -> CBCharacteristicWriteWithoutResponse
     }
 
-private fun formatCbUuid(uuid: CBUUID): String {
+private fun formatCbUuid(uuid: CBUUID): Uuid {
     return if (uuid.UUIDString.length == 4) {
-            "0000${uuid.UUIDString}-0000-1000-8000-00805f9b34fb"
-        } else {
-            uuid.UUIDString
-        }
-        .lowercase()
+        Uuid.parseHexDash("0000${uuid.UUIDString}-0000-1000-8000-00805f9b34fb")
+    } else {
+        Uuid.fromByteArray(uuid.data.toByteArray())
+    }
 }

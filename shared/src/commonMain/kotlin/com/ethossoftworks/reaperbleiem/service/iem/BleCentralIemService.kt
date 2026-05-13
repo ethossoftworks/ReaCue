@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package com.ethossoftworks.reaperbleiem.service.iem
 
 import co.touchlab.kermit.Logger
@@ -24,6 +26,7 @@ import kotlinx.io.readByteArray
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.uuid.ExperimentalUuidApi
 
 @OptIn(ExperimentalSerializationApi::class)
 class BleCentralIemService(private val bleCentralManager: IKmpBleCentralManager) : IIemService {
@@ -35,7 +38,7 @@ class BleCentralIemService(private val bleCentralManager: IKmpBleCentralManager)
         preferCborLabelsOverNames = true
     }
 
-    fun scan() = bleCentralManager.scan().filter { it.serviceUuids.contains(REAPER_BLE_IEM_SERVICE_UUID) }
+    fun scan() = bleCentralManager.scan().filter { it.services.contains(REAPER_BLE_IEM_SERVICE_UUID) }
 
     suspend fun connect(id: KmpBlePeripheralId): Outcome<Unit, Any> {
         val connectedPeripheral =

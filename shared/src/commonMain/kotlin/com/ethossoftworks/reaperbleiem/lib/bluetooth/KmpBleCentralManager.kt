@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package com.ethossoftworks.reaperbleiem.lib.bluetooth
 
 import com.outsidesource.oskitkmp.concurrency.KmpDispatchers
@@ -15,15 +17,16 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.withContext
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 data class KmpBleScanRecord(
     val name: String,
     val identifier: KmpBlePeripheralId,
     val rssi: Int,
     val manufacturerData: Map<Int, ByteArray>,
-    val serviceData: Map<String, ByteArray>,
-    val serviceUuids: List<String>,
+    val serviceData: Map<Uuid, ByteArray>,
+    val services: List<Uuid>,
 )
 
 typealias KmpBlePeripheralId = String
@@ -46,8 +49,8 @@ enum class KmpBleConnectionStatus {
 
 interface IKmpBlePeripheral {
     val connectionStatus: StateFlow<KmpBleConnectionStatus>
-    val services: Map<String, IKmpBleService>
-    val characteristics: Map<String, IKmpBleCharacteristic>
+    val services: Map<Uuid, IKmpBleService>
+    val characteristics: Map<Uuid, IKmpBleCharacteristic>
     val scope: CoroutineScope
 
     fun mtu(mode: KmpBleWriteMode = KmpBleWriteMode.WithResponse): Int
@@ -61,7 +64,7 @@ interface IKmpBlePeripheral {
 
     suspend fun disconnect(): Outcome<Unit, KmpBleError>
 
-    suspend fun discoverServices(): Outcome<Map<String, IKmpBleService>, KmpBleError>
+    suspend fun discoverServices(): Outcome<Map<Uuid, IKmpBleService>, KmpBleError>
 
     /**
      * Await bond attempts to read from an encrypted read characteristic and watches for disconnection. This will cause
@@ -69,30 +72,30 @@ interface IKmpBlePeripheral {
      *
      * Note: This call should be done before any reads/writes on any characteristic.
      */
-    suspend fun awaitBond(encryptedReadCharacteristicUuid: String): Outcome<Unit, KmpBleError>
+    suspend fun awaitBond(encryptedReadCharacteristic: Uuid): Outcome<Unit, KmpBleError>
 
-    suspend fun read(characteristicUuid: String): Outcome<ByteArray, KmpBleError>
+    suspend fun read(characteristic: Uuid): Outcome<ByteArray, KmpBleError>
 
     suspend fun write(
-        characteristicUuid: String,
+        characteristic: Uuid,
         data: ByteArray,
         mode: KmpBleWriteMode = KmpBleWriteMode.WithResponse,
     ): Outcome<Unit, KmpBleError>
 
     suspend fun notifications(
-        characteristicUuid: String,
+        characteristic: Uuid,
         bufferSize: Int = 0,
         bufferOverflow: BufferOverflow = BufferOverflow.DROP_OLDEST,
     ): Flow<ByteArray>
 }
 
 interface IKmpBleService {
-    val uuid: String
-    val characteristics: Map<String, IKmpBleCharacteristic>
+    val uuid: Uuid
+    val characteristics: Map<Uuid, IKmpBleCharacteristic>
 }
 
 interface IKmpBleCharacteristic {
-    val uuid: String
+    val uuid: Uuid
     val properties: List<KmpBleGattProperty>
 
     val isBroadcastSupported: Boolean
@@ -128,7 +131,7 @@ interface IKmpBleCharacteristic {
 internal class KmpBlePeripheralDisconnect : CancellationException("The peripheral has disconnected")
 
 internal suspend fun IKmpBlePeripheral.awaitBond(
-    encryptedReadCharacteristicUuid: String,
+    encryptedReadCharacteristic: Uuid,
     scope: CoroutineScope,
 ): Outcome<Unit, KmpBleError> =
     withScope(scope) {
@@ -144,7 +147,7 @@ internal suspend fun IKmpBlePeripheral.awaitBond(
                     }
             }
             async {
-                when (read(encryptedReadCharacteristicUuid)) {
+                when (read(encryptedReadCharacteristic)) {
                     is Outcome.Ok -> deferred.complete(Outcome.Ok(Unit))
                     is Outcome.Error -> deferred.complete(Outcome.Error(KmpBleError.NotBonded))
                 }
