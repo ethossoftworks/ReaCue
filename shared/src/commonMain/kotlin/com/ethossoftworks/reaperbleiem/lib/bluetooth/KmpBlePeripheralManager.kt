@@ -8,7 +8,7 @@ interface IKmpBlePeripheralManager {
 
     suspend fun advertise(advertisementData: KmpBleAdvertisementData): Flow<KmpBlePeripheralEvent>
 
-    suspend fun notify(characteristicUuid: String, data: ByteArray, centrals: List<KmpBleCentralId>? = null)
+    fun notify(characteristicUuid: String, data: ByteArray, centrals: List<KmpBleCentralId>? = null)
 
     suspend fun respondToRequest(
         central: KmpBleCentralId,

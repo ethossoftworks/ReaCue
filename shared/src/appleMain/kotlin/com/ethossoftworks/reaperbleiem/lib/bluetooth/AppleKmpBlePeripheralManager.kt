@@ -15,8 +15,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import platform.CoreBluetooth.CBATTErrorInsufficientAuthentication
 import platform.CoreBluetooth.CBATTErrorInsufficientEncryption
@@ -68,10 +67,10 @@ private val KmpBleCbPeripheralQueue: dispatch_queue_t = dispatch_queue_create("k
 // TODO: Maybe add state observable for peripheral manager. Need to check how Android handles things.
 class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripheralManager)? = null) :
     IKmpBlePeripheralManager {
-    private val sendMutexes = atomic<Map<String, Mutex>>(emptyMap())
     private val events = MutableSharedFlow<KmpBlePeripheralEvent>(extraBufferCapacity = Channel.UNLIMITED)
     private val serviceAddedEvents = Channel<ServiceAddedEvent>(Channel.CONFLATED)
     private val peripheralManagerIsReadyToUpdateSubscribers = Channel<Unit>(Channel.CONFLATED)
+    private val notificationQueue: Channel<BleNotification> = Channel(Channel.UNLIMITED)
     private val localCharacteristics: AtomicRef<Map<String, CBMutableCharacteristic>> = atomic(emptyMap())
     private val localCentrals: AtomicRef<Map<String, CBCentral>> = atomic(emptyMap())
     private val localCentralSubscriptions: AtomicRef<Map<String, Set<String>>> = atomic(emptyMap())
@@ -115,15 +114,7 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
                 }
 
             try {
-                while (serviceAddedEvents.tryReceive().isSuccess) {
-                    // Drain any stale events. This should happen in typical usage, but conflated channels will hold on
-                    // to old data if advertise is stopped
-                }
-
                 for (service in advertisementData.services) {
-                    for (characteristic in service.characteristics) {
-                        sendMutexes.update { it + (characteristic.uuid to Mutex()) }
-                    }
                     peripheralManager.addService(createMutableService(service))
 
                     val response = serviceAddedEvents.receive()
@@ -134,6 +125,8 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
                 }
 
                 events.onEach { send(it) }.launchIn(this)
+
+                launch { processNotificationQueue() }
 
                 peripheralManager.startAdvertising(
                     buildMap {
@@ -156,7 +149,10 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
                 localCentrals.update { emptyMap() }
                 localCentralSubscriptions.update { emptyMap() }
                 localRequests.update { emptyMap() }
-                sendMutexes.update { emptyMap() }
+
+                // Drain any stale events. channels will hold on to old data if advertise is stopped
+                while (serviceAddedEvents.tryReceive().isSuccess) {}
+                while (notificationQueue.tryReceive().isSuccess) {}
             }
         }
 
@@ -212,18 +208,20 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
                 },
         )
 
-    // TODO: I'm not a fan of the silent error here, even though this should never happen
-    override suspend fun notify(characteristicUuid: String, data: ByteArray, centrals: List<KmpBleCentralId>?) {
-        val mutex = sendMutexes.value[characteristicUuid] ?: return
-        val characteristic = localCharacteristics.value[characteristicUuid] ?: return
-        val centralsRefs = centrals?.mapNotNull { localCentrals.value[it] }
+    override fun notify(characteristicUuid: String, data: ByteArray, centrals: List<KmpBleCentralId>?) {
+        notificationQueue.trySend(BleNotification(characteristicUuid, data, centrals))
+    }
 
-        mutex.withLock {
+    private suspend fun processNotificationQueue() {
+        for (notification in notificationQueue) {
+            val characteristic = localCharacteristics.value[notification.characteristicUuid] ?: return
+            val centralsRefs = notification.centrals?.mapNotNull { localCentrals.value[it] }
+
             while (peripheralManagerIsReadyToUpdateSubscribers.tryReceive().isSuccess) {
                 // Drain ready signal
             }
 
-            while (!peripheralManager.updateValue(data.toNSData(), characteristic, centralsRefs)) {
+            while (!peripheralManager.updateValue(notification.data.toNSData(), characteristic, centralsRefs)) {
                 peripheralManagerIsReadyToUpdateSubscribers.receive()
             }
         }
@@ -385,3 +383,9 @@ private class PeripheralManagerDelegate(
 }
 
 private data class ServiceAddedEvent(val uuid: String, val error: NSError? = null)
+
+private data class BleNotification(
+    val characteristicUuid: String,
+    val data: ByteArray,
+    val centrals: List<KmpBleCentralId>?,
+)
