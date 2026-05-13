@@ -12,6 +12,8 @@ import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattPermission
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattProperty
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralEvent
 import kotlin.math.ceil
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.getAndUpdate
 import kotlinx.atomicfu.update
@@ -29,8 +31,6 @@ import kotlinx.io.readByteArray
 import kotlinx.io.writeUShort
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
 val REAPER_BLE_IEM_SERVICE_UUID = Uuid.parseHexDash("fa6e666c-2c23-43f1-84e4-4653ebf930f4")
 val REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID = Uuid.parseHexDash("319893ca-5fa2-4c21-9f51-bc2b1116a352")
@@ -94,7 +94,7 @@ class BlePeripheralIemService(
                         is KmpBlePeripheralEvent.CentralSubscribed -> {}
                         is KmpBlePeripheralEvent.CentralUnsubscribed -> {}
                         is KmpBlePeripheralEvent.ReadRequest -> {}
-                        is KmpBlePeripheralEvent.WriteRequest -> onWriteRequest(event)
+                        is KmpBlePeripheralEvent.WriteRequest -> onWriteRequest(event, ::send)
                     }
                 }
                 .launchIn(this)
@@ -120,7 +120,10 @@ class BlePeripheralIemService(
         }
     }
 
-    private suspend fun onWriteRequest(request: KmpBlePeripheralEvent.WriteRequest) {
+    private suspend fun onWriteRequest(
+        request: KmpBlePeripheralEvent.WriteRequest,
+        send: suspend (IemEvent) -> Unit,
+    ) {
         try {
             val event = cbor.decodeFromByteArray(IemEvent.serializer(), request.data)
             Logger.i { "Received command - $event" }
@@ -142,6 +145,7 @@ class BlePeripheralIemService(
             val centrals =
                 peripheralManager.subscribedCentrals(REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID) - request.central
             sendBleNotification(event, centrals)
+            send(event)
         } catch (t: Throwable) {
             Logger.e { "Could not decode write request ${t.message}" }
         }
