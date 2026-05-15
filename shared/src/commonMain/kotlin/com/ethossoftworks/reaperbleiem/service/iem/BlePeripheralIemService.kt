@@ -120,10 +120,7 @@ class BlePeripheralIemService(
         }
     }
 
-    private suspend fun onWriteRequest(
-        request: KmpBlePeripheralEvent.WriteRequest,
-        send: suspend (IemEvent) -> Unit,
-    ) {
+    private suspend fun onWriteRequest(request: KmpBlePeripheralEvent.WriteRequest, send: suspend (IemEvent) -> Unit) {
         try {
             val event = cbor.decodeFromByteArray(IemEvent.serializer(), request.data)
             Logger.i { "Received command - $event" }
