@@ -10,11 +10,14 @@ import com.outsidesource.oskitkmp.interactor.Interactor
 import com.outsidesource.oskitkmp.lib.update
 import com.outsidesource.oskitkmp.outcome.Outcome
 import com.outsidesource.oskitkmp.outcome.unwrapOrReturn
+import kotlinx.collections.immutable.PersistentMap
+import kotlinx.collections.immutable.mutate
+import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 
-data class IemState(val tracks: Map<Int, Track> = emptyMap())
+data class IemState(val tracks: PersistentMap<Int, Track> = persistentMapOf())
 
 class IemInteractor(private val iemService: IIemService) :
     Interactor<IemState>(dependencies = emptyList(), initialState = IemState()) {
@@ -43,7 +46,7 @@ class IemInteractor(private val iemService: IIemService) :
                     IemEvent.Reset -> {
                         // Do Nothing. These are commands sent from the central.
                     }
-                    IemEvent.Refreshing -> update { state -> state.copy(tracks = emptyMap()) }
+                    IemEvent.Refreshing -> update { state -> state.copy(tracks = persistentMapOf()) }
                     is IemEvent.Refreshed -> update { state -> state.copy(tracks = event.tracks) }
                     is IemEvent.OutputVolumeUpdated ->
                         updateHardwareOutput(event.trackId) { it.copy(volume = event.value) }
@@ -55,16 +58,16 @@ class IemInteractor(private val iemService: IIemService) :
                         update { state ->
                             state.copy(
                                 tracks =
-                                    state.tracks.update {
-                                        val track = this[event.trackId] ?: return@update
-                                        this[event.trackId] = track.copy(name = event.name)
+                                    state.tracks.mutate { tracks ->
+                                        val track = tracks[event.trackId] ?: return@mutate
+                                        tracks[event.trackId] = track.copy(name = event.name)
                                     }
                             )
                         }
-                    is IemEvent.Error -> update { state -> state.copy(tracks = emptyMap()) }
+                    is IemEvent.Error -> update { state -> state.copy(tracks = persistentMapOf()) }
                 }
             }
-            .onCompletion { update { state -> state.copy(tracks = emptyMap()) } }
+            .onCompletion { update { state -> state.copy(tracks = persistentMapOf()) } }
 
     suspend fun setOutputVolume(trackId: Int, value: Float) {
         iemService.setOutputVolume(trackId, value)
@@ -84,14 +87,14 @@ class IemInteractor(private val iemService: IIemService) :
         update { state ->
             state.copy(
                 tracks =
-                    state.tracks.update {
-                        val track = this[trackId] ?: return@update
-                        this[trackId] =
+                    state.tracks.mutate { tracks ->
+                        val track = tracks[trackId] ?: return@mutate
+                        tracks[trackId] =
                             track.copy(
                                 receives =
-                                    track.receives.update {
-                                        val receive = this[receiveId] ?: return@update
-                                        this[receive.id] = block(receive)
+                                    track.receives.mutate { receives ->
+                                        val receive = receives[receiveId] ?: return@mutate
+                                        receives[receive.id] = block(receive)
                                     }
                             )
                     }
@@ -103,14 +106,14 @@ class IemInteractor(private val iemService: IIemService) :
         update { state ->
             state.copy(
                 tracks =
-                    state.tracks.update {
-                        val track = this[trackId] ?: return@update
-                        this[trackId] =
+                    state.tracks.mutate { tracks ->
+                        val track = tracks[trackId] ?: return@mutate
+                        tracks[trackId] =
                             track.copy(
                                 hardwareOuts =
-                                    track.hardwareOuts.update {
-                                        val hwOut = values.firstOrNull() ?: return@update
-                                        this[hwOut.id] = block(hwOut)
+                                    track.hardwareOuts.mutate { hwOuts ->
+                                        val hwOut = hwOuts.values.firstOrNull() ?: return@mutate
+                                        hwOuts[hwOut.id] = block(hwOut)
                                     }
                             )
                     }

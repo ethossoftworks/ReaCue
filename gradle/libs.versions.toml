@@ -27,6 +27,7 @@ ktfmt = "0.26.0"
 navigationEvent = "1.1.1"
 navigationEventCompose = "1.0.1"
 serializationCbor = "1.11.0"
+kotlinxImmutableCollections = "0.5.0-beta01"
 
 [libraries]
 desugar_jdk_libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar_jdk_libs" }
@@ -37,6 +38,7 @@ kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
 koin-core = { module = "io.insert-koin:koin-core", version.ref = "koinCore" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutinesCore" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutinesCore" }
+kotlinxImmutableCollections = { module = "org.jetbrains.kotlinx:kotlinx-collections-immutable", version.ref = "kotlinxImmutableCollections" }
 oskit-compose = { module = "com.outsidesource:oskit-compose", version.ref = "oskitCompose" }
 oskit-kmp = { module = "com.outsidesource:oskit-kmp", version.ref = "oskitKmp" }
 nordic-ble-client-kotlin = { module = "no.nordicsemi.android.kotlin.ble:client", version.ref = "nordic-ble-kotlin" }

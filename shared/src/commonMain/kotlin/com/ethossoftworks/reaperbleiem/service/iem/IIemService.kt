@@ -1,12 +1,16 @@
 @file:OptIn(ExperimentalSerializationApi::class)
+@file:UseSerializers(PersistentMapSerializer::class)
 
 package com.ethossoftworks.reaperbleiem.service.iem
 
+import com.ethossoftworks.reaperbleiem.lib.PersistentMapSerializer
+import kotlinx.collections.immutable.PersistentMap
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
 import kotlinx.serialization.cbor.CborLabel
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
@@ -35,7 +39,9 @@ sealed class IemEvent {
 
     @Serializable @SerialName("1") data object Refreshing : IemEvent()
 
-    @Serializable @SerialName("2") data class Refreshed(@CborLabel(1) val tracks: Map<Int, Track>) : IemEvent()
+    @Serializable
+    @SerialName("2")
+    data class Refreshed(@CborLabel(1) val tracks: PersistentMap<Int, Track>) : IemEvent()
 
     @Serializable
     @SerialName("3")
@@ -61,8 +67,7 @@ sealed class IemEvent {
     @SerialName("7")
     data class OutputVolumeUpdated(@CborLabel(1) val trackId: Int, @CborLabel(2) val value: Float) : IemEvent()
 
-    @SerialName("8")
-    data object Reset : IemEvent()
+    @SerialName("8") data object Reset : IemEvent()
 
     @Serializable(with = IemErrorEventSerializer::class)
     @SerialName("9")
@@ -73,8 +78,8 @@ sealed class IemEvent {
 data class Track(
     @CborLabel(1) val id: Int,
     @CborLabel(2) val name: String,
-    @CborLabel(4) val receives: Map<Int, Mix>,
-    @CborLabel(5) val hardwareOuts: Map<Int, Mix>,
+    @CborLabel(4) val receives: PersistentMap<Int, Mix>,
+    @CborLabel(5) val hardwareOuts: PersistentMap<Int, Mix>,
 ) {
     val isIem = hardwareOuts.isNotEmpty() && receives.isNotEmpty()
 }

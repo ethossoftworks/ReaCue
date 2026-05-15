@@ -102,6 +102,7 @@ kotlin {
             implementation(libs.navigationEvent)
             implementation(libs.navigationEvent.compose)
             implementation(libs.kotlinxSerializationCbor)
+            implementation(libs.kotlinxImmutableCollections)
         }
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)

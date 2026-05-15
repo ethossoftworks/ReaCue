@@ -18,6 +18,8 @@ import kotlin.math.absoluteValue
 import kotlin.math.pow
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
+import kotlinx.collections.immutable.PersistentMap
+import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -107,12 +109,13 @@ class NetworkIemService(
         oscSocket.update { null }
     }
 
-    private suspend fun getTracks(): Map<Int, Track> {
+    private suspend fun getTracks(): PersistentMap<Int, Track> {
         val tracksResponse = httpClient.get("$restDomain/_/TRACK")
-        if (!tracksResponse.status.isSuccess()) return emptyMap()
+        if (!tracksResponse.status.isSuccess()) return persistentMapOf()
+        val tracks = persistentMapOf<Int, Track>().builder()
 
-        return tracksResponse.bodyAsText().split("\n").mapNotNull { track ->
-            if (!track.startsWith("TRACK")) return@mapNotNull null
+        tracksResponse.bodyAsText().split("\n").forEach { track ->
+            if (!track.startsWith("TRACK")) return@forEach
             val tokens = track.split("\t")
 
             val trackId = tokens[1].toInt()
@@ -129,10 +132,10 @@ class NetworkIemService(
             }
 
             val mixesResponse = httpClient.get("$restDomain/_/$request")
-            if (!mixesResponse.status.isSuccess()) return emptyMap()
+            if (!mixesResponse.status.isSuccess()) return@forEach
 
-            val hardwareOuts = mutableMapOf<Int, Mix>()
-            val receives = mutableMapOf<Int, Mix>()
+            val hardwareOuts = persistentMapOf<Int, Mix>().builder()
+            val receives = persistentMapOf<Int, Mix>().builder()
 
             mixesResponse.bodyAsText().split("\n").mapNotNull { mix ->
                 if (!mix.startsWith("SEND")) return@mapNotNull null
@@ -147,8 +150,11 @@ class NetworkIemService(
                 if (trackId == -1) hardwareOuts[id] = mix else receives[mix.id] = mix
             }
 
-            Track(id = trackId, name = tokens[2], receives = receives.toMap(), hardwareOuts = hardwareOuts.toMap())
-        }.associateBy { it.id }
+            tracks[trackId] =
+                Track(id = trackId, name = tokens[2], receives = receives.build(), hardwareOuts = hardwareOuts.build())
+        }
+
+        return tracks.build()
     }
 
     private fun List<OscMessage>.toIemEvents(): List<IemEvent> = mapNotNull { message ->

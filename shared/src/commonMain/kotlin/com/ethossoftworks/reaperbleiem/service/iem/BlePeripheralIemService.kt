@@ -18,6 +18,7 @@ import kotlin.uuid.Uuid
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.getAndUpdate
 import kotlinx.atomicfu.update
+import kotlinx.collections.immutable.mutate
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
@@ -218,14 +219,14 @@ class BlePeripheralIemService(
                     val state = it ?: return@update null
                     state.copy(
                         tracks =
-                            state.tracks.update {
-                                val track = this[event.trackId] ?: return@update
-                                this[event.trackId] =
+                            state.tracks.mutate { tracks ->
+                                val track = tracks[event.trackId] ?: return@mutate
+                                tracks[event.trackId] =
                                     track.copy(
                                         hardwareOuts =
-                                            track.hardwareOuts.update {
-                                                val hwOut = values.firstOrNull() ?: return@update
-                                                this[hwOut.id] = hwOut.copy(volume = event.value)
+                                            track.hardwareOuts.mutate { hwOuts ->
+                                                val hwOut = hwOuts.values.firstOrNull() ?: return@mutate
+                                                hwOuts[hwOut.id] = hwOut.copy(volume = event.value)
                                             }
                                     )
                             }
@@ -236,14 +237,14 @@ class BlePeripheralIemService(
                     val state = it ?: return@update null
                     state.copy(
                         tracks =
-                            state.tracks.update {
-                                val track = this[event.trackId] ?: return@update
-                                this[event.trackId] =
+                            state.tracks.mutate { tracks ->
+                                val track = tracks[event.trackId] ?: return@mutate
+                                tracks[event.trackId] =
                                     track.copy(
                                         receives =
-                                            track.receives.update {
-                                                val receive = track.receives[event.receiveId] ?: return@update
-                                                this[receive.id] = receive.copy(pan = event.value)
+                                            track.receives.mutate { receives ->
+                                                val receive = receives[event.receiveId] ?: return@mutate
+                                                receives[receive.id] = receive.copy(pan = event.value)
                                             }
                                     )
                             }
@@ -254,14 +255,14 @@ class BlePeripheralIemService(
                     val state = it ?: return@update null
                     state.copy(
                         tracks =
-                            state.tracks.update {
-                                val track = this[event.trackId] ?: return@update
-                                this[event.trackId] =
+                            state.tracks.mutate { tracks ->
+                                val track = tracks[event.trackId] ?: return@mutate
+                                tracks[event.trackId] =
                                     track.copy(
                                         receives =
-                                            track.receives.update {
-                                                val receive = track.receives[event.receiveId] ?: return@update
-                                                this[receive.id] = receive.copy(volume = event.value)
+                                            track.receives.mutate { receives ->
+                                                val receive = receives[event.receiveId] ?: return@mutate
+                                                receives[receive.id] = receive.copy(volume = event.value)
                                             }
                                     )
                             }
@@ -273,9 +274,9 @@ class BlePeripheralIemService(
                     val state = it ?: return@update null
                     state.copy(
                         tracks =
-                            state.tracks.update {
-                                val track = this[event.trackId] ?: return@update
-                                this[event.trackId] = track.copy(name = track.name)
+                            state.tracks.mutate { tracks ->
+                                val track = tracks[event.trackId] ?: return@mutate
+                                tracks[event.trackId] = track.copy(name = track.name)
                             }
                     )
                 }
