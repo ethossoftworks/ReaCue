@@ -11,6 +11,7 @@ import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleCentralId
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattPermission
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattProperty
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralEvent
+import com.outsidesource.oskitkmp.lib.update
 import kotlin.math.ceil
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -108,7 +109,7 @@ class BlePeripheralIemService(
                 .onEach { event ->
                     Logger.i { "Received event from Reaper - $event" }
                     send(event)
-                    if (event is IemEvent.Refreshed) lastRefreshedEvent.update { event }
+                    updateLastRefreshedEvent(event)
                     bleNotificationChannel.trySend(event)
                 }
                 .launchIn(this)
@@ -125,12 +126,17 @@ class BlePeripheralIemService(
             val event = cbor.decodeFromByteArray(IemEvent.serializer(), request.data)
             Logger.i { "Received command - $event" }
 
+            updateLastRefreshedEvent(event)
+
             when (event) {
                 IemEvent.Refresh -> {
-                    val refreshEvent = lastRefreshedEvent.value ?: return
-                    sendBleNotification(refreshEvent, setOf(request.central))
+                    sendBleNotification(lastRefreshedEvent.value ?: return, setOf(request.central))
+                    return
                 }
-                IemEvent.Reset -> networkIemService.refresh()
+                IemEvent.Reset -> {
+                    networkIemService.refresh()
+                    return
+                }
                 is IemEvent.OutputVolumeUpdated -> networkIemService.setOutputVolume(event.trackId, event.value)
                 is IemEvent.ReceivePanUpdated ->
                     networkIemService.setReceivePan(event.trackId, event.receiveId, event.value)
@@ -202,6 +208,81 @@ class BlePeripheralIemService(
                     centrals = listOf(central),
                 )
             }
+        }
+    }
+
+    private fun updateLastRefreshedEvent(event: IemEvent) {
+        when (event) {
+            is IemEvent.OutputVolumeUpdated ->
+                lastRefreshedEvent.update {
+                    val state = it ?: return@update null
+                    state.copy(
+                        tracks =
+                            state.tracks.update {
+                                val track = this[event.trackId] ?: return@update
+                                this[event.trackId] =
+                                    track.copy(
+                                        hardwareOuts =
+                                            track.hardwareOuts.update {
+                                                val hwOut = values.firstOrNull() ?: return@update
+                                                this[hwOut.id] = hwOut.copy(volume = event.value)
+                                            }
+                                    )
+                            }
+                    )
+                }
+            is IemEvent.ReceivePanUpdated ->
+                lastRefreshedEvent.update {
+                    val state = it ?: return@update null
+                    state.copy(
+                        tracks =
+                            state.tracks.update {
+                                val track = this[event.trackId] ?: return@update
+                                this[event.trackId] =
+                                    track.copy(
+                                        receives =
+                                            track.receives.update {
+                                                val receive = track.receives[event.receiveId] ?: return@update
+                                                this[receive.id] = receive.copy(pan = event.value)
+                                            }
+                                    )
+                            }
+                    )
+                }
+            is IemEvent.ReceiveVolumeUpdated ->
+                lastRefreshedEvent.update {
+                    val state = it ?: return@update null
+                    state.copy(
+                        tracks =
+                            state.tracks.update {
+                                val track = this[event.trackId] ?: return@update
+                                this[event.trackId] =
+                                    track.copy(
+                                        receives =
+                                            track.receives.update {
+                                                val receive = track.receives[event.receiveId] ?: return@update
+                                                this[receive.id] = receive.copy(volume = event.value)
+                                            }
+                                    )
+                            }
+                    )
+                }
+            is IemEvent.Refreshed -> lastRefreshedEvent.update { event }
+            is IemEvent.TrackNameUpdated ->
+                lastRefreshedEvent.update {
+                    val state = it ?: return@update null
+                    state.copy(
+                        tracks =
+                            state.tracks.update {
+                                val track = this[event.trackId] ?: return@update
+                                this[event.trackId] = track.copy(name = track.name)
+                            }
+                    )
+                }
+            IemEvent.Refresh,
+            IemEvent.Refreshing,
+            IemEvent.Reset,
+            is IemEvent.Error -> return
         }
     }
 }

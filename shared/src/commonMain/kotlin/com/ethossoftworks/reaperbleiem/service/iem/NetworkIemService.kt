@@ -79,10 +79,10 @@ class NetworkIemService(
     override suspend fun refresh() {
         events.emit(IemEvent.Refreshing)
         val tracks = getTracks()
-        trackCache.update { tracks.associateBy { it.id } }
+        trackCache.update { tracks }
         events.emit(IemEvent.Refreshed(tracks))
         oscSetTrackNotificationCount(tracks.size - 1) // -1 because master is reported regardless
-        oscSetReceiveNotificationCount(tracks.maxOf { if (it.isIem) it.receives.size else 0 })
+        oscSetReceiveNotificationCount(tracks.values.maxOf { if (it.isIem) it.receives.size else 0 })
         oscReset()
     }
 
@@ -107,9 +107,9 @@ class NetworkIemService(
         oscSocket.update { null }
     }
 
-    private suspend fun getTracks(): List<Track> {
+    private suspend fun getTracks(): Map<Int, Track> {
         val tracksResponse = httpClient.get("$restDomain/_/TRACK")
-        if (!tracksResponse.status.isSuccess()) return emptyList()
+        if (!tracksResponse.status.isSuccess()) return emptyMap()
 
         return tracksResponse.bodyAsText().split("\n").mapNotNull { track ->
             if (!track.startsWith("TRACK")) return@mapNotNull null
@@ -129,7 +129,7 @@ class NetworkIemService(
             }
 
             val mixesResponse = httpClient.get("$restDomain/_/$request")
-            if (!mixesResponse.status.isSuccess()) return emptyList()
+            if (!mixesResponse.status.isSuccess()) return emptyMap()
 
             val hardwareOuts = mutableMapOf<Int, Mix>()
             val receives = mutableMapOf<Int, Mix>()
@@ -148,7 +148,7 @@ class NetworkIemService(
             }
 
             Track(id = trackId, name = tokens[2], receives = receives.toMap(), hardwareOuts = hardwareOuts.toMap())
-        }
+        }.associateBy { it.id }
     }
 
     private fun List<OscMessage>.toIemEvents(): List<IemEvent> = mapNotNull { message ->

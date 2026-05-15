@@ -35,7 +35,7 @@ sealed class IemEvent {
 
     @Serializable @SerialName("1") data object Refreshing : IemEvent()
 
-    @Serializable @SerialName("2") data class Refreshed(@CborLabel(1) val tracks: List<Track>) : IemEvent()
+    @Serializable @SerialName("2") data class Refreshed(@CborLabel(1) val tracks: Map<Int, Track>) : IemEvent()
 
     @Serializable
     @SerialName("3")

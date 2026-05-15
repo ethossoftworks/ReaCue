@@ -44,7 +44,7 @@ class IemInteractor(private val iemService: IIemService) :
                         // Do Nothing. These are commands sent from the central.
                     }
                     IemEvent.Refreshing -> update { state -> state.copy(tracks = emptyMap()) }
-                    is IemEvent.Refreshed -> update { state -> state.copy(tracks = event.tracks.associateBy { it.id }) }
+                    is IemEvent.Refreshed -> update { state -> state.copy(tracks = event.tracks) }
                     is IemEvent.OutputVolumeUpdated ->
                         updateHardwareOutput(event.trackId) { it.copy(volume = event.value) }
                     is IemEvent.ReceivePanUpdated ->
