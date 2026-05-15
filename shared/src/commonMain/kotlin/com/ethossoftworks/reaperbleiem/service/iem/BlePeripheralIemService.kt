@@ -133,7 +133,6 @@ class BlePeripheralIemService(
                 is IemEvent.ReceiveVolumeUpdated ->
                     networkIemService.setReceiveVolume(event.trackId, event.receiveId, event.value)
                 is IemEvent.Error,
-                is IemEvent.ReceiveRegistered,
                 IemEvent.Refreshing,
                 is IemEvent.Refreshed,
                 is IemEvent.TrackNameUpdated -> return

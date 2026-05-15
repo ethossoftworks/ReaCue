@@ -213,7 +213,6 @@ DEVICE_ROTARY_CENTER 0
 # configuration, copy this file and edit the copy.
 
 TRACK_NAME s/track/@/name
-TRACK_RECV_NAME s/track/@/recv/@/name
 TRACK_RECV_VOLUME n/track/@/recv/@/volume
 TRACK_RECV_PAN n/track/@/recv/@/pan
 TRACK_SEND_VOLUME n/track/@/send/@/volume

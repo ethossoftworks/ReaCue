@@ -56,11 +56,12 @@ fun IemScreen(interactor: IemScreenViewInteractor = rememberInjectForRoute()) {
                 )
 
                 ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    state.iems.forEach { selectionOption ->
+                    state.tracks.forEach { (trackId, track) ->
+                        if (!track.isIem) return@forEach
                         DropdownMenuItem(
-                            text = { Text(text = state.tracks[selectionOption.key]?.name ?: return@DropdownMenuItem) },
+                            text = { Text(text = state.tracks[trackId]?.name ?: return@DropdownMenuItem) },
                             onClick = {
-                                interactor.onIemSelect(selectionOption.value.trackId)
+                                interactor.onIemSelect(trackId)
                                 expanded = false
                             },
                             contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
@@ -78,19 +79,20 @@ fun IemScreen(interactor: IemScreenViewInteractor = rememberInjectForRoute()) {
             Button(onClick = interactor::onRefreshClick) { Text(text = "Refresh") }
         }
 
-        val mix = state.iems[state.selectedIemId] ?: return@Column
+        val track = state.tracks[state.selectedIemId] ?: return@Column
+        val hardwareOut = track.hardwareOuts.values.firstOrNull()
 
         Column {
             Text("Output")
-            Slider(value = mix.volume, onValueChange = { interactor.onOutputVolumeChange(mix.trackId, it) })
+            Slider(value = hardwareOut?.volume ?: 0f, onValueChange = { interactor.onOutputVolumeChange(track.id, it) })
         }
 
-        for (receive in mix.receives) {
+        for (receive in track.receives) {
             Column {
-                Text(state.tracks[receive.value.srcTrackId]?.name ?: continue)
+                Text(state.tracks[receive.value.trackId]?.name ?: continue)
                 Slider(
                     value = receive.value.volume,
-                    onValueChange = { interactor.onReceiveVolumeChange(mix.trackId, receive.key, it) },
+                    onValueChange = { interactor.onReceiveVolumeChange(track.id, receive.key, it) },
                 )
             }
         }

@@ -14,7 +14,8 @@ import io.ktor.network.sockets.InetSocketAddress
 import io.ktor.network.sockets.aSocket
 import io.ktor.utils.io.core.buildPacket
 import io.ktor.utils.io.core.discard
-import kotlin.collections.get
+import kotlin.math.absoluteValue
+import kotlin.math.pow
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
 import kotlinx.coroutines.CompletableDeferred
@@ -83,7 +84,7 @@ class NetworkIemService(
         trackNameCache.update { buildMap { tracks.forEach { this[it.name] = it.id } } }
         events.emit(IemEvent.Refreshed(tracks))
         oscSetTrackNotificationCount(tracks.size - 1) // -1 because master is reported regardless
-        oscSetReceiveNotificationCount(tracks.maxOf { if (it.isIem) it.receiveCount else 0 })
+        oscSetReceiveNotificationCount(tracks.maxOf { if (it.isIem) it.receives.size else 0 })
         oscReset()
     }
 
@@ -109,20 +110,46 @@ class NetworkIemService(
     }
 
     private suspend fun getTracks(): List<Track> {
-        val response = httpClient.get("$restDomain/_/TRACK")
-        if (!response.status.isSuccess()) return emptyList()
+        val tracksResponse = httpClient.get("$restDomain/_/TRACK")
+        if (!tracksResponse.status.isSuccess()) return emptyList()
 
-        return response.bodyAsText().split("\n").mapNotNull { track ->
+        return tracksResponse.bodyAsText().split("\n").mapNotNull { track ->
             if (!track.startsWith("TRACK")) return@mapNotNull null
             val tokens = track.split("\t")
 
-            Track(
-                id = tokens[1].toInt(),
-                name = tokens[2],
-                sendCount = tokens[10].toInt(),
-                receiveCount = tokens[11].toInt(),
-                hardwareOutCount = tokens[12].toInt(),
-            )
+            val trackId = tokens[1].toInt()
+            val receiveCount = tokens[11].toInt()
+            val hardwareOutCount = tokens[12].toInt()
+
+            val request = buildString {
+                for (i in 0 until hardwareOutCount) {
+                    append("GET/TRACK/$trackId/SEND/$i;")
+                }
+                for (i in 1..receiveCount) {
+                    append("GET/TRACK/$trackId/SEND/-$i;")
+                }
+            }
+
+            val mixesResponse = httpClient.get("$restDomain/_/$request")
+            if (!mixesResponse.status.isSuccess()) return emptyList()
+
+            val hardwareOuts = mutableMapOf<Int, Mix>()
+            val receives = mutableMapOf<Int, Mix>()
+
+            mixesResponse.bodyAsText().split("\n").mapNotNull { mix ->
+                if (!mix.startsWith("SEND")) return@mapNotNull null
+                val tokens = mix.split("\t")
+
+                val id = tokens[2].toInt().absoluteValue
+                val volume = normalizeWebVolume(tokens[4].toDouble())
+                val pan = normalizeWebPan(tokens[5].toDouble())
+                val trackId = tokens[6].toInt()
+
+                val mix = Mix(id = id, volume = volume, pan = pan, trackId = trackId)
+                if (trackId == -1) hardwareOuts[id] = mix else receives[mix.id] = mix
+            }
+
+            Track(id = trackId, name = tokens[2], receives = receives.toMap(), hardwareOuts = hardwareOuts.toMap())
         }
     }
 
@@ -140,10 +167,6 @@ class NetworkIemService(
                 if (trackCache.value[trackId]?.isIem != true) return@mapNotNull null
                 val receiveId = parts[3].toInt()
                 when (parts[4]) {
-                    "name" -> {
-                        val srcTrackId = trackNameCache.value[message.arguments[0]] ?: return@mapNotNull null
-                        IemEvent.ReceiveRegistered(trackId = trackId, receiveId = receiveId, srcTrackId = srcTrackId)
-                    }
                     "pan" ->
                         IemEvent.ReceivePanUpdated(
                             trackId = trackId,
@@ -288,6 +311,17 @@ class NetworkIemService(
         val totalBytes = (tokenLength + 4) and 3.inv()
         discard((totalBytes - tokenLength).toLong())
         return totalBytes - tokenLength
+    }
+
+    private fun normalizeWebVolume(value: Double): Float {
+        if (value <= 0.0) return 0.0.toFloat()
+        val maxGainLinear = 10.0.pow(12.0 / 20.0)
+        val oscValue = (value / maxGainLinear).pow(0.25)
+        return oscValue.coerceIn(0.0, 1.0).toFloat()
+    }
+
+    private fun normalizeWebPan(value: Double): Float {
+        return ((value + 1.0) / 2.0).coerceIn(0.0, 1.0).toFloat()
     }
 }
 

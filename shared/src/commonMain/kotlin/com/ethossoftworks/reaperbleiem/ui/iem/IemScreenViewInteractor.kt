@@ -2,7 +2,6 @@ package com.ethossoftworks.reaperbleiem.ui.iem
 
 import com.ethossoftworks.reaperbleiem.interactor.CapabilityInteractor
 import com.ethossoftworks.reaperbleiem.interactor.IemInteractor
-import com.ethossoftworks.reaperbleiem.interactor.IemMix
 import com.ethossoftworks.reaperbleiem.interactor.InfoMessageInteractor
 import com.ethossoftworks.reaperbleiem.service.iem.Track
 import com.outsidesource.oskitkmp.capability.CapabilityStatus
@@ -12,7 +11,6 @@ import kotlinx.coroutines.launch
 data class IemScreenViewState(
     val bluetoothStatus: CapabilityStatus = CapabilityStatus.Unknown,
     val isServiceRunning: Boolean = false,
-    val iems: Map<Int, IemMix> = emptyMap(),
     val selectedIemId: Int? = null,
     val tracks: Map<Int, Track> = emptyMap(),
 )
@@ -31,7 +29,6 @@ class IemScreenViewInteractor(
         return state.copy(
             bluetoothStatus = capabilityInteractor.state.bluetoothStatus,
             tracks = iemInteractor.state.tracks,
-            iems = iemInteractor.state.iems,
         )
     }
 

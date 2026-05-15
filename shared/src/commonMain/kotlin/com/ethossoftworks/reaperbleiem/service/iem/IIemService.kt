@@ -42,14 +42,6 @@ sealed class IemEvent {
     data class TrackNameUpdated(@CborLabel(1) val trackId: Int, @CborLabel(2) val name: String) : IemEvent()
 
     @Serializable
-    @SerialName("4")
-    data class ReceiveRegistered(
-        @CborLabel(1) val trackId: Int,
-        @CborLabel(2) val receiveId: Int,
-        @CborLabel(3) val srcTrackId: Int,
-    ) : IemEvent()
-
-    @Serializable
     @SerialName("5")
     data class ReceivePanUpdated(
         @CborLabel(1) val trackId: Int,
@@ -78,11 +70,10 @@ sealed class IemEvent {
 data class Track(
     @CborLabel(1) val id: Int,
     @CborLabel(2) val name: String,
-    @CborLabel(3) val sendCount: Int,
-    @CborLabel(4) val receiveCount: Int,
-    @CborLabel(5) val hardwareOutCount: Int,
+    @CborLabel(4) val receives: Map<Int, Mix>,
+    @CborLabel(5) val hardwareOuts: Map<Int, Mix>,
 ) {
-    val isIem = hardwareOutCount > 0 && receiveCount > 0
+    val isIem = hardwareOuts.isNotEmpty() && receives.isNotEmpty()
 }
 
 object IemErrorEventSerializer : KSerializer<IemEvent.Error> {
@@ -96,3 +87,13 @@ object IemErrorEventSerializer : KSerializer<IemEvent.Error> {
         encoder.encodeString(value.error.toString())
     }
 }
+
+@Serializable
+data class Mix(
+    @CborLabel(1) val id: Int, // The id for the hardware out or receive
+    @CborLabel(2)
+    val trackId: Int, // The track ID the mix is sending to or receiving from -1 means it's a hardware output
+    @CborLabel(3) val volume: Float = 0f,
+    @CborLabel(4) val pan: Float = .5f,
+    @CborLabel(5) val isMuted: Boolean = false,
+)
