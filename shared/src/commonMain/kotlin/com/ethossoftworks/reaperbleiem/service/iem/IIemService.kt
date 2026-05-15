@@ -61,9 +61,12 @@ sealed class IemEvent {
     @SerialName("7")
     data class OutputVolumeUpdated(@CborLabel(1) val trackId: Int, @CborLabel(2) val value: Float) : IemEvent()
 
-    @Serializable(with = IemErrorEventSerializer::class)
     @SerialName("8")
-    class Error(@CborLabel(1) val error: Any) : IemEvent()
+    data object Reset : IemEvent()
+
+    @Serializable(with = IemErrorEventSerializer::class)
+    @SerialName("9")
+    data class Error(@CborLabel(1) val error: Any) : IemEvent()
 }
 
 @Serializable

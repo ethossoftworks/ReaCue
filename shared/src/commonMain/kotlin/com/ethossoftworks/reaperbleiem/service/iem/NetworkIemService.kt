@@ -46,7 +46,6 @@ class NetworkIemService(
     private val oscSocket = atomic<BoundDatagramSocket?>(null)
     private val paddingBuffer = byteArrayOf(0x00, 0x00, 0x00)
     private val events = MutableSharedFlow<IemEvent>()
-    private val trackNameCache = atomic<Map<String, Int>>(emptyMap())
     private val trackCache = atomic<Map<Int, Track>>(emptyMap())
 
     override fun subscribe(): Flow<IemEvent> = callbackFlow {
@@ -81,7 +80,6 @@ class NetworkIemService(
         events.emit(IemEvent.Refreshing)
         val tracks = getTracks()
         trackCache.update { tracks.associateBy { it.id } }
-        trackNameCache.update { buildMap { tracks.forEach { this[it.name] = it.id } } }
         events.emit(IemEvent.Refreshed(tracks))
         oscSetTrackNotificationCount(tracks.size - 1) // -1 because master is reported regardless
         oscSetReceiveNotificationCount(tracks.maxOf { if (it.isIem) it.receives.size else 0 })

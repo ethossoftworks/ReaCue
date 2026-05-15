@@ -39,8 +39,9 @@ class IemInteractor(private val iemService: IIemService) :
             .subscribe()
             .onEach { event ->
                 when (event) {
-                    IemEvent.Refresh -> {
-                        // Do Nothing. This is a command sent from the central.
+                    IemEvent.Refresh,
+                    IemEvent.Reset -> {
+                        // Do Nothing. These are commands sent from the central.
                     }
                     IemEvent.Refreshing -> update { state -> state.copy(tracks = emptyMap()) }
                     is IemEvent.Refreshed -> update { state -> state.copy(tracks = event.tracks.associateBy { it.id }) }

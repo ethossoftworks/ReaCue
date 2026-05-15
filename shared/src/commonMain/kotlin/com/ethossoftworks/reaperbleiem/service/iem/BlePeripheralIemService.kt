@@ -126,7 +126,11 @@ class BlePeripheralIemService(
             Logger.i { "Received command - $event" }
 
             when (event) {
-                IemEvent.Refresh -> networkIemService.refresh()
+                IemEvent.Refresh -> {
+                    val refreshEvent = lastRefreshedEvent.value ?: return
+                    sendBleNotification(refreshEvent, setOf(request.central))
+                }
+                IemEvent.Reset -> networkIemService.refresh()
                 is IemEvent.OutputVolumeUpdated -> networkIemService.setOutputVolume(event.trackId, event.value)
                 is IemEvent.ReceivePanUpdated ->
                     networkIemService.setReceivePan(event.trackId, event.receiveId, event.value)
