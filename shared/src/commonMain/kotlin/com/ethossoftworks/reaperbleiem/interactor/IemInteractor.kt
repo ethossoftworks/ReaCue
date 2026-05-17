@@ -7,7 +7,6 @@ import com.ethossoftworks.reaperbleiem.service.iem.IemEvent
 import com.ethossoftworks.reaperbleiem.service.iem.Mix
 import com.ethossoftworks.reaperbleiem.service.iem.Track
 import com.outsidesource.oskitkmp.interactor.Interactor
-import com.outsidesource.oskitkmp.lib.update
 import com.outsidesource.oskitkmp.outcome.Outcome
 import com.outsidesource.oskitkmp.outcome.unwrapOrReturn
 import kotlinx.collections.immutable.PersistentMap
@@ -16,8 +15,9 @@ import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
+import kotlinx.io.files.Path
 
-data class IemState(val tracks: PersistentMap<Int, Track> = persistentMapOf())
+data class IemState(val projectName: String = "Unknown", val tracks: PersistentMap<Int, Track> = persistentMapOf())
 
 class IemInteractor(private val iemService: IIemService) :
     Interactor<IemState>(dependencies = emptyList(), initialState = IemState()) {
@@ -47,7 +47,10 @@ class IemInteractor(private val iemService: IIemService) :
                         // Do Nothing. These are commands sent from the central.
                     }
                     IemEvent.Refreshing -> update { state -> state.copy(tracks = persistentMapOf()) }
-                    is IemEvent.Refreshed -> update { state -> state.copy(tracks = event.tracks) }
+                    is IemEvent.Refreshed ->
+                        update { state ->
+                            state.copy(projectName = Path(path = event.projectName).name, tracks = event.tracks)
+                        }
                     is IemEvent.OutputVolumeUpdated ->
                         updateHardwareOutput(event.trackId) { it.copy(volume = event.value) }
                     is IemEvent.ReceivePanUpdated ->

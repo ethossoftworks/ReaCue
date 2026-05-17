@@ -12,21 +12,27 @@ import io.ktor.network.sockets.BoundDatagramSocket
 import io.ktor.network.sockets.Datagram
 import io.ktor.network.sockets.InetSocketAddress
 import io.ktor.network.sockets.aSocket
+import io.ktor.utils.io.CancellationException
 import io.ktor.utils.io.core.buildPacket
 import io.ktor.utils.io.core.discard
 import kotlin.math.absoluteValue
 import kotlin.math.pow
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
 import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable.isActive
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.io.Sink
 import kotlinx.io.Source
@@ -54,6 +60,7 @@ class NetworkIemService(
         try {
             val socketListeningStarted = CompletableDeferred<Unit>()
             val eventsListeningStarted = CompletableDeferred<Unit>()
+
             oscSocket.update { aSocket(selectorManager).udp().bind(oscIp, oscNotificationPort) }
 
             launch {
@@ -66,7 +73,10 @@ class NetworkIemService(
 
             launch { events.onStart { eventsListeningStarted.complete(Unit) }.collect { send(it) } }
 
+            launch { startWebPolling() }
+
             socketListeningStarted.await()
+            eventsListeningStarted.await()
             refresh()
         } catch (t: Throwable) {
             Logger.e("NetworkIemService", t)
@@ -82,7 +92,8 @@ class NetworkIemService(
         events.emit(IemEvent.Refreshing)
         val tracks = getTracks()
         trackCache.update { tracks }
-        events.emit(IemEvent.Refreshed(tracks))
+        val projectName = getProjectName()
+        events.emit(IemEvent.Refreshed(projectName = projectName, tracks = tracks))
         oscSetTrackNotificationCount(tracks.size - 1) // -1 because master is reported regardless
         oscSetReceiveNotificationCount(tracks.values.maxOf { if (it.isIem) it.receives.size else 0 })
         oscReset()
@@ -155,6 +166,33 @@ class NetworkIemService(
         }
 
         return tracks.build()
+    }
+
+    private suspend fun startWebPolling() {
+        var projectName: String? = null
+
+        while (currentCoroutineContext().isActive) {
+            delay(500.milliseconds)
+            val newName = getProjectName()
+            if (newName != projectName && projectName != null) {
+                projectName = newName
+                refresh()
+            } else {
+                projectName = newName
+            }
+        }
+    }
+
+    private suspend fun getProjectName(): String {
+        return try {
+            val response = httpClient.get("$restDomain/_/GET/EXTSTATE/BleIem/ProjectName")
+            if (!response.status.isSuccess()) return "Unknown"
+            response.bodyAsText().split("\t")[3]
+        } catch (t: CancellationException) {
+            throw t
+        } catch (t: Throwable) {
+            "Unknown"
+        }
     }
 
     private fun List<OscMessage>.toIemEvents(): List<IemEvent> = mapNotNull { message ->

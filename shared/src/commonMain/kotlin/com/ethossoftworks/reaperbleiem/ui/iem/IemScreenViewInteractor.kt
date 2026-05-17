@@ -13,6 +13,7 @@ data class IemScreenViewState(
     val isServiceRunning: Boolean = false,
     val selectedIemId: Int? = null,
     val tracks: Map<Int, Track> = emptyMap(),
+    val projectName: String = "Unknown",
 )
 
 class IemScreenViewInteractor(
@@ -29,6 +30,7 @@ class IemScreenViewInteractor(
         return state.copy(
             bluetoothStatus = capabilityInteractor.state.bluetoothStatus,
             tracks = iemInteractor.state.tracks,
+            projectName = iemInteractor.state.projectName,
         )
     }
 

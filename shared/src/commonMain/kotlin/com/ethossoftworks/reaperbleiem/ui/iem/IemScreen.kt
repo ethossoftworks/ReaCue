@@ -43,6 +43,7 @@ fun IemScreen(interactor: IemScreenViewInteractor = rememberInjectForRoute()) {
             Modifier.windowInsetsPadding(WindowInsets.systemBars).padding(24.dp).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        Text(state.projectName)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             var expanded by remember { mutableStateOf(false) }
 
