@@ -4,8 +4,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import co.touchlab.kermit.CommonWriter
 import co.touchlab.kermit.Logger
@@ -13,14 +15,18 @@ import com.ethossoftworks.reaperbleiem.PlatformContext
 import com.ethossoftworks.reaperbleiem.initKoin
 import com.ethossoftworks.reaperbleiem.macOsDiModule
 import com.ethossoftworks.reaperbleiem.ui.app.App
+import com.outsidesource.oskitcompose.systemui.KmpWindowInsetsHolder
+import com.outsidesource.oskitcompose.systemui.LocalKmpWindowInsets
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.AppKit.NSApplication
 import platform.AppKit.NSApplicationActivationPolicy
 import platform.AppKit.NSWindowDidChangeBackingPropertiesNotification
+import platform.AppKit.NSWindowStyleMaskFullSizeContentView
+import platform.AppKit.NSWindowTitleHidden
 import platform.Foundation.NSNotificationCenter
 import platform.Foundation.NSOperationQueue
 
-@OptIn(ExperimentalForeignApi::class)
+@OptIn(ExperimentalForeignApi::class, InternalComposeUiApi::class)
 fun main() {
     initKoin(platformContext = PlatformContext(), extraModules = arrayOf(macOsDiModule)).koin
 
@@ -31,9 +37,9 @@ fun main() {
 
     Window("Reaper BLE IEM") {
         // TODO: Figure out window issues on MacOS Native
-        //        window.styleMask = window.styleMask or NSWindowStyleMaskFullSizeContentView
-        //        window.titleVisibility = NSWindowTitleHidden
-        //        window.titlebarAppearsTransparent = true
+        window.styleMask = window.styleMask or NSWindowStyleMaskFullSizeContentView
+        window.titleVisibility = NSWindowTitleHidden
+        window.titlebarAppearsTransparent = true
 
         var density by remember { mutableStateOf(Density(window.backingScaleFactor.toFloat())) }
 
@@ -48,7 +54,12 @@ fun main() {
             }
         }
 
-        CompositionLocalProvider(LocalDensity provides density) { App() }
+        CompositionLocalProvider(
+            LocalDensity provides density,
+            LocalKmpWindowInsets provides KmpWindowInsetsHolder(top = 24.dp),
+        ) {
+            App()
+        }
     }
 
     app.run()

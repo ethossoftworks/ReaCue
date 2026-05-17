@@ -17,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.outsidesource.oskitcompose.interactor.collectAsState
 import com.outsidesource.oskitcompose.lib.rememberInjectForRoute
+import com.outsidesource.oskitcompose.systemui.KmpWindowInsets
+import com.outsidesource.oskitcompose.systemui.vertical
 import com.outsidesource.oskitkmp.capability.CapabilityStatus
 import com.outsidesource.oskitkmp.capability.NoPermissionReason
 
@@ -30,7 +32,7 @@ fun ScanScreen(interactor: ScanScreenViewInteractor = rememberInjectForRoute()) 
     }
 
     Column(
-        modifier = Modifier.windowInsetsPadding(WindowInsets.systemBars).padding(16.dp).fillMaxSize(),
+        modifier = Modifier.windowInsetsPadding(KmpWindowInsets.vertical).padding(16.dp).fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp, alignment = Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
