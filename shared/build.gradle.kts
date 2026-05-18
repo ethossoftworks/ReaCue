@@ -14,7 +14,10 @@ plugins {
     alias(libs.plugins.detekt)
 }
 
-dependencies { detektPlugins(libs.detektCompose) }
+dependencies {
+    detektPlugins(libs.detektCompose)
+    androidRuntimeClasspath(libs.compose.ui.tooling)
+}
 
 kotlin {
     KmpBuildInfo.generate(rootProject)
