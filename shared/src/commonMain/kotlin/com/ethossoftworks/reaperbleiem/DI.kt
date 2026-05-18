@@ -73,7 +73,7 @@ fun commonModule() = module {
     single { IemInteractor(get()) }
 
     // View Interactors
-    factory { IemScreenViewInteractor(get(), get(), get()) }
+    factory { params -> IemScreenViewInteractor(params[0], get(), get(), get(), get()) }
     factory { ScanScreenViewInteractor(get(), get(), get()) }
 }
 

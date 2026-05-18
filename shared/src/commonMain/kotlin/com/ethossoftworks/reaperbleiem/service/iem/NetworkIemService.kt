@@ -56,7 +56,7 @@ class NetworkIemService(
     private val events = MutableSharedFlow<IemEvent>()
     private val trackCache = atomic<Map<Int, Track>>(emptyMap())
 
-    override fun subscribe(): Flow<IemEvent> = callbackFlow {
+    override fun subscribe(context: IemContext): Flow<IemEvent> = callbackFlow {
         try {
             val socketListeningStarted = CompletableDeferred<Unit>()
             val eventsListeningStarted = CompletableDeferred<Unit>()

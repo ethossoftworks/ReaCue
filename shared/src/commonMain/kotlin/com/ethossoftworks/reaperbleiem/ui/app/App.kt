@@ -15,7 +15,7 @@ fun App(coordinator: AppCoordinator = rememberInject()) {
         RouteSwitch(coordinator) {
             when (it) {
                 is Route.Scan -> ScanScreen()
-                is Route.Iem -> IemScreen()
+                is Route.Iem -> IemScreen(context = it.context)
             }
             InfoMessageContainer()
         }

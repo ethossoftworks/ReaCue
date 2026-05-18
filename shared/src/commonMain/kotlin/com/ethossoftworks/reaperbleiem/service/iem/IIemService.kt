@@ -4,6 +4,7 @@
 package com.ethossoftworks.reaperbleiem.service.iem
 
 import com.ethossoftworks.reaperbleiem.lib.PersistentMapSerializer
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleScanRecord
 import kotlinx.collections.immutable.PersistentMap
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -19,7 +20,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 interface IIemService {
-    fun subscribe(): Flow<IemEvent>
+    fun subscribe(context: IemContext): Flow<IemEvent>
 
     suspend fun refresh()
 
@@ -30,6 +31,12 @@ interface IIemService {
     suspend fun setReceivePan(trackId: Int, receiveId: Int, value: Float)
 
     suspend fun setReceiveMute(trackId: Int, receiveId: Int, isMuted: Boolean)
+}
+
+sealed class IemContext {
+    data object Peripheral : IemContext()
+
+    data class Central(val peripheral: KmpBleScanRecord) : IemContext()
 }
 
 @Serializable

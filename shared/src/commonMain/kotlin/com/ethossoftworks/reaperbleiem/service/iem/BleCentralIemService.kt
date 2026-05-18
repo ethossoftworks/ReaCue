@@ -5,14 +5,16 @@ package com.ethossoftworks.reaperbleiem.service.iem
 import co.touchlab.kermit.Logger
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBleCentralManager
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBlePeripheral
-import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralId
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleConnectionStatus
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleWriteMode
 import com.outsidesource.oskitkmp.lib.toUShort
 import com.outsidesource.oskitkmp.lib.update
-import com.outsidesource.oskitkmp.outcome.Outcome
 import com.outsidesource.oskitkmp.outcome.unwrapOrReturn
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.uuid.ExperimentalUuidApi
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -25,8 +27,6 @@ import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.uuid.ExperimentalUuidApi
 
 @OptIn(ExperimentalSerializationApi::class)
 class BleCentralIemService(private val bleCentralManager: IKmpBleCentralManager) : IIemService {
@@ -38,39 +38,29 @@ class BleCentralIemService(private val bleCentralManager: IKmpBleCentralManager)
         preferCborLabelsOverNames = true
     }
 
-    fun scan() = bleCentralManager.scan().filter { it.services.contains(REAPER_BLE_IEM_SERVICE_UUID) }
+    override fun subscribe(context: IemContext): Flow<IemEvent> = callbackFlow {
+        // Connect to and observe peripheral
+        val peripheralId = (context as? IemContext.Central ?: return@callbackFlow).peripheral.identifier
+        val peripheral =
+            bleCentralManager
+                .connect(peripheralId)
+                .unwrapOrReturn {
+                    return@callbackFlow
+                }
+                .apply { this@BleCentralIemService.peripheral.update { this } }
 
-    suspend fun connect(id: KmpBlePeripheralId): Outcome<Unit, Any> {
-        val connectedPeripheral =
-            bleCentralManager.connect(id).unwrapOrReturn {
-                return it
-            }
-
-        connectedPeripheral.requestMtu(517).unwrapOrReturn {
-            return it
+        peripheral.requestMtu(517).unwrapOrReturn {
+            return@callbackFlow
         }
-        connectedPeripheral.discoverServices().unwrapOrReturn {
-            return it
+        peripheral.discoverServices().unwrapOrReturn {
+            return@callbackFlow
         }
 
-        peripheral.update { connectedPeripheral }
+        peripheral.connectionStatus.onEach { if (it == KmpBleConnectionStatus.Disconnected) cancel() }.launchIn(this)
 
-        return Outcome.Ok(Unit)
-    }
-
-    suspend fun disconnect(): Outcome<Unit, Any> {
-        peripheral.value?.disconnect()?.unwrapOrReturn {
-            return it
-        }
-        peripheral.update { null }
-        return Outcome.Ok(Unit)
-    }
-
-    override fun subscribe(): Flow<IemEvent> = callbackFlow {
-        val localPeripheral = peripheral.value ?: return@callbackFlow
-
+        // Subscribe to notifications
         val job =
-            localPeripheral
+            peripheral
                 .notifications(REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID)
                 .onEach { notification ->
                     try {
@@ -97,13 +87,20 @@ class BleCentralIemService(private val bleCentralManager: IKmpBleCentralManager)
                 .launchIn(this)
 
         // Wait for collector to be ready to send refresh command
-        launch {
-            delay(16.milliseconds)
-            refresh()
-        }
+        delay(16.milliseconds)
+        refresh()
 
-        awaitClose { job.cancel() }
+        awaitClose {
+            job.cancel()
+            launch {
+                peripheral.disconnect().unwrapOrReturn {
+                    return@launch
+                }
+            }
+        }
     }
+
+    fun scan() = bleCentralManager.scan().filter { it.services.contains(REAPER_BLE_IEM_SERVICE_UUID) }
 
     override suspend fun refresh() {
         val payload = cbor.encodeToByteArray(IemEvent.serializer(), IemEvent.Refresh)

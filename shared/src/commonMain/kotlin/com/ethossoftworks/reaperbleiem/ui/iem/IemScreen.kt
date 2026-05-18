@@ -26,14 +26,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.ethossoftworks.reaperbleiem.interactor.ServiceStatus
+import com.ethossoftworks.reaperbleiem.service.iem.IemContext
 import com.outsidesource.oskitcompose.interactor.collectAsState
 import com.outsidesource.oskitcompose.lib.rememberInjectForRoute
 import com.outsidesource.oskitcompose.systemui.KmpWindowInsets
 import com.outsidesource.oskitcompose.systemui.vertical
+import org.koin.core.parameter.parametersOf
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun IemScreen(interactor: IemScreenViewInteractor = rememberInjectForRoute()) {
+fun IemScreen(
+    context: IemContext,
+    interactor: IemScreenViewInteractor = rememberInjectForRoute { parametersOf(context) },
+) {
     val state = interactor.collectAsState()
 
     LaunchedEffect(Unit) { interactor.onMount() }
@@ -43,6 +49,16 @@ fun IemScreen(interactor: IemScreenViewInteractor = rememberInjectForRoute()) {
             Modifier.windowInsetsPadding(KmpWindowInsets.vertical).padding(24.dp).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        if (state.serviceStatus == ServiceStatus.Connecting) {
+            Text("Connecting...")
+            return
+        } else if (state.serviceStatus == ServiceStatus.Disconnected) {
+            Text("Disconnected")
+            Button(onClick = interactor::onConnectClick) { Text(text = "Connect") }
+            Button(onClick = interactor::onBackToScanClick) { Text(text = "Back to Scan") }
+            return
+        }
+
         Text(state.projectName)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             var expanded by remember { mutableStateOf(false) }
@@ -72,10 +88,6 @@ fun IemScreen(interactor: IemScreenViewInteractor = rememberInjectForRoute()) {
             }
 
             Spacer(Modifier.weight(1f))
-
-            if (!state.isServiceRunning) {
-                Button(onClick = interactor::onRestartClick) { Text(text = "Restart") }
-            }
 
             Button(onClick = interactor::onRefreshClick) { Text(text = "Refresh") }
         }

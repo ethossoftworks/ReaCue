@@ -54,7 +54,7 @@ class BlePeripheralIemService(
 
     private val advertisementData =
         KmpBleAdvertisementData(
-            name = "",
+            name = "ReapEar",
             services =
                 listOf(
                     KmpBleAdvertisementService(
@@ -77,7 +77,7 @@ class BlePeripheralIemService(
                 ),
         )
 
-    override fun subscribe(): Flow<IemEvent> = channelFlow {
+    override fun subscribe(context: IemContext): Flow<IemEvent> = channelFlow {
         val isAdvertising = CompletableDeferred<Unit>()
 
         val bleChannelJob = launch {
@@ -106,8 +106,9 @@ class BlePeripheralIemService(
 
         val networkJob =
             networkIemService
-                .subscribe()
+                .subscribe(context)
                 .onEach { event ->
+                    if (event is IemEvent.Error) cancel()
                     Logger.i { "Received event from Reaper - $event" }
                     send(event)
                     updateLastRefreshedEvent(event)
@@ -131,6 +132,7 @@ class BlePeripheralIemService(
 
             when (event) {
                 IemEvent.Refresh -> {
+                    sendBleNotification(IemEvent.Refreshing, setOf(request.central))
                     sendBleNotification(lastRefreshedEvent.value ?: return, setOf(request.central))
                     return
                 }

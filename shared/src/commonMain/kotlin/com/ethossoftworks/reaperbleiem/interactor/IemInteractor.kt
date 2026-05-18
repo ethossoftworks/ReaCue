@@ -1,52 +1,53 @@
 package com.ethossoftworks.reaperbleiem.interactor
 
-import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralId
 import com.ethossoftworks.reaperbleiem.service.iem.BleCentralIemService
 import com.ethossoftworks.reaperbleiem.service.iem.IIemService
+import com.ethossoftworks.reaperbleiem.service.iem.IemContext
 import com.ethossoftworks.reaperbleiem.service.iem.IemEvent
 import com.ethossoftworks.reaperbleiem.service.iem.Mix
 import com.ethossoftworks.reaperbleiem.service.iem.Track
 import com.outsidesource.oskitkmp.interactor.Interactor
-import com.outsidesource.oskitkmp.outcome.Outcome
-import com.outsidesource.oskitkmp.outcome.unwrapOrReturn
 import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.mutate
 import kotlinx.collections.immutable.persistentMapOf
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.io.files.Path
 
-data class IemState(val projectName: String = "Unknown", val tracks: PersistentMap<Int, Track> = persistentMapOf())
+data class IemState(
+    val projectName: String = "Unknown",
+    val tracks: PersistentMap<Int, Track> = persistentMapOf(),
+    val serviceStatus: ServiceStatus = ServiceStatus.Disconnected,
+)
+
+enum class ServiceStatus {
+    Disconnected,
+    Connecting,
+    Connected,
+}
 
 class IemInteractor(private val iemService: IIemService) :
     Interactor<IemState>(dependencies = emptyList(), initialState = IemState()) {
 
     fun scanPeripherals() = (iemService as? BleCentralIemService)?.scan() ?: emptyFlow()
 
-    suspend fun connectPeripheral(peripheralId: KmpBlePeripheralId): Outcome<Unit, Any> {
-        val service = (iemService as? BleCentralIemService) ?: return Outcome.Error("Not supported")
-        service.connect(peripheralId).unwrapOrReturn {
-            return it
-        }
-        return Outcome.Ok(Unit)
-    }
+    fun subscribe(context: IemContext): Flow<IemEvent> {
+        update { state -> state.copy(serviceStatus = ServiceStatus.Connecting) }
 
-    suspend fun disconnectPeripheral() {
-        val service = (iemService as? BleCentralIemService) ?: return
-        service.disconnect()
-    }
-
-    fun subscribe() =
-        iemService
-            .subscribe()
+        return iemService
+            .subscribe(context)
             .onEach { event ->
                 when (event) {
                     IemEvent.Refresh,
                     IemEvent.Reset -> {
                         // Do Nothing. These are commands sent from the central.
                     }
-                    IemEvent.Refreshing -> update { state -> state.copy(tracks = persistentMapOf()) }
+                    IemEvent.Refreshing ->
+                        update { state ->
+                            state.copy(tracks = persistentMapOf(), serviceStatus = ServiceStatus.Connected)
+                        }
                     is IemEvent.Refreshed ->
                         update { state ->
                             state.copy(projectName = Path(path = event.projectName).name, tracks = event.tracks)
@@ -70,7 +71,10 @@ class IemInteractor(private val iemService: IIemService) :
                     is IemEvent.Error -> update { state -> state.copy(tracks = persistentMapOf()) }
                 }
             }
-            .onCompletion { update { state -> state.copy(tracks = persistentMapOf()) } }
+            .onCompletion {
+                update { state -> state.copy(tracks = persistentMapOf(), serviceStatus = ServiceStatus.Disconnected) }
+            }
+    }
 
     suspend fun setOutputVolume(trackId: Int, value: Float) {
         iemService.setOutputVolume(trackId, value)

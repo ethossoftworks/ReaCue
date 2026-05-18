@@ -7,7 +7,6 @@ import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleScanRecord
 import com.outsidesource.oskitkmp.capability.CapabilityStatus
 import com.outsidesource.oskitkmp.interactor.Interactor
 import com.outsidesource.oskitkmp.lib.update
-import com.outsidesource.oskitkmp.outcome.unwrapOrReturn
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.launchIn
@@ -18,7 +17,6 @@ import kotlinx.coroutines.withTimeout
 data class ScanScreenViewState(
     val bluetoothStatus: CapabilityStatus = CapabilityStatus.Unknown,
     val devices: Map<String, KmpBleScanRecord> = emptyMap(),
-    val isConnecting: Boolean = false,
 )
 
 class ScanScreenViewInteractor(
@@ -65,16 +63,7 @@ class ScanScreenViewInteractor(
         interactorScope.launch { capabilityInteractor.requestBlePermissions() }
     }
 
-    fun onDeviceClick(device: KmpBleScanRecord) {
-        interactorScope.launch {
-            update { state -> state.copy(isConnecting = true) }
-
-            iemInteractor.connectPeripheral(device.identifier).unwrapOrReturn {
-                update { state -> state.copy(isConnecting = false) }
-                return@launch
-            }
-
-            appCoordinator.deviceConnected()
-        }
+    fun onDeviceClick(scanRecord: KmpBleScanRecord) {
+        appCoordinator.onBleScanRecordClick(scanRecord)
     }
 }
