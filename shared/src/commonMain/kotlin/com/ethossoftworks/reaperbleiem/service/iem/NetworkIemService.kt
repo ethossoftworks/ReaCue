@@ -24,6 +24,7 @@ import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable.isActive
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -73,11 +74,20 @@ class NetworkIemService(
 
             launch { events.onStart { eventsListeningStarted.complete(Unit) }.collect { send(it) } }
 
-            launch { startWebPolling() }
+            launch {
+                try {
+                    startWebPolling()
+                } catch (t: Throwable) {
+                    send(IemEvent.Error(t))
+                    this@callbackFlow.cancel()
+                }
+            }
 
             socketListeningStarted.await()
             eventsListeningStarted.await()
             refresh()
+        } catch (e: CancellationException) {
+            throw e
         } catch (t: Throwable) {
             Logger.e("NetworkIemService", t)
             send(IemEvent.Error(t))

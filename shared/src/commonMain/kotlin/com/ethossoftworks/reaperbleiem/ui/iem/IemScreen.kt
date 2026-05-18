@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.ethossoftworks.reaperbleiem.interactor.ServiceStatus
 import com.ethossoftworks.reaperbleiem.service.iem.IemContext
+import com.ethossoftworks.reaperbleiem.service.iem.IemEvent
 import com.outsidesource.oskitcompose.interactor.collectAsState
 import com.outsidesource.oskitcompose.lib.rememberInjectForRoute
 import com.outsidesource.oskitcompose.systemui.KmpWindowInsets
@@ -55,7 +56,9 @@ fun IemScreen(
         } else if (state.serviceStatus == ServiceStatus.Disconnected) {
             Text("Disconnected")
             Button(onClick = interactor::onConnectClick) { Text(text = "Connect") }
-            Button(onClick = interactor::onBackToScanClick) { Text(text = "Back to Scan") }
+            if (context is IemContext.Central) {
+                Button(onClick = interactor::onBackToScanClick) { Text(text = "Back to Scan") }
+            }
             return
         }
 

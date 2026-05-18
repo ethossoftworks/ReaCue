@@ -11,6 +11,7 @@ import com.outsidesource.oskitkmp.lib.toUShort
 import com.outsidesource.oskitkmp.lib.update
 import com.outsidesource.oskitkmp.outcome.unwrapOrReturn
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.ExperimentalUuidApi
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
@@ -23,6 +24,7 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -42,12 +44,12 @@ class BleCentralIemService(private val bleCentralManager: IKmpBleCentralManager)
         // Connect to and observe peripheral
         val peripheralId = (context as? IemContext.Central ?: return@callbackFlow).peripheral.identifier
         val peripheral =
-            bleCentralManager
-                .connect(peripheralId)
-                .unwrapOrReturn {
-                    return@callbackFlow
-                }
-                .apply { this@BleCentralIemService.peripheral.update { this } }
+            withTimeout(10.seconds) {
+                bleCentralManager
+                    .connect(peripheralId)
+                    .unwrapOrReturn { throw RuntimeException("Could not connect") }
+                    .apply { this@BleCentralIemService.peripheral.update { this } }
+            }
 
         peripheral.requestMtu(517).unwrapOrReturn {
             return@callbackFlow
@@ -78,8 +80,11 @@ class BleCentralIemService(private val bleCentralManager: IKmpBleCentralManager)
 
                         requestBuffers.update { it.update { remove(requestId) } }
                         val event = cbor.decodeFromByteArray(IemEvent.serializer(), buffer.readByteArray())
+
                         send(event)
                         Logger.i { "Received message - $event" }
+
+                        if (event is IemEvent.Error) cancel()
                     } catch (e: Exception) {
                         Logger.e(e) { "Error while assembling packets: ${notification.toHexString()}" }
                     }

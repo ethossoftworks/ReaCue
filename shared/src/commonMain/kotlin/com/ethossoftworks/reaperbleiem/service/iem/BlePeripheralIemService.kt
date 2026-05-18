@@ -11,7 +11,6 @@ import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleCentralId
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattPermission
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattProperty
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralEvent
-import com.outsidesource.oskitkmp.lib.update
 import kotlin.math.ceil
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -23,6 +22,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.launchIn
@@ -33,6 +33,8 @@ import kotlinx.io.readByteArray
 import kotlinx.io.writeUShort
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 val REAPER_BLE_IEM_SERVICE_UUID = Uuid.parseHexDash("fa6e666c-2c23-43f1-84e4-4653ebf930f4")
 val REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID = Uuid.parseHexDash("319893ca-5fa2-4c21-9f51-bc2b1116a352")
@@ -83,6 +85,11 @@ class BlePeripheralIemService(
         val bleChannelJob = launch {
             for (notification in bleNotificationChannel) {
                 sendBleNotification(notification)
+
+                if (notification is IemEvent.Error) {
+                    delay(500.milliseconds)
+                    this@channelFlow.cancel()
+                }
             }
         }
 
@@ -108,7 +115,6 @@ class BlePeripheralIemService(
             networkIemService
                 .subscribe(context)
                 .onEach { event ->
-                    if (event is IemEvent.Error) cancel()
                     Logger.i { "Received event from Reaper - $event" }
                     send(event)
                     updateLastRefreshedEvent(event)
