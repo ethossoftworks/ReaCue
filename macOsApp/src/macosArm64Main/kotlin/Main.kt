@@ -9,9 +9,9 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import co.touchlab.kermit.CommonWriter
-import co.touchlab.kermit.Logger
 import com.ethossoftworks.reaperbleiem.PlatformContext
 import com.ethossoftworks.reaperbleiem.initKoin
+import com.ethossoftworks.reaperbleiem.lib.initLogger
 import com.ethossoftworks.reaperbleiem.macOsDiModule
 import com.ethossoftworks.reaperbleiem.ui.app.App
 import com.outsidesource.oskitcompose.systemui.KmpWindowInsetsHolder
@@ -26,8 +26,7 @@ import platform.Foundation.NSOperationQueue
 
 fun main() {
     initKoin(platformContext = PlatformContext(), extraModules = arrayOf(macOsDiModule)).koin
-
-    Logger.setLogWriters(CommonWriter())
+    initLogger(CommonWriter())
 
     val app = NSApplication.sharedApplication()
     app.setActivationPolicy(NSApplicationActivationPolicy.NSApplicationActivationPolicyRegular)
