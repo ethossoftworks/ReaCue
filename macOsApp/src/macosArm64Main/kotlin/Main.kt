@@ -4,7 +4,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -17,7 +16,6 @@ import com.ethossoftworks.reaperbleiem.macOsDiModule
 import com.ethossoftworks.reaperbleiem.ui.app.App
 import com.outsidesource.oskitcompose.systemui.KmpWindowInsetsHolder
 import com.outsidesource.oskitcompose.systemui.LocalKmpWindowInsets
-import kotlinx.cinterop.ExperimentalForeignApi
 import platform.AppKit.NSApplication
 import platform.AppKit.NSApplicationActivationPolicy
 import platform.AppKit.NSWindowDidChangeBackingPropertiesNotification
@@ -26,7 +24,6 @@ import platform.AppKit.NSWindowTitleHidden
 import platform.Foundation.NSNotificationCenter
 import platform.Foundation.NSOperationQueue
 
-@OptIn(ExperimentalForeignApi::class, InternalComposeUiApi::class)
 fun main() {
     initKoin(platformContext = PlatformContext(), extraModules = arrayOf(macOsDiModule)).koin
 

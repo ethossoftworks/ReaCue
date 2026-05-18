@@ -38,35 +38,13 @@ kotlin {
         androidResources { enable = true }
     }
 
-    listOf(iosArm64(), iosSimulatorArm64()).forEach { iosTarget ->
-        iosTarget.binaries.framework {
+    listOf(iosArm64(), iosSimulatorArm64(), macosArm64()).forEach { appleTarget ->
+        appleTarget.binaries.framework {
             baseName = "Shared"
             isStatic = true
             binaryOption("bundleId", "com.ethossoftworks.reaperbleiem.shared")
             export(libs.oskit.kmp)
             export(libs.kotlinx.coroutines.core)
-        }
-    }
-
-    macosArm64 {
-        binaries {
-            executable {
-                entryPoint = "main"
-                linkerOpts("-lsqlite3")
-
-                // Link Info.plist
-                freeCompilerArgs +=
-                    listOf(
-                        "-linker-option",
-                        "-sectcreate",
-                        "-linker-option",
-                        "__TEXT",
-                        "-linker-option",
-                        "__info_plist",
-                        "-linker-option",
-                        "${projectDir}/src/macosMain/resources/Info.plist",
-                    )
-            }
         }
     }
 
@@ -95,10 +73,7 @@ kotlin {
             implementation(libs.ktor.network)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.koin.core)
-            implementation(libs.kotlinx.datetime)
             implementation(libs.atomicfu)
-            implementation(libs.uuid)
-            implementation(libs.material.icons)
             implementation(libs.navigationEvent)
             implementation(libs.navigationEvent.compose)
             implementation(libs.kotlinxSerializationCbor)
@@ -113,8 +88,6 @@ kotlin {
             implementation(libs.nordic.ble.scanner)
             implementation(libs.nordic.ble.client.ktx)
         }
-
-        iosMain.dependencies {}
     }
 }
 

@@ -20,4 +20,4 @@ dependencyResolutionManagement {
     }
 }
 
-include(":shared", ":androidApp")
+include(":shared", ":androidApp", ":macOsApp")
