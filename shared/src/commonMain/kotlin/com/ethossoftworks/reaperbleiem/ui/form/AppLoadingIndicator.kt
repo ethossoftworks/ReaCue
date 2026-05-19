@@ -34,7 +34,7 @@ fun AppLoadingIndicator(size: Dp = 32.dp) {
 
     val alpha by
         transition.animateFloat(
-            initialValue = .5f,
+            initialValue = .3f,
             targetValue = 1f,
             animationSpec = infiniteRepeatable(tween(1000), repeatMode = RepeatMode.Reverse),
         )
@@ -47,13 +47,13 @@ fun AppLoadingIndicator(size: Dp = 32.dp) {
     val shadow by
         transition.animateFloat(
             initialValue = 0f,
-            targetValue = 30f,
+            targetValue = 40f,
             animationSpec = infiniteRepeatable(tween(1000), repeatMode = RepeatMode.Reverse),
         )
 
     Box(
         modifier =
-            Modifier.size(48.dp)
+            Modifier.size(size)
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
