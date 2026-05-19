@@ -7,7 +7,42 @@ plugins {
 val buildInfo = KmpBuildInfo.read(rootProject)
 val generatedPlistFile = layout.buildDirectory.file("generated/Info.plist")
 
+kotlin {
+    compilerOptions {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+        freeCompilerArgs.add("-Xconsistent-data-class-copy-visibility")
+    }
+
+    applyDefaultHierarchyTemplate()
+
+    macosArm64 {
+        binaries {
+            executable {
+                entryPoint = "main"
+                linkerOpts("-lsqlite3")
+                // Link Info.plist (generated so version is embedded at link time)
+                freeCompilerArgs +=
+                    listOf(
+                        "-linker-option",
+                        "-sectcreate",
+                        "-linker-option",
+                        "__TEXT",
+                        "-linker-option",
+                        "__info_plist",
+                        "-linker-option",
+                        generatedPlistFile.get().asFile.absolutePath,
+                    )
+            }
+        }
+    }
+
+    sourceSets { macosArm64Main.dependencies { implementation(projects.shared) } }
+}
+
+// Generate the Info.plist for MacOS
 val generateInfoPlist by tasks.registering {
+    description = "Generate Info.plist for MacOS"
+
     // Re-assign to locals so doLast captures Strings, not the build script object.
     val version = buildInfo.version
     val build = buildInfo.build
@@ -55,53 +90,27 @@ val generateInfoPlist by tasks.registering {
     }
 }
 
-// All link tasks must wait for the plist so -sectcreate has the file ready.
-tasks.configureEach {
-    if (name.matches(Regex("link(Debug|Release)ExecutableMacosArm64"))) {
-        dependsOn(generateInfoPlist)
+// CMP on macOS native looks for resources at:
+//   $cwd/src/commonMain/composeResources/<path-without-package>
+// processedResources has all resources namespaced under their package dirs, so we strip
+// the first path segment (the package name) when staging for the run task.
+val stageRunResources by tasks.registering(Copy::class) {
+    description = "Strips package prefix from processed resources for CMP resolution"
+    dependsOn(":macOsApp:macosArm64ProcessResources")
+    from(layout.buildDirectory.dir("processedResources/macosArm64/main/composeResources")) {
+        eachFile { relativePath = RelativePath(true, *relativePath.segments.drop(1).toTypedArray()) }
+        includeEmptyDirs = false
     }
-}
-
-kotlin {
-    compilerOptions {
-        freeCompilerArgs.add("-Xexpect-actual-classes")
-        freeCompilerArgs.add("-Xconsistent-data-class-copy-visibility")
-    }
-
-    applyDefaultHierarchyTemplate()
-
-    macosArm64 {
-        binaries {
-            executable {
-                entryPoint = "main"
-                linkerOpts("-lsqlite3")
-                runTask?.dependsOn("stageRunResources")
-                runTask?.workingDir(layout.buildDirectory.dir("run-resources"))
-
-                // Link Info.plist (generated so version is embedded at link time)
-                freeCompilerArgs +=
-                    listOf(
-                        "-linker-option",
-                        "-sectcreate",
-                        "-linker-option",
-                        "__TEXT",
-                        "-linker-option",
-                        "__info_plist",
-                        "-linker-option",
-                        generatedPlistFile.get().asFile.absolutePath,
-                    )
-            }
-        }
-    }
-
-    sourceSets { macosArm64Main.dependencies { implementation(projects.shared) } }
+    into(layout.buildDirectory.dir("run-resources/src/commonMain/composeResources"))
 }
 
 // Assembles a distributable .app bundle from the release executable.
 // Prerequisites: place AppIcon.icns at src/macosArm64Main/resources/AppIcon.icns
 // Run: ./gradlew :macOsApp:assembleApp
-tasks.register("assembleApp") {
-    dependsOn("linkReleaseExecutableMacosArm64", generateInfoPlist, "stageRunResources")
+val assembleApp by tasks.registering {
+    description = "Assembles MacOS .app bundle"
+
+    dependsOn("linkReleaseExecutableMacosArm64", generateInfoPlist, stageRunResources)
 
     // Re-assign to locals so doLast captures Providers/File/String, not the build script object.
     val contentsDir = layout.buildDirectory.dir("Reaper BLE IEM.app/Contents")
@@ -141,15 +150,14 @@ tasks.register("assembleApp") {
     }
 }
 
-// CMP on macOS native looks for resources at:
-//   $cwd/src/commonMain/composeResources/<path-without-package>
-// processedResources has all resources namespaced under their package dirs, so we strip
-// the first path segment (the package name) when staging for the run task.
-tasks.register<Copy>("stageRunResources") {
-    dependsOn(":macOsApp:macosArm64ProcessResources")
-    from(layout.buildDirectory.dir("processedResources/macosArm64/main/composeResources")) {
-        eachFile { relativePath = RelativePath(true, *relativePath.segments.drop(1).toTypedArray()) }
-        includeEmptyDirs = false
+// All link tasks must wait for the plist so -sectcreate has the file ready.
+// Run tasks need stageRunResources in the working directory for CMP resource resolution.
+tasks.configureEach {
+    if (name.matches(Regex("link(Debug|Release)ExecutableMacosArm64"))) {
+        dependsOn(generateInfoPlist)
     }
-    into(layout.buildDirectory.dir("run-resources/src/commonMain/composeResources"))
+    if (name.matches(Regex("run(Debug|Release)ExecutableMacosArm64"))) {
+        dependsOn(stageRunResources)
+        (this as? Exec)?.workingDir(layout.buildDirectory.dir("run-resources"))
+    }
 }

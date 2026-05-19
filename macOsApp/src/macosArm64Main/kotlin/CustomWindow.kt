@@ -130,10 +130,16 @@ private class AppWindow(
         styleMask = NSWindowStyleMaskTitled or
             NSWindowStyleMaskMiniaturizable or
             NSWindowStyleMaskClosable or
-            NSWindowStyleMaskResizable,
+            NSWindowStyleMaskResizable or
+            NSWindowStyleMaskFullSizeContentView,
         backing = NSBackingStoreBuffered,
-        defer = true,
+        defer = false,
     ) {
+        init {
+            titleVisibility = NSWindowTitleHidden
+            titlebarAppearsTransparent = true
+        }
+
         override fun canBecomeKeyWindow() = true
         override fun canBecomeMainWindow() = true
     }
@@ -202,9 +208,6 @@ private class AppWindow(
         skiaLayer.renderDelegate = renderDelegate
         skiaLayer.attachTo(view)
 
-        window.styleMask = window.styleMask or NSWindowStyleMaskFullSizeContentView
-        window.titleVisibility = NSWindowTitleHidden
-        window.titlebarAppearsTransparent = true
         window.minSize = NSMakeSize(minSize.width.value.toDouble(), minSize.height.value.toDouble())
 
         // Restore saved frame; center only on first launch when no saved frame exists.
