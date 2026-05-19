@@ -62,7 +62,7 @@ fun IemScreen(
         if (state.serviceStatus == ServiceStatus.Connecting) {
             Column(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+                verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(text = stringResource(Res.string.connecting))
@@ -72,7 +72,7 @@ fun IemScreen(
         } else if (state.serviceStatus == ServiceStatus.Disconnected) {
             Column(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+                verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 if (context is IemContext.Central) {
@@ -92,7 +92,7 @@ fun IemScreen(
         }
 
         Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(text = state.projectName)
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),

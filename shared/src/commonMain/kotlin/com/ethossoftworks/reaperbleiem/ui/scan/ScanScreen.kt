@@ -38,7 +38,7 @@ fun ScanScreen(interactor: ScanScreenViewInteractor = rememberInjectForRoute()) 
     Screen {
         Column(
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(12.dp, alignment = Alignment.CenterVertically),
+            verticalArrangement = Arrangement.spacedBy(16.dp, alignment = Alignment.CenterVertically),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (state.bluetoothStatus is CapabilityStatus.NoPermission) {
