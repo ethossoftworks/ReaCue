@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">ReapEar</string>
-    <string name="connecting">Connecting...</string>
+    <string name="connecting">Connecting</string>
     <string name="disconnected_from_peripheral">Could not connect to ReapEar service</string>
     <string name="disconnected_from_reaper">Could not connect to Reaper</string>
     <string name="connect">Connect</string>

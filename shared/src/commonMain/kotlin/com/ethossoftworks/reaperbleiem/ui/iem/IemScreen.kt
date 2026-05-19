@@ -7,14 +7,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.unit.dp
 import com.ethossoftworks.reaperbleiem.interactor.ServiceStatus
 import com.ethossoftworks.reaperbleiem.service.iem.IemContext
@@ -23,9 +24,17 @@ import com.ethossoftworks.reaperbleiem.ui.form.AppButton
 import com.ethossoftworks.reaperbleiem.ui.form.AppDropdown
 import com.ethossoftworks.reaperbleiem.ui.form.AppDropdownItem
 import com.ethossoftworks.reaperbleiem.ui.form.AppLoadingIndicator
+import com.ethossoftworks.reaperbleiem.ui.form.AppSlider
+import com.ethossoftworks.reaperbleiem.ui.theme.AppTheme
+import com.outsidesource.oskitcompose.form.DpAxisSize
+import com.outsidesource.oskitcompose.form.KmpSliderAlignment
+import com.outsidesource.oskitcompose.form.KmpSliderTick
+import com.outsidesource.oskitcompose.form.KmpSliderTickPosition
+import com.outsidesource.oskitcompose.form.KmpSliderTickStyle
 import com.outsidesource.oskitcompose.interactor.collectAsState
 import com.outsidesource.oskitcompose.layout.FlexRowLayoutScope.weight
 import com.outsidesource.oskitcompose.lib.rememberInjectForRoute
+import kotlin.math.roundToInt
 import org.jetbrains.compose.resources.stringResource
 import org.koin.core.parameter.parametersOf
 import reaper_ble_iem.shared.generated.resources.Res
@@ -45,6 +54,7 @@ fun IemScreen(
     interactor: IemScreenViewInteractor = rememberInjectForRoute { parametersOf(context) },
 ) {
     val state = interactor.collectAsState()
+    val theme = AppTheme.colors
 
     LaunchedEffect(Unit) { interactor.onMount() }
 
@@ -110,27 +120,53 @@ fun IemScreen(
 
             val track = state.tracks[state.selectedIemId] ?: return@Column
             val hardwareOut = track.hardwareOuts.values.firstOrNull()
+            val ticks = remember {
+                listOf(
+                    KmpSliderTick(
+                        value = .716f,
+                        style =
+                            KmpSliderTickStyle(
+                                shapeBrush = SolidColor(theme.strokePrimary),
+                                shapePosition = KmpSliderTickPosition(alignment = KmpSliderAlignment.Start),
+                                shapeSize = DpAxisSize(mainAxis = 1.dp, crossAxis = 10.dp),
+                            ),
+                    ),
+                    KmpSliderTick(
+                        value = .716f,
+                        style =
+                            KmpSliderTickStyle(
+                                shapeBrush = SolidColor(theme.strokePrimary),
+                                shapePosition = KmpSliderTickPosition(alignment = KmpSliderAlignment.End),
+                                shapeSize = DpAxisSize(mainAxis = 1.dp, crossAxis = 10.dp),
+                            ),
+                    ),
+                )
+            }
 
             Column(
                 modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Column {
-                    Text(text = stringResource(Res.string.output))
-                    Slider(
-                        value = hardwareOut?.volume ?: 0f,
-                        onValueChange = { interactor.onOutputVolumeChange(track.id, it) },
-                    )
-                }
+                AppSlider(
+                    value = hardwareOut?.volume ?: 0f,
+                    range = 0f..1f,
+                    step = .01f,
+                    label = stringResource(Res.string.output),
+                    onChange = { interactor.onOutputVolumeChange(track.id, it) },
+                    valueFormatter = { "${(it * 100f).roundToInt()}%" },
+                    ticks = ticks,
+                )
 
                 for (receive in track.receives) {
-                    Column {
-                        Text(state.tracks[receive.value.trackId]?.name ?: continue)
-                        Slider(
-                            value = receive.value.volume,
-                            onValueChange = { interactor.onReceiveVolumeChange(track.id, receive.key, it) },
-                        )
-                    }
+                    AppSlider(
+                        value = receive.value.volume,
+                        range = 0f..1f,
+                        step = .01f,
+                        label = state.tracks[receive.value.trackId]?.name ?: continue,
+                        onChange = { interactor.onReceiveVolumeChange(track.id, receive.key, it) },
+                        valueFormatter = { "${(it * 100f).roundToInt()}%" },
+                        ticks = ticks,
+                    )
                 }
             }
         }

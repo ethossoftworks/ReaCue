@@ -17,7 +17,8 @@ open class AppColors {
     open val bgPopup = Color.Black
     open val strokePrimary = Color.Black
 
-    open val buttonBg: Brush = SolidColor(bgPrimary)
+    open val sliderTrackBg: Brush = SolidColor(Color.Black)
+    open val buttonBg: Brush = SolidColor(Color.Black)
 }
 
 @Immutable
@@ -30,6 +31,13 @@ data object LightAppColors : AppColors() {
     override val bgPrimary = Color(0xFF090d12)
     override val bgPopup = Color(0xFF12161a)
     override val strokePrimary = Color(0xFF383c42)
+
+    override val sliderTrackBg =
+        Brush.verticalGradient(
+            0.0f to Color(0xFF171c22),
+            0.8f to Color(0xFF171c22),
+            .95f to strokePrimary,
+        )
 
     override val buttonBg =
         Brush.linearGradient(
