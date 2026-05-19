@@ -197,7 +197,7 @@ class NetworkIemService(
         return try {
             val response = httpClient.get("$restDomain/_/GET/EXTSTATE/BleIem/ProjectName")
             if (!response.status.isSuccess()) return "Unknown"
-            response.bodyAsText().split("\t")[3]
+            response.bodyAsText().split("\t")[3].trim()
         } catch (t: CancellationException) {
             throw t
         } catch (t: Throwable) {

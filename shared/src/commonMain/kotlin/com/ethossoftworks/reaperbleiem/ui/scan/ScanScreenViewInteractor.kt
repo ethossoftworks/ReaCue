@@ -12,11 +12,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 
 data class ScanScreenViewState(
     val bluetoothStatus: CapabilityStatus = CapabilityStatus.Unknown,
     val devices: Map<String, KmpBleScanRecord> = emptyMap(),
+    val isScanning: Boolean = false,
 )
 
 class ScanScreenViewInteractor(
@@ -51,11 +52,13 @@ class ScanScreenViewInteractor(
 
     fun onScan() {
         interactorScope.launch {
-            withTimeout(10.seconds) {
+            update { state -> state.copy(isScanning = true) }
+            withTimeoutOrNull(10.seconds) {
                 iemInteractor.scanPeripherals().collect {
                     update { state -> state.copy(devices = state.devices.update { this[it.identifier] = it }) }
                 }
             }
+            update { state -> state.copy(isScanning = false) }
         }
     }
 

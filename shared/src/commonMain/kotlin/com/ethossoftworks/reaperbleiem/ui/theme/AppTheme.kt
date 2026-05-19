@@ -9,15 +9,19 @@ import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import kotlin.math.min
 
@@ -62,29 +66,29 @@ fun AppThemeProvider(colorsOverride: AppColors? = null, content: @Composable Box
 
     val textSelectionColors = remember {
         TextSelectionColors(
-            handleColor = colors.primaryAppColor,
-            backgroundColor = colors.primaryAppColor.copy(alpha = .15f),
+            handleColor = colors.accent,
+            backgroundColor = colors.accent.copy(alpha = .15f),
         )
     }
 
     MaterialTheme(
-        colorScheme =
-            MaterialTheme.colorScheme.copy(
-                primary = colors.primaryAppColor,
-                outline = colors.controlColor,
-                onSurface = colors.textColor,
-                surfaceContainer = colors.primaryBgColor10,
-                secondaryContainer = colors.controlColor,
+        typography = Typography(
+            fontFamily = AppTheme.typography.defaultFontFamily,
+            bodyLarge = MaterialTheme.typography.bodyLarge.copy(
+                fontFamily = AppTheme.typography.defaultFontFamily,
+                lineHeight = TextUnit.Unspecified,
+                color = colors.textPrimary,
             )
+        )
     ) {
         CompositionLocalProvider(
             LocalTextSelectionColors provides textSelectionColors,
             LocalAppColors provides colors,
             LocalAppTypography provides typography,
             LocalAppDimensions provides dimensions,
-            LocalContentColor provides colors.textColor,
+            LocalContentColor provides colors.textPrimary,
         ) {
-            Box(modifier = Modifier.fillMaxSize().background(AppTheme.colors.primaryBgColor), content = content)
+            Box(modifier = Modifier.fillMaxSize().background(AppTheme.colors.bgPrimary), content = content)
         }
     }
 }

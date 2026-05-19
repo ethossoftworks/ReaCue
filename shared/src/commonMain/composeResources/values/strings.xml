@@ -1,3 +1,17 @@
 <resources>
-    <string name="app_name">Reaper BLE IEM</string>
+    <string name="app_name">ReapEar</string>
+    <string name="connecting">Connecting...</string>
+    <string name="disconnected_from_peripheral">Could not connect to ReapEar service</string>
+    <string name="disconnected_from_reaper">Could not connect to Reaper</string>
+    <string name="connect">Connect</string>
+    <string name="scan_for_devices">Scan for Devices</string>
+    <string name="refresh">Refresh</string>
+    <string name="output">Output</string>
+    <string name="select_iem">Select IEM</string>
+    <string name="request">Request</string>
+    <string name="ble_disabled_message">Enable BLE in settings to use ReapEar</string>
+    <string name="ble_permission_request_message">ReapEar requires BLE to control your IEM</string>
+    <string name="ble_permission_denied_message">ReapEar requires BLE to control your IEM. Add the BLE permission in application settings.</string>
+    <string name="no_devices_found">No ReapEar services were found.\nPlease scan again.</string>
+    <string name="scanning">Scanning for ReapEar Devices</string>
 </resources>

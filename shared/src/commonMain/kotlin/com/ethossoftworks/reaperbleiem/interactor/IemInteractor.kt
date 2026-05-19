@@ -44,13 +44,14 @@ class IemInteractor(private val iemService: IIemService) :
                     IemEvent.Reset -> {
                         // Do Nothing. These are commands sent from the central.
                     }
-                    IemEvent.Refreshing ->
-                        update { state ->
-                            state.copy(tracks = persistentMapOf(), serviceStatus = ServiceStatus.Connected)
-                        }
+                    IemEvent.Refreshing -> update { state -> state.copy(tracks = persistentMapOf()) }
                     is IemEvent.Refreshed ->
                         update { state ->
-                            state.copy(projectName = Path(path = event.projectName).name, tracks = event.tracks)
+                            state.copy(
+                                projectName = Path(path = event.projectName).name,
+                                tracks = event.tracks,
+                                serviceStatus = ServiceStatus.Connected,
+                            )
                         }
                     is IemEvent.OutputVolumeUpdated ->
                         updateHardwareOutput(event.trackId) { it.copy(volume = event.value) }
