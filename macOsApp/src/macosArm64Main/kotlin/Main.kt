@@ -11,8 +11,16 @@ import com.outsidesource.oskitcompose.systemui.KmpWindowInsetsHolder
 import com.outsidesource.oskitcompose.systemui.LocalKmpWindowInsets
 import platform.AppKit.NSApplication
 import platform.AppKit.NSApplicationActivationPolicy
+import platform.Foundation.NSBundle
+import platform.posix.chdir
 
 fun main() {
+    // CMP 1.11.0 on macOS native resolves resources relative to CWD. When running as an .app
+    // bundle, redirect CWD to Contents/Resources/ where the stripped resources are staged.
+    // chdir() is a no-op (returns -1, ignored) when the path doesn't exist, so this has no
+    // effect during the Gradle run task where CWD is already set correctly.
+    NSBundle.mainBundle.resourcePath?.let { chdir(it) }
+
     initKoin(platformContext = PlatformContext(), extraModules = arrayOf(macOsDiModule)).koin
     initLogger(CommonWriter())
 
@@ -22,7 +30,7 @@ fun main() {
     // Window is resolved to the custom implementation in CustomWindow.kt, which fixes:
     // - title bar visible on launch (chrome configured before makeKeyAndOrderFront)
     // - hit-box drift after monitor change (scene.density updated via notification)
-    CustomWindow(title = "com.ethossoftworks.reapear", minSize = DpSize(480.dp, 400.dp)) {
+    CustomWindow(title = "Reaper BLE IEM", minSize = DpSize(480.dp, 400.dp)) {
         CompositionLocalProvider(LocalKmpWindowInsets provides KmpWindowInsetsHolder(top = 24.dp)) { App() }
     }
 

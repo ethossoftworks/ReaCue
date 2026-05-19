@@ -46,8 +46,12 @@ import platform.AppKit.NSTrackingInVisibleRect
 import platform.AppKit.NSTrackingMouseEnteredAndExited
 import platform.AppKit.NSTrackingMouseMoved
 import platform.AppKit.NSView
+import platform.AppKit.NSApplication
 import platform.AppKit.NSWindow
+import platform.AppKit.NSWindowDelegateProtocol
 import platform.AppKit.NSWindowDidChangeBackingPropertiesNotification
+import platform.Foundation.NSNotification
+import platform.darwin.NSObject
 import platform.AppKit.NSWindowStyleMaskClosable
 import platform.AppKit.NSWindowStyleMaskFullSizeContentView
 import platform.AppKit.NSWindowStyleMaskMiniaturizable
@@ -114,13 +118,11 @@ private class AppWindow(
         },
         invalidate = skiaLayer::needRender,
     )
-    private val renderDelegate = object : SkikoRenderDelegate {
-        override fun onRender(canvas: SkiaCanvas, width: Int, height: Int, nanoTime: Long) {
-            val newSize = IntSize(width, height)
-            windowInfo.containerSize = newSize
-            scene.size = newSize
-            scene.render(canvas.asComposeCanvas(), nanoTime)
-        }
+    private val renderDelegate = SkikoRenderDelegate { canvas, width, height, nanoTime ->
+        val newSize = IntSize(width, height)
+        windowInfo.containerSize = newSize
+        scene.size = newSize
+        scene.render(canvas.asComposeCanvas(), nanoTime)
     }
 
     override val window = object : NSWindow(
@@ -187,8 +189,15 @@ private class AppWindow(
         }
     }
 
+    private val delegate = object : NSObject(), NSWindowDelegateProtocol {
+        override fun windowWillClose(notification: NSNotification) {
+            NSApplication.sharedApplication().terminate(null)
+        }
+    }
+
     init {
         window.title = title
+        window.delegate = delegate
         window.contentView = view
         skiaLayer.renderDelegate = renderDelegate
         skiaLayer.attachTo(view)
