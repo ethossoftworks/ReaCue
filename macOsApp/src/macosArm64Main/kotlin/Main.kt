@@ -21,7 +21,7 @@ fun main() {
     // Window is resolved to the custom implementation in CustomWindow.kt, which fixes:
     // - title bar visible on launch (chrome configured before makeKeyAndOrderFront)
     // - hit-box drift after monitor change (scene.density updated via notification)
-    Window("Reaper BLE IEM") {
+    CustomWindow("Reaper BLE IEM") {
         CompositionLocalProvider(
             LocalKmpWindowInsets provides KmpWindowInsetsHolder(top = 24.dp),
         ) {

@@ -13,13 +13,13 @@ import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.PointerKeyboardModifiers
 import androidx.compose.ui.platform.DefaultArchitectureComponentsOwner
 import androidx.compose.ui.platform.PlatformContext
+import androidx.compose.ui.platform.WindowInfo
 import androidx.compose.ui.scene.CanvasLayersComposeScene
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.toOffset
 import androidx.compose.ui.window.WindowScope
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.enableSavedStateHandles
@@ -27,7 +27,6 @@ import com.outsidesource.oskitcompose.geometry.toOffset
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.useContents
 import kotlinx.coroutines.Dispatchers
-import org.jetbrains.skia.Canvas as SkiaCanvas
 import org.jetbrains.skiko.SkiaLayer
 import org.jetbrains.skiko.SkikoRenderDelegate
 import platform.AppKit.NSBackingStoreBuffered
@@ -58,6 +57,7 @@ import platform.AppKit.NSWindowTitleHidden
 import platform.Foundation.NSMakeRect
 import platform.Foundation.NSNotificationCenter
 import platform.Foundation.NSOperationQueue
+import org.jetbrains.skia.Canvas as SkiaCanvas
 
 /**
  * Replaces the Compose-provided Window composable with a version that fixes two bugs present
@@ -80,7 +80,7 @@ import platform.Foundation.NSOperationQueue
  * IME composition (e.g. Chinese/Japanese input) is not supported. Basic typing still works
  * via keyDown/keyUp key events.
  */
-fun Window(
+fun CustomWindow(
     title: String = "ComposeWindow",
     size: DpSize = DpSize(800.dp, 600.dp),
     content: @Composable WindowScope.() -> Unit,
@@ -95,10 +95,16 @@ private class AppWindow(
 ) : WindowScope {
     private val archComponentsOwner = DefaultArchitectureComponentsOwner()
     private val skiaLayer = SkiaLayer()
+    private val windowInfo = object : WindowInfo {
+        override var isWindowFocused: Boolean = true
+        override var containerSize: IntSize = IntSize.Zero
+        override var keyboardModifiers: PointerKeyboardModifiers = PointerKeyboardModifiers(0)
+    }
     private val scene = CanvasLayersComposeScene(
         coroutineContext = Dispatchers.Main,
         platformContext = object : PlatformContext by PlatformContext.Empty() {
             override val architectureComponentsOwner get() = archComponentsOwner
+            override val windowInfo: WindowInfo get() = this@AppWindow.windowInfo
             override fun setPointerIcon(pointerIcon: PointerIcon) {
                 NSCursor.arrowCursor.set()
             }
@@ -107,7 +113,9 @@ private class AppWindow(
     )
     private val renderDelegate = object : SkikoRenderDelegate {
         override fun onRender(canvas: SkiaCanvas, width: Int, height: Int, nanoTime: Long) {
-            scene.size = IntSize(width, height)
+            val newSize = IntSize(width, height)
+            windowInfo.containerSize = newSize
+            scene.size = newSize
             scene.render(canvas.asComposeCanvas(), nanoTime)
         }
     }
