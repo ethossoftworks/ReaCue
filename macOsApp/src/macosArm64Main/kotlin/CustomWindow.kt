@@ -55,6 +55,7 @@ import platform.AppKit.NSWindowStyleMaskResizable
 import platform.AppKit.NSWindowStyleMaskTitled
 import platform.AppKit.NSWindowTitleHidden
 import platform.Foundation.NSMakeRect
+import platform.Foundation.NSMakeSize
 import platform.Foundation.NSNotificationCenter
 import platform.Foundation.NSOperationQueue
 import org.jetbrains.skia.Canvas as SkiaCanvas
@@ -83,14 +84,16 @@ import org.jetbrains.skia.Canvas as SkiaCanvas
 fun CustomWindow(
     title: String = "ComposeWindow",
     size: DpSize = DpSize(800.dp, 600.dp),
+    minSize: DpSize = DpSize(400.dp, 300.dp),
     content: @Composable WindowScope.() -> Unit,
 ) {
-    AppWindow(title = title, size = size, content = content)
+    AppWindow(title = title, size = size, minSize = minSize, content = content)
 }
 
 private class AppWindow(
     title: String,
     size: DpSize,
+    minSize: DpSize,
     content: @Composable WindowScope.() -> Unit,
 ) : WindowScope {
     private val archComponentsOwner = DefaultArchitectureComponentsOwner()
@@ -193,8 +196,11 @@ private class AppWindow(
         window.styleMask = window.styleMask or NSWindowStyleMaskFullSizeContentView
         window.titleVisibility = NSWindowTitleHidden
         window.titlebarAppearsTransparent = true
+        window.minSize = NSMakeSize(minSize.width.value.toDouble(), minSize.height.value.toDouble())
 
-        window.center()
+        // Restore saved frame; center only on first launch when no saved frame exists.
+        val hasRestoredFrame = window.setFrameAutosaveName(title)
+        if (!hasRestoredFrame) window.center()
         window.makeKeyAndOrderFront(null)
 
         scene.density = Density(window.backingScaleFactor.toFloat())

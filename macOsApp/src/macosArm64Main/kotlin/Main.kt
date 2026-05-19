@@ -1,4 +1,5 @@
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import co.touchlab.kermit.CommonWriter
 import com.ethossoftworks.reaperbleiem.PlatformContext
@@ -21,13 +22,10 @@ fun main() {
     // Window is resolved to the custom implementation in CustomWindow.kt, which fixes:
     // - title bar visible on launch (chrome configured before makeKeyAndOrderFront)
     // - hit-box drift after monitor change (scene.density updated via notification)
-    CustomWindow("Reaper BLE IEM") {
-        CompositionLocalProvider(
-            LocalKmpWindowInsets provides KmpWindowInsetsHolder(top = 24.dp),
-        ) {
-            App()
-        }
+    CustomWindow(title = "Reaper BLE IEM", minSize = DpSize(480.dp, 400.dp)) {
+        CompositionLocalProvider(LocalKmpWindowInsets provides KmpWindowInsetsHolder(top = 24.dp)) { App() }
     }
 
+    app.activateIgnoringOtherApps(true)
     app.run()
 }
