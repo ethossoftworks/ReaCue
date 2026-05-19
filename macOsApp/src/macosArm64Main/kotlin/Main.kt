@@ -17,9 +17,10 @@ import platform.posix.chdir
 fun main() {
     // CMP 1.11.0 on macOS native resolves resources relative to CWD. When running as an .app
     // bundle, redirect CWD to Contents/Resources/ where the stripped resources are staged.
-    // chdir() is a no-op (returns -1, ignored) when the path doesn't exist, so this has no
-    // effect during the Gradle run task where CWD is already set correctly.
-    NSBundle.mainBundle.resourcePath?.let { chdir(it) }
+    // Guard on ".app" suffix so the Gradle run task (bare kexe, CWD already correct) is unaffected.
+    if (NSBundle.mainBundle.bundlePath.endsWith(".app")) {
+        NSBundle.mainBundle.resourcePath?.let { chdir(it) }
+    }
 
     initKoin(platformContext = PlatformContext(), extraModules = arrayOf(macOsDiModule)).koin
     initLogger(CommonWriter())
