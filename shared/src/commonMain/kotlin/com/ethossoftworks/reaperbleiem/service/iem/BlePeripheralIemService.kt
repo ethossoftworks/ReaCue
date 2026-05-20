@@ -117,7 +117,6 @@ class BlePeripheralIemService(
                 .onEach { event ->
                     Logger.i { "Received event from Reaper - $event" }
                     send(event)
-                    updateLastRefreshedEvent(event)
                     bleNotificationChannel.trySend(event)
                 }
                 .launchIn(this)
@@ -133,8 +132,6 @@ class BlePeripheralIemService(
         try {
             val event = cbor.decodeFromByteArray(IemEvent.serializer(), request.data)
             Logger.i { "Received command - $event" }
-
-            updateLastRefreshedEvent(event)
 
             when (event) {
                 IemEvent.Refresh -> {
@@ -191,11 +188,12 @@ class BlePeripheralIemService(
     }
 
     private suspend fun sendBleNotification(event: IemEvent, centralList: Set<KmpBleCentralId>? = null) {
+        updateLastRefreshedEvent(event)
         val payload = cbor.encodeToByteArray(IemEvent.serializer(), event)
         val centrals = centralList ?: peripheralManager.subscribedCentrals(REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID)
         val requestId = notificationId.getAndUpdate { it.inc() }
 
-        Logger.i { "Sending notification to ${centrals.size} centrals" }
+        Logger.i { "Sending notification to ${centrals.size} centrals - $event" }
 
         for (central in centrals) {
             val packetSize = peripheralManager.maximumUpdateValueLengthForCentral(central) - headerSize
@@ -210,7 +208,7 @@ class BlePeripheralIemService(
                         write(payload, startIndex, minOf(startIndex + packetSize.toInt(), payload.size))
                     }
 
-                Logger.i { "Sending notification packet $requestId - ${packetIndex.toInt() + 1}/$packetCount" }
+                Logger.i { "Sending notification packet: Request Id - $requestId - ${packetIndex.toInt() + 1}/$packetCount" }
                 peripheralManager.notify(
                     REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID,
                     buffer.readByteArray(),
