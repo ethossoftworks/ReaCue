@@ -81,13 +81,13 @@ class IemInteractor(private val iemService: IIemService) :
     }
 
     suspend fun setOutputVolume(trackId: Int, value: Float) {
-        iemService.setOutputVolume(trackId, value)
         updateHardwareOutput(trackId) { it.copy(volume = value) }
+        iemService.setOutputVolume(trackId, value)
     }
 
     suspend fun setReceiveVolume(trackId: Int, receiveId: Int, value: Float) {
-        iemService.setReceiveVolume(trackId, receiveId, value)
         updateReceive(trackId, receiveId) { it.copy(volume = value) }
+        iemService.setReceiveVolume(trackId, receiveId, value)
     }
 
     suspend fun refresh() {
