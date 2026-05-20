@@ -31,7 +31,7 @@ fun main() {
     // Window is resolved to the custom implementation in CustomWindow.kt, which fixes:
     // - title bar visible on launch (chrome configured before makeKeyAndOrderFront)
     // - hit-box drift after monitor change (scene.density updated via notification)
-    CustomWindow(title = "Reaper BLE IEM", minSize = DpSize(480.dp, 400.dp)) {
+    CustomWindow(title = "ReapEar", minSize = DpSize(480.dp, 400.dp)) {
         CompositionLocalProvider(LocalKmpWindowInsets provides KmpWindowInsetsHolder(top = 24.dp)) { App() }
     }
 

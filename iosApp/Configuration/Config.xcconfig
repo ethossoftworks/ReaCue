@@ -1,4 +1,4 @@
 #include? "../KmpBuildInfo.xcconfig"
 TEAM_ID=
 BUNDLE_ID=com.ethossoftworks.reaperbleiem
-APP_NAME=Reaper BLE IEM
+APP_NAME=ReapEar

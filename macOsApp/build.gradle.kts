@@ -62,9 +62,9 @@ val generateInfoPlist by tasks.registering {
             <plist version="1.0">
             <dict>
                 <key>CFBundleName</key>
-                <string>Reaper BLE IEM</string>
+                <string>ReapEar</string>
                 <key>CFBundleDisplayName</key>
-                <string>Reaper BLE IEM</string>
+                <string>ReapEar</string>
                 <key>CFBundleIdentifier</key>
                 <string>com.ethossoftworks.reaperbleiem</string>
                 <key>CFBundleVersion</key>
@@ -72,7 +72,7 @@ val generateInfoPlist by tasks.registering {
                 <key>CFBundleShortVersionString</key>
                 <string>$version</string>
                 <key>CFBundleExecutable</key>
-                <string>Reaper BLE IEM</string>
+                <string>ReapEar</string>
                 <key>CFBundleIconFile</key>
                 <string>AppIcon</string>
                 <key>CFBundlePackageType</key>
@@ -110,10 +110,12 @@ val stageRunResources by tasks.registering(Copy::class) {
 val assembleApp by tasks.registering {
     description = "Assembles MacOS .app bundle"
 
+    val appName = "ReapEar"
+
     dependsOn("linkReleaseExecutableMacosArm64", generateInfoPlist, stageRunResources)
 
     // Re-assign to locals so doLast captures Providers/File/String, not the build script object.
-    val contentsDir = layout.buildDirectory.dir("Reaper BLE IEM.app/Contents")
+    val contentsDir = layout.buildDirectory.dir("$appName.app/Contents")
     val kexeFile = layout.buildDirectory.file("bin/macosArm64/releaseExecutable/macOsApp.kexe")
     val iconFile = file("src/macosArm64Main/resources/AppIcon.icns")
     val plistFile = generatedPlistFile
@@ -132,8 +134,8 @@ val assembleApp by tasks.registering {
         val contents = contentsDir.get().asFile
 
         val macosDir = contents.resolve("MacOS").apply { mkdirs() }
-        kexeFile.get().asFile.copyTo(macosDir.resolve("Reaper BLE IEM"), overwrite = true)
-        macosDir.resolve("Reaper BLE IEM").setExecutable(true)
+        kexeFile.get().asFile.copyTo(macosDir.resolve(appName), overwrite = true)
+        macosDir.resolve(appName).setExecutable(true)
 
         plistFile.get().asFile.copyTo(contents.resolve("Info.plist"), overwrite = true)
 

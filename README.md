@@ -1,4 +1,4 @@
-# Reaper BLE IEM
+# ReapEar
 
 An app for IEM mixing over bluetooth
 
