@@ -35,6 +35,7 @@ import com.outsidesource.oskitcompose.interactor.collectAsState
 import com.outsidesource.oskitcompose.layout.FlexRowLayoutScope.weight
 import com.outsidesource.oskitcompose.lib.rememberInjectForRoute
 import kotlin.math.roundToInt
+import kotlinx.atomicfu.atomic
 import org.jetbrains.compose.resources.stringResource
 import org.koin.core.parameter.parametersOf
 import reaper_ble_iem.shared.generated.resources.Res
@@ -123,7 +124,7 @@ fun IemScreen(
             val ticks = remember {
                 listOf(
                     KmpSliderTick(
-                        value = .716f,
+                        value = .716f * 100f,
                         style =
                             KmpSliderTickStyle(
                                 shapeBrush = SolidColor(theme.strokePrimary),
@@ -132,7 +133,7 @@ fun IemScreen(
                             ),
                     ),
                     KmpSliderTick(
-                        value = .716f,
+                        value = .716f * 100f,
                         style =
                             KmpSliderTickStyle(
                                 shapeBrush = SolidColor(theme.strokePrimary),
@@ -148,23 +149,23 @@ fun IemScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 AppSlider(
-                    value = hardwareOut?.volume ?: 0f,
-                    range = 0f..1f,
-                    step = .01f,
+                    value = (hardwareOut?.volume ?: 0f) * 100f,
+                    range = 0f..100f,
+                    step = 1f,
                     label = stringResource(Res.string.output),
-                    onChange = { interactor.onOutputVolumeChange(track.id, it) },
-                    valueFormatter = { "${(it * 100f).roundToInt()}%" },
+                    onChange = { interactor.onOutputVolumeChange(track.id, it / 100f) },
+                    valueFormatter = { "${it.roundToInt()}%" },
                     ticks = ticks,
                 )
 
                 for (receive in track.receives) {
                     AppSlider(
-                        value = receive.value.volume,
-                        range = 0f..1f,
-                        step = .01f,
+                        value = receive.value.volume * 100f,
+                        range = 0f..100f,
+                        step = 1f,
                         label = state.tracks[receive.value.trackId]?.name ?: continue,
-                        onChange = { interactor.onReceiveVolumeChange(track.id, receive.key, it) },
-                        valueFormatter = { "${(it * 100f).roundToInt()}%" },
+                        onChange = { interactor.onReceiveVolumeChange(track.id, receive.key, it / 100f) },
+                        valueFormatter = { "${it.roundToInt()}%" },
                         ticks = ticks,
                     )
                 }
