@@ -20,6 +20,7 @@ data class IemState(
     val projectName: String = "Unknown",
     val tracks: PersistentMap<Int, Track> = persistentMapOf(),
     val serviceStatus: ServiceStatus = ServiceStatus.Disconnected,
+    val isRefreshing: Boolean = false,
 )
 
 enum class ServiceStatus {
@@ -44,13 +45,15 @@ class IemInteractor(private val iemService: IIemService) :
                     IemEvent.Reset -> {
                         // Do Nothing. These are commands sent from the central.
                     }
-                    IemEvent.Refreshing -> update { state -> state.copy(tracks = persistentMapOf()) }
+                    IemEvent.Refreshing ->
+                        update { state -> state.copy(tracks = persistentMapOf(), isRefreshing = true) }
                     is IemEvent.Refreshed ->
                         update { state ->
                             state.copy(
                                 projectName = Path(path = event.projectName).name,
                                 tracks = event.tracks,
                                 serviceStatus = ServiceStatus.Connected,
+                                isRefreshing = false,
                             )
                         }
                     is IemEvent.OutputVolumeUpdated ->

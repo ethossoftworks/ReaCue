@@ -19,6 +19,7 @@ data class IemScreenViewState(
     val tracks: Map<Int, Track> = emptyMap(),
     val projectName: String = "Unknown",
     val serviceStatus: ServiceStatus = ServiceStatus.Disconnected,
+    val isRefreshing: Boolean = false,
 )
 
 class IemScreenViewInteractor(
@@ -41,6 +42,7 @@ class IemScreenViewInteractor(
             tracks = iemInteractor.state.tracks,
             projectName = iemInteractor.state.projectName,
             serviceStatus = iemInteractor.state.serviceStatus,
+            isRefreshing = iemInteractor.state.isRefreshing,
         )
     }
 

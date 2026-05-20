@@ -35,7 +35,6 @@ import com.outsidesource.oskitcompose.interactor.collectAsState
 import com.outsidesource.oskitcompose.layout.FlexRowLayoutScope.weight
 import com.outsidesource.oskitcompose.lib.rememberInjectForRoute
 import kotlin.math.roundToInt
-import kotlinx.atomicfu.atomic
 import org.jetbrains.compose.resources.stringResource
 import org.koin.core.parameter.parametersOf
 import reaper_ble_iem.shared.generated.resources.Res
@@ -45,7 +44,9 @@ import reaper_ble_iem.shared.generated.resources.disconnected_from_peripheral
 import reaper_ble_iem.shared.generated.resources.disconnected_from_reaper
 import reaper_ble_iem.shared.generated.resources.output
 import reaper_ble_iem.shared.generated.resources.refresh
+import reaper_ble_iem.shared.generated.resources.refreshing
 import reaper_ble_iem.shared.generated.resources.scan_for_devices
+import reaper_ble_iem.shared.generated.resources.scanning
 import reaper_ble_iem.shared.generated.resources.select_iem
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -55,7 +56,6 @@ fun IemScreen(
     interactor: IemScreenViewInteractor = rememberInjectForRoute { parametersOf(context) },
 ) {
     val state = interactor.collectAsState()
-    val theme = AppTheme.colors
 
     LaunchedEffect(Unit) { interactor.onMount() }
 
@@ -92,6 +92,18 @@ fun IemScreen(
             return@Screen
         }
 
+        if (state.isRefreshing) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(text = stringResource(Res.string.refreshing))
+                AppLoadingIndicator()
+            }
+            return@Screen
+        }
+
         Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(text = state.projectName)
@@ -121,33 +133,13 @@ fun IemScreen(
 
             val track = state.tracks[state.selectedIemId] ?: return@Column
             val hardwareOut = track.hardwareOuts.values.firstOrNull()
-            val ticks = remember {
-                listOf(
-                    KmpSliderTick(
-                        value = .716f * 100f,
-                        style =
-                            KmpSliderTickStyle(
-                                shapeBrush = SolidColor(theme.strokePrimary),
-                                shapePosition = KmpSliderTickPosition(alignment = KmpSliderAlignment.Start),
-                                shapeSize = DpAxisSize(mainAxis = 1.dp, crossAxis = 10.dp),
-                            ),
-                    ),
-                    KmpSliderTick(
-                        value = .716f * 100f,
-                        style =
-                            KmpSliderTickStyle(
-                                shapeBrush = SolidColor(theme.strokePrimary),
-                                shapePosition = KmpSliderTickPosition(alignment = KmpSliderAlignment.End),
-                                shapeSize = DpAxisSize(mainAxis = 1.dp, crossAxis = 10.dp),
-                            ),
-                    ),
-                )
-            }
 
             Column(
                 modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
+                val ticks = rememberTicks()
+
                 AppSlider(
                     value = (hardwareOut?.volume ?: 0f) * 100f,
                     range = 0f..100f,
@@ -171,5 +163,32 @@ fun IemScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun rememberTicks(): List<KmpSliderTick> {
+    val theme = AppTheme.colors
+    return remember {
+        listOf(
+            KmpSliderTick(
+                value = .716f * 100f,
+                style =
+                    KmpSliderTickStyle(
+                        shapeBrush = SolidColor(theme.strokePrimary),
+                        shapePosition = KmpSliderTickPosition(alignment = KmpSliderAlignment.Start),
+                        shapeSize = DpAxisSize(mainAxis = 1.dp, crossAxis = 10.dp),
+                    ),
+            ),
+            KmpSliderTick(
+                value = .716f * 100f,
+                style =
+                    KmpSliderTickStyle(
+                        shapeBrush = SolidColor(theme.strokePrimary),
+                        shapePosition = KmpSliderTickPosition(alignment = KmpSliderAlignment.End),
+                        shapeSize = DpAxisSize(mainAxis = 1.dp, crossAxis = 10.dp),
+                    ),
+            ),
+        )
     }
 }

@@ -14,4 +14,6 @@
     <string name="ble_permission_denied_message">Bluetooth is required to control your IEM. Add the Bluetooth permission in application settings.</string>
     <string name="no_devices_found">No devices were found.\nPlease scan again.</string>
     <string name="scanning">Scanning for Devices</string>
+    <string name="discovered_devices">Discovered ReapEar Devices</string>
+    <string name="refreshing">Refreshing</string>
 </resources>

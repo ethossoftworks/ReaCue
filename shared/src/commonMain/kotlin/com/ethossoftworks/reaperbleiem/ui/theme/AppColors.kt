@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.SolidColor
 @Immutable
 open class AppColors {
     open val textPrimary = Color.Black
+    open val textSecondary = Color.Black
     open val accent = Color.Black
     open val accentTint = Color.Black
     open val error = Color.Black
@@ -24,6 +25,7 @@ open class AppColors {
 @Immutable
 data object LightAppColors : AppColors() {
     override val textPrimary = Color(0xFFE5E7EB)
+    override val textSecondary = Color(0xFF5f6872)
     override val accent = Color(0xFF1077f6)
     override val accentTint = accent.copy(alpha = 0.15f)
     override val error = Color(0xFFfc5c55)
