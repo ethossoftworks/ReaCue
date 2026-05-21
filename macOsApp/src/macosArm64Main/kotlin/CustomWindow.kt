@@ -62,6 +62,7 @@ import platform.Foundation.NSMakeRect
 import platform.Foundation.NSMakeSize
 import platform.Foundation.NSNotificationCenter
 import platform.Foundation.NSOperationQueue
+import platform.Foundation.NSUserDefaults
 import org.jetbrains.skia.Canvas as SkiaCanvas
 
 /**
@@ -170,8 +171,17 @@ private class AppWindow(
             addTrackingArea(trackingArea!!)
         }
 
-        override fun mouseDown(event: NSEvent) =
+        override fun mouseDown(event: NSEvent) {
+            // Double-click in the title bar area should zoom/minimize the window, respecting
+            // the system preference (System Settings → Desktop & Dock → "Double-click a window's
+            // title bar to"). With NSWindowStyleMaskFullSizeContentView the content view covers
+            // the title bar, so we must handle this ourselves.
+            if (event.clickCount == 2L && isInTitleBarArea(event)) {
+                performTitleBarDoubleClickAction()
+                return
+            }
             onMouseEvent(event, PointerEventType.Press, PointerButton.Primary)
+        }
         override fun mouseUp(event: NSEvent) =
             onMouseEvent(event, PointerEventType.Release, PointerButton.Primary)
         override fun rightMouseDown(event: NSEvent) =
@@ -228,6 +238,23 @@ private class AppWindow(
         scene.setContent { content() }
         archComponentsOwner.enableSavedStateHandles()
         archComponentsOwner.lifecycle.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+    }
+
+    // Returns true when the event's y position (window coords, origin at bottom-left) is above
+    // the content layout rect — i.e. in the transparent title bar overlay area.
+    private fun isInTitleBarArea(event: NSEvent): Boolean {
+        val clickY = event.locationInWindow.useContents { y }
+        val contentMaxY = window.contentLayoutRect.useContents { origin.y + size.height }
+        return clickY > contentMaxY
+    }
+
+    // Respects System Settings → Desktop & Dock → "Double-click a window's title bar to".
+    private fun performTitleBarDoubleClickAction() {
+        when (NSUserDefaults.standardUserDefaults.stringForKey("AppleActionOnDoubleClick")) {
+            "Minimize" -> window.miniaturize(null)
+            "None" -> {}
+            else -> window.zoom(null) // "Maximize" is the default
+        }
     }
 
     private fun onMouseEvent(
