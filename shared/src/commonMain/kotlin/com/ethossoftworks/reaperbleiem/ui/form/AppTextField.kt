@@ -41,7 +41,6 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.ethossoftworks.reaperbleiem.ui.theme.AppTheme
 import com.ethossoftworks.reaperbleiem.ui.theme.AppThemeProvider
-import com.outsidesource.oskitcompose.layout.FlexRowLayoutScope.weight
 import com.outsidesource.oskitcompose.modifier.kmpOuterShadow
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
@@ -90,7 +89,7 @@ fun AppTextField(
                             color = Color.Black.copy(alpha = .25f),
                             shape = shape,
                         )
-                        .background(brush = theme.buttonBg, shape = shape)
+                        .background(brush = theme.controlBg, shape = shape)
                         .background(
                             color =
                                 if (isHovered) {

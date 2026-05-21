@@ -20,13 +20,18 @@ data class IemScreenViewState(
     val projectName: String = "Unknown",
     val serviceStatus: ServiceStatus = ServiceStatus.Disconnected,
     val isRefreshing: Boolean = false,
+    val numberInputModalType: NumberInputModalType? = null,
 )
+
+enum class NumberInputModalType {
+    Adjust,
+    Set,
+}
 
 class IemScreenViewInteractor(
     private val iemContext: IemContext,
     private val iemInteractor: IemInteractor,
     private val capabilityInteractor: CapabilityInteractor,
-    private val infoMessageInteractor: InfoMessageInteractor,
     private val coordinator: AppCoordinator,
 ) :
     Interactor<IemScreenViewState>(
@@ -64,6 +69,44 @@ class IemScreenViewInteractor(
 
     fun onRefreshClick() {
         interactorScope.launch { iemInteractor.refresh() }
+    }
+
+    fun onSetAllTo0Click() {
+        interactorScope.launch {
+            val track = state.tracks[state.selectedIemId] ?: return@launch
+            for ((_, receive) in track.receives) {
+                iemInteractor.setReceiveVolume(track.id, receive.id, .716f)
+            }
+        }
+    }
+
+    fun onSetAllToNClick() {
+        update { state -> state.copy(numberInputModalType = NumberInputModalType.Set) }
+    }
+
+    fun onAdjustAllByNClick() {
+        update { state -> state.copy(numberInputModalType = NumberInputModalType.Adjust) }
+    }
+
+    fun onNumberModalCommit(value: Float) {
+        val modalType = state.numberInputModalType ?: return
+
+        update { state -> state.copy(numberInputModalType = null) }
+
+        interactorScope.launch {
+            val track = state.tracks[state.selectedIemId] ?: return@launch
+            for ((_, receive) in track.receives) {
+                val clampedValue = when (modalType) {
+                    NumberInputModalType.Adjust -> (receive.volume + (value / 100f)).coerceIn(0f..1f)
+                    NumberInputModalType.Set -> (value / 100f).coerceIn(0f, 1f)
+                }
+                iemInteractor.setReceiveVolume(track.id, receive.id, clampedValue)
+            }
+        }
+    }
+
+    fun onNumberModalDismiss() {
+        update { state -> state.copy(numberInputModalType = null) }
     }
 
     fun onOutputVolumeChange(trackId: Int, value: Float) {

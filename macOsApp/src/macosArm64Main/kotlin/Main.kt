@@ -32,7 +32,7 @@ fun main() {
     // - title bar visible on launch (chrome configured before makeKeyAndOrderFront)
     // - hit-box drift after monitor change (scene.density updated via notification)
     CustomWindow(title = "ReapEar", minSize = DpSize(480.dp, 400.dp)) {
-        CompositionLocalProvider(LocalKmpWindowInsets provides KmpWindowInsetsHolder(top = 24.dp)) { App() }
+        CompositionLocalProvider(LocalKmpWindowInsets provides KmpWindowInsetsHolder(top = 30.dp)) { App() }
     }
 
     app.activateIgnoringOtherApps(true)

@@ -8,12 +8,14 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
@@ -43,12 +45,33 @@ import reaper_ble_iem.shared.generated.resources.Res
 import reaper_ble_iem.shared.generated.resources.volume_up
 
 @Composable
+fun CircleAppButton(
+    icon: DrawableResource? = null,
+    iconSize: DpSize = DpSize(22.dp, 22.dp),
+    padding: PaddingValues = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    buttonType: AppButtonType = AppButtonType.Default,
+) {
+    AppButton(
+        iconStart = icon,
+        iconSize = iconSize,
+        padding = padding,
+        onClick = onClick,
+        modifier = modifier,
+        buttonType = buttonType,
+        shape = CircleShape,
+    )
+}
+
+@Composable
 fun AppButton(
     iconStart: DrawableResource? = null,
     iconEnd: DrawableResource? = null,
     iconSize: DpSize = DpSize(22.dp, 22.dp),
     label: String? = null,
     shape: Shape = remember { RoundedCornerShape(8.dp) },
+    padding: PaddingValues = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     buttonType: AppButtonType = AppButtonType.Default,
@@ -74,7 +97,7 @@ fun AppButton(
                     color = Color.Black.copy(alpha = .25f),
                     shape = shape,
                 )
-                .background(brush = theme.buttonBg, shape = shape)
+                .background(brush = theme.controlBg, shape = shape)
                 .background(
                     color = if (buttonType == AppButtonType.Error) theme.errorTint else Color.Transparent,
                     shape = shape,
@@ -90,7 +113,7 @@ fun AppButton(
                 )
                 .clip(shape)
                 .clickable(onClick = onClick, interactionSource = interactionSource, indication = ripple)
-                .padding(horizontal = 24.dp, vertical = 12.dp),
+                .padding(padding),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -135,7 +158,12 @@ private fun AppButtonPreview() {
         Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             AppButton(label = "Test", onClick = {})
             AppButton(iconStart = Res.drawable.volume_up, label = "Test 2", onClick = {})
-            AppButton(buttonType = AppButtonType.Error, iconStart = Res.drawable.volume_up, label = "Test 2", onClick = {})
+            AppButton(
+                buttonType = AppButtonType.Error,
+                iconStart = Res.drawable.volume_up,
+                label = "Test 2",
+                onClick = {},
+            )
             AppButton(iconEnd = Res.drawable.volume_up, label = "Test 2", onClick = {})
         }
     }

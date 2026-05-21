@@ -16,7 +16,7 @@ class AppCoordinator :
         defaultTransition = PushFromRightRouteTransition,
     ) {
 
-    fun onBleScanRecordClick(scanRecord: KmpBleScanRecord) = replace(Route.Iem(IemContext.Central(scanRecord)))
+    fun onBleScanRecordClick(scanRecord: KmpBleScanRecord) = push(Route.Iem(IemContext.Central(scanRecord)))
 
-    fun onBackToScanClick() = replace(Route.Scan)
+    fun onBackToScanClick() = pop { toRoute(Route.Scan) }
 }

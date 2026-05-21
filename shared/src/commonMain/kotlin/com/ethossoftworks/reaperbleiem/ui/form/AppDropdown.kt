@@ -58,7 +58,7 @@ fun AppDropdown(
         ExposedDropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            containerColor = theme.bgPopup,
+            containerColor = theme.bgSurface,
             shape = RoundedCornerShape(8.dp),
             border = BorderStroke(width = 1.dp, color = theme.strokePrimary),
             content = { itemContent(dismiss) },

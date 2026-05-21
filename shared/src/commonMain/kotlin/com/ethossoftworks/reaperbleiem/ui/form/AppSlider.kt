@@ -67,7 +67,7 @@ fun AppSlider(
             KmpSliderStyle(
                 trackFill = SolidColor(theme.accent),
                 trackBackground = theme.sliderTrackBg,
-                valueLabelBackground = SolidColor(theme.bgPopup),
+                valueLabelBackground = SolidColor(theme.bgSurface),
                 valueLabelTextStyle = textStyle,
                 trackThickness = 6.dp,
                 thumbBackground = SolidColor(theme.textPrimary),
@@ -115,7 +115,7 @@ private fun KmpSliderScope.AppManualEntryModal(
             Modifier.widthIn(max = maxWidth)
                 .border(width = 1.dp, color = theme.strokePrimary, shape = shape)
                 .kmpOuterShadow(blur = 8.dp, shape = shape, color = Color.Black.copy(alpha = 0.25f))
-                .background(theme.bgPopup, shape = shape)
+                .background(theme.bgSurface, shape = shape)
                 .padding(16.dp),
         isVisible = isVisible,
         styles = ModalStyles.UserDefinedContent,

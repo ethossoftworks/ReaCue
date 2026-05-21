@@ -50,7 +50,7 @@ class IemInteractor(private val iemService: IIemService) :
                     is IemEvent.Refreshed ->
                         update { state ->
                             state.copy(
-                                projectName = Path(path = event.projectName).name,
+                                projectName = Path(path = event.projectName).name.removeSuffix(".RPP"),
                                 tracks = event.tracks,
                                 serviceStatus = ServiceStatus.Connected,
                                 isRefreshing = false,

@@ -35,7 +35,6 @@ import com.ethossoftworks.reaperbleiem.ui.form.AppButton
 import com.ethossoftworks.reaperbleiem.ui.form.AppLoadingIndicator
 import com.ethossoftworks.reaperbleiem.ui.theme.AppTheme
 import com.outsidesource.oskitcompose.interactor.collectAsState
-import com.outsidesource.oskitcompose.layout.FlexRowLayoutScope.weight
 import com.outsidesource.oskitcompose.lib.rememberInjectForRoute
 import com.outsidesource.oskitcompose.modifier.kmpOuterShadow
 import com.outsidesource.oskitkmp.capability.CapabilityStatus
@@ -124,7 +123,7 @@ private fun Device(device: KmpBleScanRecord, onClick: () -> Unit) {
             Modifier.fillMaxWidth()
                 .heightIn(80.dp)
                 .kmpOuterShadow(blur = 8.dp, color = Color.Black.copy(alpha = 0.25f), shape = cardShape)
-                .background(color = theme.bgPopup, shape = cardShape)
+                .background(color = theme.bgSurface, shape = cardShape)
                 .background(
                     color =
                         if (isHovered) {
