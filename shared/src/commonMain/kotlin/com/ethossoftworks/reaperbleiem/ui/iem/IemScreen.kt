@@ -49,7 +49,7 @@ import reaper_ble_iem.shared.generated.resources.mix_project
 import reaper_ble_iem.shared.generated.resources.output
 import reaper_ble_iem.shared.generated.resources.refresh
 import reaper_ble_iem.shared.generated.resources.refreshing
-import reaper_ble_iem.shared.generated.resources.scan_for_devices
+import reaper_ble_iem.shared.generated.resources.scan_for_hosts
 import reaper_ble_iem.shared.generated.resources.select_iem
 import reaper_ble_iem.shared.generated.resources.set_all_0db
 import reaper_ble_iem.shared.generated.resources.set_all_n
@@ -139,7 +139,7 @@ fun IemScreen(
                 AppButton(label = stringResource(Res.string.connect), onClick = interactor::onConnectClick)
                 if (context is IemContext.Central) {
                     AppButton(
-                        label = stringResource(Res.string.scan_for_devices),
+                        label = stringResource(Res.string.scan_for_hosts),
                         onClick = interactor::onBackToScanClick,
                     )
                 }

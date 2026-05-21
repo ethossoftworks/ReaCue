@@ -47,8 +47,8 @@ import reaper_ble_iem.shared.generated.resources.ble_disabled_message
 import reaper_ble_iem.shared.generated.resources.ble_permission_denied_message
 import reaper_ble_iem.shared.generated.resources.ble_permission_request_message
 import reaper_ble_iem.shared.generated.resources.bluetooth
-import reaper_ble_iem.shared.generated.resources.discovered_devices
-import reaper_ble_iem.shared.generated.resources.no_devices_found
+import reaper_ble_iem.shared.generated.resources.discovered_hosts
+import reaper_ble_iem.shared.generated.resources.no_hosts_found
 import reaper_ble_iem.shared.generated.resources.scanning
 
 @Composable
@@ -60,7 +60,7 @@ fun ScanScreen(interactor: ScanScreenViewInteractor = rememberInjectForRoute()) 
         onDispose { interactor.onDispose() }
     }
 
-    Screen(toolbar = { AppToolbar(title = stringResource(Res.string.discovered_devices)) }) {
+    Screen(toolbar = { AppToolbar(title = stringResource(Res.string.discovered_hosts)) }) {
         Column(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(16.dp, alignment = Alignment.CenterVertically),
@@ -92,7 +92,7 @@ fun ScanScreen(interactor: ScanScreenViewInteractor = rememberInjectForRoute()) 
 
                 if (state.devices.isEmpty() && !state.isScanning) {
                     Spacer(modifier = Modifier.weight(1f))
-                    Text(text = stringResource(Res.string.no_devices_found), textAlign = TextAlign.Center)
+                    Text(text = stringResource(Res.string.no_hosts_found), textAlign = TextAlign.Center)
                     AppButton(label = "Scan", onClick = interactor::onScan)
                 }
 
