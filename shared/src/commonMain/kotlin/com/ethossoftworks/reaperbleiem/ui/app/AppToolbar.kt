@@ -10,14 +10,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ethossoftworks.reaperbleiem.ui.form.AppCircleButton
 import com.ethossoftworks.reaperbleiem.ui.form.AppDropdownItem
 import com.ethossoftworks.reaperbleiem.ui.form.AppPopoverButton
-import com.ethossoftworks.reaperbleiem.ui.theme.AppTheme
 import com.outsidesource.oskitcompose.interactor.collectAsState
-import com.outsidesource.oskitcompose.lib.rememberInject
+import com.outsidesource.oskitcompose.layout.FlexRowLayoutScope.weight
+import com.outsidesource.oskitcompose.lib.rememberInjectForRoute
 import com.outsidesource.oskitcompose.systemui.KmpWindowInsets
 import com.outsidesource.oskitcompose.systemui.top
 import org.jetbrains.compose.resources.stringResource
@@ -31,10 +32,9 @@ import reaper_ble_iem.shared.generated.resources.settings
 fun AppToolbar(
     title: String? = null,
     additionalMenuItems: @Composable (close: () -> Unit) -> Unit = {},
-    interactor: AppToolbarViewInteractor = rememberInject(),
+    interactor: AppToolbarViewInteractor = rememberInjectForRoute(),
 ) {
     val state = interactor.collectAsState()
-    val theme = AppTheme.colors
 
     Row(
         modifier = Modifier.windowInsetsPadding(KmpWindowInsets.top).padding(horizontal = 24.dp),
@@ -44,10 +44,19 @@ fun AppToolbar(
         if (state.hasBackStack) {
             AppCircleButton(icon = Res.drawable.arrow_back, onClick = interactor::onBackClick)
         }
-        title?.let {
-            Text(text = it.uppercase(), fontSize = 18.sp, fontWeight = FontWeight.ExtraLight, letterSpacing = 0.0.sp)
+        if (title != null) {
+            Text(
+                modifier = Modifier.weight(1f),
+                text = title.uppercase(),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.ExtraLight,
+                letterSpacing = 0.0.sp,
+                overflow = TextOverflow.Ellipsis,
+                maxLines = 2,
+            )
+        } else {
+            Spacer(modifier = Modifier.weight(1f))
         }
-        Spacer(modifier = Modifier.weight(1f))
         AppPopoverButton(icon = Res.drawable.menu) { close ->
             additionalMenuItems(close)
             AppDropdownItem(
