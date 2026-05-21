@@ -49,6 +49,7 @@ import platform.CoreBluetooth.CBCharacteristicPropertyRead
 import platform.CoreBluetooth.CBCharacteristicPropertyWrite
 import platform.CoreBluetooth.CBCharacteristicPropertyWriteWithoutResponse
 import platform.CoreBluetooth.CBManagerState
+import platform.CoreBluetooth.CBManagerStatePoweredOff
 import platform.CoreBluetooth.CBManagerStatePoweredOn
 import platform.CoreBluetooth.CBManagerStateUnknown
 import platform.CoreBluetooth.CBMutableCharacteristic
@@ -129,6 +130,14 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
                 }
 
                 events.onEach { send(it) }.launchIn(this)
+
+                _state
+                    .onEach { state ->
+                        if (state != CBManagerStatePoweredOff) return@onEach
+                        send(KmpBlePeripheralEvent.Error(KmpBleError.Unknown("Bluetooth is turned off")))
+                        close()
+                    }
+                    .launchIn(this)
 
                 launch { processNotificationQueue() }
 
