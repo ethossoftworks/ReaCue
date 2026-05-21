@@ -1,10 +1,10 @@
 <resources>
     <string name="app_name">ReapEar</string>
     <string name="connecting">Connecting</string>
-    <string name="disconnected_from_peripheral">Could not connect to ReapEar host</string>
+    <string name="disconnected_from_peripheral">Could not connect to host</string>
     <string name="disconnected_from_reaper">Could not connect to Reaper</string>
     <string name="connect">Connect</string>
-    <string name="scan_for_devices">Scan for ReapEar hosts</string>
+    <string name="scan_for_devices">Scan for hosts</string>
     <string name="refresh">Refresh</string>
     <string name="output">Output</string>
     <string name="select_iem">Select IEM</string>
@@ -14,7 +14,7 @@
     <string name="ble_permission_denied_message">Bluetooth is required to control your IEM. Add the Bluetooth permission in application settings.</string>
     <string name="no_devices_found">No devices were found.\nPlease scan again.</string>
     <string name="scanning">Scanning for hosts</string>
-    <string name="discovered_devices">Discovered ReapEar Hosts</string>
+    <string name="discovered_devices">Discovered Hosts</string>
     <string name="refreshing">Refreshing</string>
     <string name="reset">Reset</string>
     <string name="set_all_0db">Set all to 0dB</string>

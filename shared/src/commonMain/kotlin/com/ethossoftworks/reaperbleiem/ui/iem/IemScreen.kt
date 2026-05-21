@@ -11,7 +11,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,7 +63,10 @@ fun IemScreen(
     val state = interactor.collectAsState()
     val theme = AppTheme.colors
 
-    LaunchedEffect(Unit) { interactor.onMount() }
+    DisposableEffect(Unit) {
+        interactor.onMount()
+        onDispose { interactor.onUnmount() }
+    }
 
     Screen(
         toolbar = {
@@ -74,7 +77,7 @@ fun IemScreen(
                     } else {
                         stringResource(Res.string.mix)
                     },
-                actions = { close ->
+                additionalMenuItems = { close ->
                     if (state.serviceStatus != ServiceStatus.Connected || state.selectedIemId == null) return@AppToolbar
                     AppDropdownItem(
                         text = stringResource(Res.string.refresh),

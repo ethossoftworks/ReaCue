@@ -55,6 +55,10 @@ class IemScreenViewInteractor(
         interactorScope.launch { start() }
     }
 
+    fun onUnmount() {
+        subscriptionJob.value?.cancel()
+    }
+
     fun onIemSelect(id: Int) {
         update { state -> state.copy(selectedIemId = id) }
     }

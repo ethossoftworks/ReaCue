@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleScanRecord
+import com.ethossoftworks.reaperbleiem.ui.app.AppToolbar
 import com.ethossoftworks.reaperbleiem.ui.app.Screen
 import com.ethossoftworks.reaperbleiem.ui.form.AppButton
 import com.ethossoftworks.reaperbleiem.ui.form.AppLoadingIndicator
@@ -59,7 +60,7 @@ fun ScanScreen(interactor: ScanScreenViewInteractor = rememberInjectForRoute()) 
         onDispose { interactor.onDispose() }
     }
 
-    Screen {
+    Screen(toolbar = { AppToolbar(title = stringResource(Res.string.discovered_devices)) }) {
         Column(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(16.dp, alignment = Alignment.CenterVertically),
@@ -79,14 +80,14 @@ fun ScanScreen(interactor: ScanScreenViewInteractor = rememberInjectForRoute()) 
             }
 
             if (state.bluetoothStatus == CapabilityStatus.Ready) {
-                Text(
-                    text = stringResource(Res.string.discovered_devices),
-                    textAlign = TextAlign.Center,
-                    fontSize = 18.sp,
-                )
-
                 for (device in state.devices.values) {
                     Device(device, onClick = { interactor.onDeviceClick(device) })
+                }
+
+                if (state.devices.isEmpty() && state.isScanning) {
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text(text = stringResource(Res.string.scanning))
+                    AppLoadingIndicator()
                 }
 
                 if (state.devices.isEmpty() && !state.isScanning) {
@@ -101,7 +102,7 @@ fun ScanScreen(interactor: ScanScreenViewInteractor = rememberInjectForRoute()) 
                     AppButton(label = "Scan", onClick = interactor::onScan)
                 }
 
-                if (state.isScanning) {
+                if (state.devices.isNotEmpty() && state.isScanning) {
                     Text(text = stringResource(Res.string.scanning))
                     AppLoadingIndicator()
                 }

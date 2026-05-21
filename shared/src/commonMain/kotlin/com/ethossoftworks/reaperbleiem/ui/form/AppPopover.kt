@@ -28,7 +28,7 @@ fun AppPopoverButton(icon: DrawableResource, content: @Composable ColumnScope.(c
     Box {
         var isVisible by remember { mutableStateOf(false) }
 
-        CircleAppButton(icon = icon, onClick = { isVisible = true })
+        AppCircleButton(icon = icon, onClick = { isVisible = true })
 
         Popover(
             isVisible = isVisible,

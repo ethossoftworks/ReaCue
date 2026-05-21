@@ -19,4 +19,10 @@ class AppCoordinator :
     fun onBleScanRecordClick(scanRecord: KmpBleScanRecord) = push(Route.Iem(IemContext.Central(scanRecord)))
 
     fun onBackToScanClick() = pop { toRoute(Route.Scan) }
+
+    fun onBackClick() = pop()
+
+    fun onSettingsClick() {
+
+    }
 }

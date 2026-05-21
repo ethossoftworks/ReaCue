@@ -45,7 +45,7 @@ import reaper_ble_iem.shared.generated.resources.Res
 import reaper_ble_iem.shared.generated.resources.volume_up
 
 @Composable
-fun CircleAppButton(
+fun AppCircleButton(
     icon: DrawableResource? = null,
     iconSize: DpSize = DpSize(22.dp, 22.dp),
     padding: PaddingValues = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
@@ -62,6 +62,47 @@ fun CircleAppButton(
         buttonType = buttonType,
         shape = CircleShape,
     )
+}
+
+@Composable
+fun AppIconButton(
+    icon: DrawableResource,
+    iconSize: DpSize = DpSize(22.dp, 22.dp),
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val theme = AppTheme.colors
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val ripple = ripple(color = theme.accent)
+    val shape = CircleShape
+
+    Row(
+        modifier =
+            modifier
+                .size(44.dp)
+                .semantics { role = Role.Button }
+                .background(
+                    color =
+                        if (isHovered) {
+                            theme.accentTint
+                        } else {
+                            Color.Transparent
+                        },
+                    shape = shape,
+                )
+                .clip(shape)
+                .clickable(onClick = onClick, interactionSource = interactionSource, indication = ripple),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Image(
+            modifier = Modifier.size(iconSize),
+            painter = painterResource(icon),
+            contentDescription = null,
+            colorFilter = ColorFilter.tint(theme.textPrimary),
+        )
+    }
 }
 
 @Composable

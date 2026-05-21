@@ -6,6 +6,7 @@ import com.ethossoftworks.reaperbleiem.interactor.IemInteractor
 import com.ethossoftworks.reaperbleiem.interactor.InfoMessageInteractor
 import com.ethossoftworks.reaperbleiem.lib.KmpBuildEnvironmentOverrider
 import com.ethossoftworks.reaperbleiem.service.iem.NetworkIemService
+import com.ethossoftworks.reaperbleiem.ui.app.AppToolbarViewInteractor
 import com.ethossoftworks.reaperbleiem.ui.iem.IemScreenViewInteractor
 import com.ethossoftworks.reaperbleiem.ui.scan.ScanScreenViewInteractor
 import com.outsidesource.oskitkmp.capability.BluetoothCapabilityFlags
@@ -75,6 +76,7 @@ fun commonModule() = module {
     // View Interactors
     factory { params -> IemScreenViewInteractor(params[0], get(), get(), get()) }
     factory { ScanScreenViewInteractor(get(), get(), get()) }
+    factory { AppToolbarViewInteractor(get()) }
 }
 
 fun mockModule() = module {}
