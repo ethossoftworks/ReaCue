@@ -1,7 +1,5 @@
 package com.ethossoftworks.reaperbleiem.ui.form
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,7 +24,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -40,11 +37,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ethossoftworks.reaperbleiem.ui.theme.AppTheme
 import com.ethossoftworks.reaperbleiem.ui.theme.AppThemeProvider
+import com.ethossoftworks.reaperbleiem.ui.theme.modalSurface
 import com.outsidesource.oskitcompose.form.KmpSlider
 import com.outsidesource.oskitcompose.form.KmpSliderScope
 import com.outsidesource.oskitcompose.form.KmpSliderStyle
 import com.outsidesource.oskitcompose.form.KmpSliderTick
-import com.outsidesource.oskitcompose.modifier.kmpOuterShadow
 import com.outsidesource.oskitcompose.popup.Modal
 import com.outsidesource.oskitcompose.popup.ModalStyles
 import kotlin.math.roundToInt
@@ -113,9 +110,7 @@ private fun KmpSliderScope.AppManualEntryModal(
     Modal(
         modifier =
             Modifier.widthIn(max = maxWidth)
-                .border(width = 1.dp, color = theme.strokePrimary, shape = shape)
-                .kmpOuterShadow(blur = 8.dp, shape = shape, color = Color.Black.copy(alpha = 0.25f))
-                .background(theme.bgSurface, shape = shape)
+                .modalSurface(theme, shape)
                 .padding(16.dp),
         isVisible = isVisible,
         styles = ModalStyles.UserDefinedContent,
