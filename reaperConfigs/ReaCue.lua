@@ -5,7 +5,7 @@ function ble_iem()
 
   if last_project ~= project_fn then
     last_project = project_fn
-    reaper.SetExtState("BleIem", "ProjectName", project_fn, false)
+    reaper.SetExtState("ReaCue", "ProjectName", project_fn, false)
   end
 
   reaper.defer(ble_iem)

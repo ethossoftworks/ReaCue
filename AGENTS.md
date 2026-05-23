@@ -77,7 +77,7 @@ Be careful with these compatibility points:
 - `IemEvent` serialization uses kotlinx.serialization CBOR, `@SerialName`, and `@CborLabel`; changing labels or names is a protocol migration.
 - BLE notifications use a 4-byte packet header: request id (`UInt16`) and packets remaining (`UInt16`).
 - `NetworkIemService` assumes REAPER web access at `http://localhost:8000` by default, OSC command port `8000`, and OSC notification port `9000`.
-- REAPER setup depends on `reaperConfigs/BleIem.ReaperOSC` and `reaperConfigs/BleIem.lua`.
+- REAPER setup depends on `reaperConfigs/ReaCue.ReaperOSC` and `reaperConfigs/ReaCue.lua`.
 
 If changing any protocol shape, update both central and peripheral paths together and include a migration note in the change summary.
 
