@@ -195,7 +195,7 @@ class NetworkIemService(
 
     private suspend fun getProjectName(): String {
         return try {
-            val response = httpClient.get("$restDomain/_/GET/EXTSTATE/BleIem/ProjectName")
+            val response = httpClient.get("$restDomain/_/GET/EXTSTATE/ReaCue/ProjectName")
             if (!response.status.isSuccess()) return "Unknown"
             response.bodyAsText().split("\t")[3].trim()
         } catch (t: CancellationException) {
