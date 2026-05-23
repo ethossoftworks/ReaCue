@@ -7,11 +7,13 @@
     <string name="scan_for_hosts">Scan for hosts</string>
     <string name="refresh">Refresh</string>
     <string name="output">Output</string>
-    <string name="select_iem">Select IEM</string>
+    <string name="select_monitor">Select Monitor</string>
+    <string name="no_monitors">No Monitors</string>
+    <string name="untitled">Untitled</string>
     <string name="request">Request</string>
     <string name="ble_disabled_message">Bluetooth is disabled. Enable bluetooth in settings.</string>
-    <string name="ble_permission_request_message">Bluetooth is required to control your IEM</string>
-    <string name="ble_permission_denied_message">Bluetooth is required to control your IEM. Add the Bluetooth permission in application settings.</string>
+    <string name="ble_permission_request_message">Bluetooth is required to control your monitor mix.</string>
+    <string name="ble_permission_denied_message">Bluetooth is required to control your monitor mix. Add the Bluetooth permission in application settings.</string>
     <string name="no_hosts_found">No hosts found.\nPlease scan again.</string>
     <string name="scanning">Scanning for hosts</string>
     <string name="discovered_hosts">Discovered Hosts</string>

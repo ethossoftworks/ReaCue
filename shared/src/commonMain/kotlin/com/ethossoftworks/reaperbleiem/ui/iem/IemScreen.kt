@@ -35,6 +35,7 @@ import com.outsidesource.oskitcompose.form.KmpSliderTickPosition
 import com.outsidesource.oskitcompose.form.KmpSliderTickStyle
 import com.outsidesource.oskitcompose.interactor.collectAsState
 import com.outsidesource.oskitcompose.lib.rememberInjectForRoute
+import kotlin.collections.forEach
 import kotlin.math.roundToInt
 import org.jetbrains.compose.resources.stringResource
 import org.koin.core.parameter.parametersOf
@@ -46,13 +47,15 @@ import reaper_ble_iem.shared.generated.resources.disconnected_from_peripheral
 import reaper_ble_iem.shared.generated.resources.disconnected_from_reaper
 import reaper_ble_iem.shared.generated.resources.mix
 import reaper_ble_iem.shared.generated.resources.mix_project
+import reaper_ble_iem.shared.generated.resources.no_monitors
 import reaper_ble_iem.shared.generated.resources.output
 import reaper_ble_iem.shared.generated.resources.refresh
 import reaper_ble_iem.shared.generated.resources.refreshing
 import reaper_ble_iem.shared.generated.resources.scan_for_hosts
-import reaper_ble_iem.shared.generated.resources.select_iem
+import reaper_ble_iem.shared.generated.resources.select_monitor
 import reaper_ble_iem.shared.generated.resources.set_all_0db
 import reaper_ble_iem.shared.generated.resources.set_all_n
+import reaper_ble_iem.shared.generated.resources.untitled
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,7 +76,10 @@ fun IemScreen(
             AppToolbar(
                 title =
                     if (state.serviceStatus == ServiceStatus.Connected && !state.isRefreshing) {
-                        stringResource(Res.string.mix_project, state.projectName)
+                        stringResource(
+                            Res.string.mix_project,
+                            state.projectName.ifEmpty { stringResource(Res.string.untitled) },
+                        )
                     } else {
                         stringResource(Res.string.mix)
                     },
@@ -162,10 +168,13 @@ fun IemScreen(
         Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             AppDropdown(
                 modifier = Modifier.fillMaxWidth(),
-                valueLabel = state.tracks[state.selectedIemId]?.name ?: stringResource(Res.string.select_iem),
+                valueLabel = state.tracks[state.selectedIemId]?.name ?: stringResource(Res.string.select_monitor),
             ) { dismiss ->
+                var monitorTrackCount = 0
                 state.tracks.forEach { (trackId, track) ->
                     if (!track.isIem) return@forEach
+                    monitorTrackCount++
+
                     AppDropdownItem(
                         text = state.tracks[trackId]?.name ?: return@forEach,
                         onClick = {
@@ -173,6 +182,10 @@ fun IemScreen(
                             interactor.onIemSelect(trackId)
                         },
                     )
+                }
+
+                if (monitorTrackCount == 0) {
+                    AppDropdownItem(text = stringResource(Res.string.no_monitors), isEnabled = false, onClick = {})
                 }
             }
 

@@ -52,7 +52,7 @@ class ScanScreenViewInteractor(
 
     fun onScan() {
         interactorScope.launch {
-            update { state -> state.copy(isScanning = true) }
+            update { state -> state.copy(isScanning = true, devices = emptyMap()) }
             withTimeoutOrNull(10.seconds) {
                 iemInteractor.scanPeripherals().collect {
                     update { state -> state.copy(devices = state.devices.update { this[it.identifier] = it }) }

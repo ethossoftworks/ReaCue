@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -67,7 +68,7 @@ fun AppDropdown(
 }
 
 @Composable
-fun AppDropdownItem(text: String, onClick: () -> Unit) {
+fun AppDropdownItem(text: String, onClick: () -> Unit, isEnabled: Boolean = true) {
     val theme = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
@@ -76,8 +77,14 @@ fun AppDropdownItem(text: String, onClick: () -> Unit) {
     Box(
         modifier =
             Modifier.fillMaxWidth()
+                .heightIn(min = 44.dp)
                 .background(if (isHovered) theme.accentTint else Color.Transparent)
-                .clickable(onClick = onClick, indication = ripple, interactionSource = interactionSource)
+                .clickable(
+                    onClick = onClick,
+                    indication = ripple,
+                    interactionSource = interactionSource,
+                    enabled = isEnabled,
+                )
                 .padding(vertical = 12.dp, horizontal = 24.dp),
         contentAlignment = Alignment.CenterStart,
     ) {

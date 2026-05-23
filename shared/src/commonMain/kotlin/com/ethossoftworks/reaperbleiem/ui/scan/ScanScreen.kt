@@ -147,7 +147,5 @@ private fun Device(device: KmpBleScanRecord, onClick: () -> Unit) {
             contentDescription = null,
         )
         Text(text = device.name)
-        Spacer(modifier = Modifier.weight(1f))
-        Text(text = device.identifier, fontSize = 12.sp, color = theme.textSecondary)
     }
 }
