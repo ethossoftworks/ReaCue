@@ -52,4 +52,4 @@ interface IAppTypography {
             )
 }
 
-@Immutable data class AppTypography(val colors: AppColors, val dimensions: IAppDimensions) : IAppTypography
+@Immutable data class AppTypography(val colors: AppColors, val dimensions: AppDimensions) : IAppTypography

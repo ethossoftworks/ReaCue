@@ -1,13 +1,14 @@
 package com.ethossoftworks.reaperbleiem.ui.theme
 
 import androidx.compose.runtime.Immutable
+import androidx.compose.ui.unit.dp
 
-@Immutable interface IAppDimensions {}
+@Immutable open class AppDimensions {
+    val screenPadding = 24.dp
+}
 
-@Immutable private data object DefaultDimensions : IAppDimensions {}
+@Immutable data object PhoneAppDimensions : AppDimensions()
 
-@Immutable data object PhoneAppDimensions : IAppDimensions by DefaultDimensions
+@Immutable data object TabletAppDimensions : AppDimensions()
 
-@Immutable data object TabletAppDimensions : IAppDimensions by DefaultDimensions
-
-@Immutable data object DesktopAppDimensions : IAppDimensions by DefaultDimensions
+@Immutable data object DesktopAppDimensions : AppDimensions()

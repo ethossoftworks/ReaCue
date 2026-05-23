@@ -27,7 +27,7 @@ import kotlin.math.min
 
 val LocalAppColors = staticCompositionLocalOf<AppColors> { LightAppColors }
 val LocalAppTypography = staticCompositionLocalOf<IAppTypography> { AppTypography(LightAppColors, PhoneAppDimensions) }
-val LocalAppDimensions = staticCompositionLocalOf<IAppDimensions> { PhoneAppDimensions }
+val LocalAppDimensions = staticCompositionLocalOf<AppDimensions> { PhoneAppDimensions }
 
 object AppTheme {
     val colors

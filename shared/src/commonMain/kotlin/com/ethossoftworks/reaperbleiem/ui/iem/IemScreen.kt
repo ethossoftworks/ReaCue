@@ -2,6 +2,7 @@ package com.ethossoftworks.reaperbleiem.ui.iem
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -35,6 +36,8 @@ import com.outsidesource.oskitcompose.form.KmpSliderTickPosition
 import com.outsidesource.oskitcompose.form.KmpSliderTickStyle
 import com.outsidesource.oskitcompose.interactor.collectAsState
 import com.outsidesource.oskitcompose.lib.rememberInjectForRoute
+import com.outsidesource.oskitcompose.systemui.KmpWindowInsets
+import com.outsidesource.oskitcompose.systemui.top
 import kotlin.collections.forEach
 import kotlin.math.roundToInt
 import org.jetbrains.compose.resources.stringResource
@@ -64,7 +67,8 @@ fun IemScreen(
     interactor: IemScreenViewInteractor = rememberInjectForRoute { parametersOf(context) },
 ) {
     val state = interactor.collectAsState()
-    val theme = AppTheme.colors
+    val dimensions = AppTheme.dimensions
+    val colors = AppTheme.colors
 
     DisposableEffect(Unit) {
         interactor.onMount()
@@ -115,11 +119,18 @@ fun IemScreen(
                     )
                     HorizontalDivider(
                         modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                        color = theme.strokePrimary,
+                        color = colors.strokePrimary,
                     )
                 },
             )
-        }
+        },
+        windowInsetsPadding = KmpWindowInsets.top,
+        contentPadding =
+            PaddingValues(
+                top = dimensions.screenPadding,
+                start = dimensions.screenPadding,
+                end = dimensions.screenPadding,
+            ),
     ) {
         if (state.serviceStatus == ServiceStatus.Connecting) {
             Column(
@@ -193,7 +204,10 @@ fun IemScreen(
             val hardwareOut = track.hardwareOuts.values.firstOrNull()
 
             Column(
-                modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                modifier =
+                    Modifier.weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(bottom = dimensions.screenPadding),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 val ticks = rememberTicks()
