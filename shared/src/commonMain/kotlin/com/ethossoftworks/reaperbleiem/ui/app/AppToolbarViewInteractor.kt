@@ -4,7 +4,7 @@ import com.ethossoftworks.reaperbleiem.coordinator.AppCoordinator
 import com.outsidesource.oskitkmp.coordinator.Coordinator
 import com.outsidesource.oskitkmp.interactor.Interactor
 
-data class AppToolbarViewState(val hasBackStack: Boolean = false)
+data class AppToolbarViewState(val hasBackStack: Boolean = false, val isAboutVisible: Boolean = false)
 
 class AppToolbarViewInteractor(val coordinator: AppCoordinator) :
     Interactor<AppToolbarViewState>(
@@ -21,6 +21,10 @@ class AppToolbarViewInteractor(val coordinator: AppCoordinator) :
     }
 
     fun onAboutClick() {
+        update { state -> state.copy(isAboutVisible = true) }
+    }
 
+    fun onAboutDismiss() {
+        update { state -> state.copy(isAboutVisible = false) }
     }
 }

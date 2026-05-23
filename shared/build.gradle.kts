@@ -81,6 +81,7 @@ kotlin {
             implementation(libs.navigationEvent.compose)
             implementation(libs.kotlinxSerializationCbor)
             implementation(libs.kotlinxImmutableCollections)
+            implementation(libs.kotlinxDateTime)
         }
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)

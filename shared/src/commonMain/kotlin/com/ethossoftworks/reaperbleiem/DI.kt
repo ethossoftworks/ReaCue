@@ -1,6 +1,7 @@
 package com.ethossoftworks.reaperbleiem
 
 import com.ethossoftworks.reaperbleiem.coordinator.AppCoordinator
+import com.ethossoftworks.reaperbleiem.interactor.AboutViewInteractor
 import com.ethossoftworks.reaperbleiem.interactor.CapabilityInteractor
 import com.ethossoftworks.reaperbleiem.interactor.IemInteractor
 import com.ethossoftworks.reaperbleiem.interactor.InfoMessageInteractor
@@ -75,6 +76,7 @@ fun commonModule() = module {
 
     // View Interactors
     factory { params -> IemScreenViewInteractor(params[0], get(), get(), get()) }
+    factory { AboutViewInteractor() }
     factory { ScanScreenViewInteractor(get(), get(), get()) }
     factory { AppToolbarViewInteractor(get()) }
 }

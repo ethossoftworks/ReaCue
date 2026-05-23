@@ -17,7 +17,6 @@ import com.ethossoftworks.reaperbleiem.ui.form.AppCircleButton
 import com.ethossoftworks.reaperbleiem.ui.form.AppDropdownItem
 import com.ethossoftworks.reaperbleiem.ui.form.AppPopoverButton
 import com.outsidesource.oskitcompose.interactor.collectAsState
-import com.outsidesource.oskitcompose.layout.FlexRowLayoutScope.weight
 import com.outsidesource.oskitcompose.lib.rememberInjectForRoute
 import com.outsidesource.oskitcompose.systemui.KmpWindowInsets
 import com.outsidesource.oskitcompose.systemui.top
@@ -75,4 +74,9 @@ fun AppToolbar(
             )
         }
     }
+
+    AboutModal(
+        isVisible = state.isAboutVisible,
+        onDismissRequest = interactor::onAboutDismiss,
+    )
 }
