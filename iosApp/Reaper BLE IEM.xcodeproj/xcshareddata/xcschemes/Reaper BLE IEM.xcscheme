@@ -14,8 +14,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "7555FF7A242A565900829871"
-               BuildableName = "Reaper BLE IEM.app"
-               BlueprintName = "ReapEar"
+               BuildableName = "ReaCue.app"
+               BlueprintName = "ReaCue"
                ReferencedContainer = "container:Reaper BLE IEM.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -43,8 +43,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "7555FF7A242A565900829871"
-            BuildableName = "Reaper BLE IEM.app"
-            BlueprintName = "ReapEar"
+            BuildableName = "ReaCue.app"
+            BlueprintName = "ReaCue"
             ReferencedContainer = "container:Reaper BLE IEM.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

@@ -1,8 +1,8 @@
-# ReapEar Agent Guide
+# ReaCue Agent Guide
 
 ## Project Intent
 
-ReapEar is a Kotlin Multiplatform app for personal IEM mixing with REAPER.
+ReaCue is a Kotlin Multiplatform app for personal IEM mixing with REAPER.
 
 The macOS app is the host that should run near the REAPER machine. It connects to REAPER through the REAPER web interface and OSC, advertises a custom BLE service, and forwards mix state and commands. Android and iOS clients scan for that BLE host, connect, and control their personal monitor mix from mobile devices.
 
@@ -27,7 +27,7 @@ Primary runtime classes:
 - `IemInteractor` owns `IemState`, subscribes to `IIemService`, and applies incoming `IemEvent` updates to track/mix state.
 - `NetworkIemService` talks directly to REAPER using the web interface and OSC UDP commands/events.
 - `BlePeripheralIemService` runs on macOS, subscribes to `NetworkIemService`, advertises the custom BLE service, and sends CBOR `IemEvent` notifications to centrals.
-- `BleCentralIemService` runs on mobile, scans for the ReapEar BLE service, connects to the host, reassembles notification packets, and writes CBOR command events back to the peripheral.
+- `BleCentralIemService` runs on mobile, scans for the ReaCue BLE service, connects to the host, reassembles notification packets, and writes CBOR command events back to the peripheral.
 
 ## Module And Source-Set Map
 
@@ -73,7 +73,7 @@ Client-to-REAPER command flow:
 
 Be careful with these compatibility points:
 
-- BLE UUIDs in `BlePeripheralIemService` identify the ReapEar service, event characteristic, and command characteristic.
+- BLE UUIDs in `BlePeripheralIemService` identify the ReaCue service, event characteristic, and command characteristic.
 - `IemEvent` serialization uses kotlinx.serialization CBOR, `@SerialName`, and `@CborLabel`; changing labels or names is a protocol migration.
 - BLE notifications use a 4-byte packet header: request id (`UInt16`) and packets remaining (`UInt16`).
 - `NetworkIemService` assumes REAPER web access at `http://localhost:8000` by default, OSC command port `8000`, and OSC notification port `9000`.

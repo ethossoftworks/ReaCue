@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">ReapEar</string>
+    <string name="app_name">ReaCue</string>
     <string name="connecting">Connecting</string>
     <string name="disconnected_from_peripheral">Disconnected from host</string>
     <string name="disconnected_from_reaper">Disconnected from Reaper</string>

@@ -1,4 +1,4 @@
-# ReapEar
+# ReaCue
 
 An app for IEM mixing over bluetooth
 

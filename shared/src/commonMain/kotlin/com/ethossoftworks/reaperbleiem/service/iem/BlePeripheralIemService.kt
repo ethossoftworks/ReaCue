@@ -56,7 +56,7 @@ class BlePeripheralIemService(
 
     private val advertisementData =
         KmpBleAdvertisementData(
-            name = "ReapEar",
+            name = "ReaCue",
             services =
                 listOf(
                     KmpBleAdvertisementService(

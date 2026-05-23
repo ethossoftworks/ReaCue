@@ -62,9 +62,9 @@ val generateInfoPlist by tasks.registering {
             <plist version="1.0">
             <dict>
                 <key>CFBundleName</key>
-                <string>ReapEar</string>
+                <string>ReaCue</string>
                 <key>CFBundleDisplayName</key>
-                <string>ReapEar</string>
+                <string>ReaCue</string>
                 <key>CFBundleIdentifier</key>
                 <string>com.ethossoftworks.reaperbleiem</string>
                 <key>CFBundleVersion</key>
@@ -72,7 +72,7 @@ val generateInfoPlist by tasks.registering {
                 <key>CFBundleShortVersionString</key>
                 <string>$version</string>
                 <key>CFBundleExecutable</key>
-                <string>ReapEar</string>
+                <string>ReaCue</string>
                 <key>CFBundleIconFile</key>
                 <string>AppIcon</string>
                 <key>CFBundlePackageType</key>
@@ -110,7 +110,7 @@ val stageRunResources by tasks.registering(Copy::class) {
 val assembleApp by tasks.registering {
     description = "Assembles MacOS .app bundle"
 
-    val appName = "ReapEar"
+    val appName = "ReaCue"
 
     dependsOn("linkReleaseExecutableMacosArm64", generateInfoPlist, stageRunResources)
 
