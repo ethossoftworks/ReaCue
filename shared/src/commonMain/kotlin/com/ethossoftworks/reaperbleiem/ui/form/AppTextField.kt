@@ -3,18 +3,19 @@ package com.ethossoftworks.reaperbleiem.ui.form
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -37,21 +38,21 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.DpOffset
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.ethossoftworks.reaperbleiem.ui.theme.AppTheme
 import com.ethossoftworks.reaperbleiem.ui.theme.AppThemeProvider
 import com.outsidesource.oskitcompose.modifier.kmpOuterShadow
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
+import reaper_ble_iem.shared.generated.resources.Res
+import reaper_ble_iem.shared.generated.resources.close
 
 @Composable
 fun AppTextField(
     value: String,
     onChange: (String) -> Unit,
-    iconStart: DrawableResource? = null,
-    iconEnd: DrawableResource? = null,
-    iconSize: DpSize = DpSize(22.dp, 22.dp),
+    iconStart: (@Composable () -> Unit)? = null,
+    iconEnd: (@Composable () -> Unit)? = null,
     shape: Shape = remember { RoundedCornerShape(8.dp) },
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
@@ -100,39 +101,46 @@ fun AppTextField(
                             shape = shape,
                         )
                         .clip(shape)
-                        .padding(horizontal = 24.dp, vertical = 12.dp),
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                iconStart?.let {
-                    Image(
-                        modifier = Modifier.size(iconSize),
-                        painter = painterResource(it),
-                        contentDescription = null,
-                        colorFilter = ColorFilter.tint(theme.textPrimary),
-                    )
-                }
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.CenterStart
-                ) {
+                iconStart?.let { iconStart() }
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                     if (value.isEmpty() && placeholder != null) {
                         Text(modifier = Modifier.alpha(.5f), text = placeholder, style = textStyle)
                     }
                     field()
                 }
-                iconEnd?.let {
-                    Spacer(modifier = Modifier.weight(1f))
-                    Image(
-                        modifier = Modifier.size(iconSize),
-                        painter = painterResource(it),
-                        contentDescription = null,
-                        colorFilter = ColorFilter.tint(theme.textPrimary),
-                    )
+                if (iconEnd != null) {
+                    iconEnd()
+                } else {
+                    AppTextFieldButton(icon = Res.drawable.close, onClick = { onChange("") })
                 }
             }
         },
     )
+}
+
+@Composable
+fun AppTextFieldButton(onClick: () -> Unit, icon: DrawableResource) {
+    val colors = AppTheme.colors
+
+    Box(
+        modifier =
+            Modifier.size(28.dp)
+                .clip(CircleShape)
+                .clickable(onClick = onClick)
+                .background(colors.bgPrimary30, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Image(
+            modifier = Modifier.size(10.dp),
+            painter = painterResource(icon),
+            contentDescription = null,
+            colorFilter = ColorFilter.tint(colors.textPrimary),
+        )
+    }
 }
 
 @Preview

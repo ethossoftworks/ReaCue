@@ -1,13 +1,19 @@
 package com.ethossoftworks.reaperbleiem.ui.form
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -20,8 +26,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -36,6 +44,10 @@ import com.ethossoftworks.reaperbleiem.ui.theme.modalSurface
 import com.outsidesource.oskitcompose.popup.Modal
 import com.outsidesource.oskitcompose.popup.ModalStyles
 import com.outsidesource.oskitkmp.text.parseFloatOrNull
+import org.jetbrains.compose.resources.painterResource
+import reaper_ble_iem.shared.generated.resources.Res
+import reaper_ble_iem.shared.generated.resources.add
+import reaper_ble_iem.shared.generated.resources.remove
 
 @Composable
 fun NumberEntryModal(
@@ -49,14 +61,11 @@ fun NumberEntryModal(
     onCommit: (Float) -> Unit,
 ) {
     val focusRequester = remember { FocusRequester() }
-    val theme = AppTheme.colors
+    val colors = AppTheme.colors
     val shape = remember { RoundedCornerShape(12.dp) }
 
     Modal(
-        modifier =
-            Modifier.widthIn(max = maxWidth)
-                .modalSurface(theme, shape)
-                .padding(16.dp),
+        modifier = Modifier.widthIn(max = maxWidth).modalSurface(colors, shape).padding(16.dp),
         isVisible = isVisible,
         styles = ModalStyles.UserDefinedContent,
         onDismissRequest = onCancel,
@@ -64,6 +73,10 @@ fun NumberEntryModal(
         LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
         var value by remember { mutableStateOf("") }
+        var isNegative by remember { mutableStateOf(false) }
+        val sanitizeValue = { value: String ->
+            value.parseFloatOrNull()?.let { if (isNegative) it * -1f else it * 1f }?.coerceIn(range)
+        }
 
         Column(
             modifier = Modifier.fillMaxWidth(),
@@ -83,15 +96,40 @@ fun NumberEntryModal(
                     Modifier.fillMaxWidth().focusRequester(focusRequester).onKeyEvent {
                         if ((it.key != Key.Enter && it.key != Key.NumPadEnter) || it.type != KeyEventType.KeyUp)
                             return@onKeyEvent false
-                        onCommit(value.parseFloatOrNull()?.coerceIn(range) ?: return@onKeyEvent false)
+                        onCommit(sanitizeValue(value) ?: return@onKeyEvent false)
                         return@onKeyEvent true
                     },
                 value = value,
+                iconStart = {
+                    Box(
+                        modifier =
+                            Modifier.size(28.dp)
+                                .clip(CircleShape)
+                                .clickable(onClick = { isNegative = !isNegative })
+                                .background(colors.accentTint, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Image(
+                            modifier = Modifier.size(10.dp),
+                            painter =
+                                painterResource(
+                                    if (isNegative) {
+                                        Res.drawable.remove
+                                    } else {
+                                        Res.drawable.add
+                                    }
+                                ),
+                            contentDescription = null,
+                            colorFilter = ColorFilter.tint(colors.textPrimary),
+                        )
+                    }
+                },
+                iconEnd = {},
                 onChange = { value = it },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 keyboardActions =
                     KeyboardActions(
-                        onDone = { onCommit(value.parseFloatOrNull()?.coerceIn(range) ?: return@KeyboardActions) }
+                        onDone = { onCommit(sanitizeValue(value) ?: return@KeyboardActions) }
                     ),
                 singleLine = true,
                 maxLines = 1,
@@ -104,7 +142,7 @@ fun NumberEntryModal(
                 AppButton(label = "Cancel", onClick = onCancel)
                 AppButton(
                     label = "Ok",
-                    onClick = { onCommit(value.parseFloatOrNull()?.coerceIn(range) ?: return@AppButton) },
+                    onClick = { onCommit(sanitizeValue(value) ?: return@AppButton) },
                 )
             }
         }

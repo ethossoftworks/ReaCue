@@ -17,6 +17,7 @@ open class AppColors {
     open val bgPrimary = Color.Black
     open val bgPrimary10 = Color.Black
     open val bgPrimary20 = Color.Black
+    open val bgPrimary30 = Color.Black
     open val bgSurface = Color.Black
     open val strokePrimary = Color.Black
 
@@ -35,6 +36,7 @@ data object LightAppColors : AppColors() {
     override val bgPrimary = Color(0xFF090d12)
     override val bgPrimary10 = Color(0xFF12161a)
     override val bgPrimary20 = Color(0xFF171c22)
+    override val bgPrimary30 = Color(0xFF242b38)
     override val bgSurface = Color(0xFF12161a)
     override val strokePrimary = Color(0xFF383c42)
 
