@@ -41,3 +41,17 @@ sealed class KmpBleError {
 
     object NotBonded : KmpBleError()
 }
+
+enum class KmpBleConnectionPriority {
+    // Approximate connection interval 11-15ms. Maps to BluetoothGatt.CONNECTION_PRIORITY_HIGH on Android
+    // and CBPeripheralManagerConnectionLatencyLow on Apple platforms
+    High,
+
+    // Approximate connection interval 30-50ms. Maps to BluetoothGatt.CONNECTION_PRIORITY_BALANCED on Android
+    // and CBPeripheralManagerConnectionLatencyMedium on Apple platforms
+    Balanced,
+
+    // Approximate connection interval 100-125ms. Maps to BluetoothGatt.CONNECTION_PRIORITY_LOW_POWER on Android
+    // and CBPeripheralManagerConnectionLatencyHigh on Apple platforms
+    Low,
+}

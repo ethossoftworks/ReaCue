@@ -16,6 +16,7 @@ import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBleCentralManager
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBleCharacteristic
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBlePeripheral
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBleService
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleConnectionPriority
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleConnectionStatus
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleError
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattProperty
@@ -140,6 +141,16 @@ private class NordicManagerProxy(private val context: Context) : BleManager(cont
 
     suspend fun requestMtuExternal(value: Int): Int = requestMtu(value).suspend()
 
+    suspend fun requestConnectionPriority(priority: KmpBleConnectionPriority) {
+        val connectionPriority =
+            when (priority) {
+                KmpBleConnectionPriority.High -> BluetoothGatt.CONNECTION_PRIORITY_HIGH
+                KmpBleConnectionPriority.Balanced -> BluetoothGatt.CONNECTION_PRIORITY_BALANCED
+                KmpBleConnectionPriority.Low -> BluetoothGatt.CONNECTION_PRIORITY_LOW_POWER
+            }
+        requestConnectionPriority(connectionPriority).suspend()
+    }
+
     fun getDiscoveredServicesExternal(): List<BluetoothGattService> = services.value
 
     suspend fun readExternal(char: BluetoothGattCharacteristic): ByteArray {
@@ -239,6 +250,10 @@ private class AndroidKmpBlePeripheral(
 
     override suspend fun requestMtu(size: Int): Outcome<Int, KmpBleError> =
         withScope(scope) { Outcome.Ok(nordicManager.requestMtuExternal(size)) }
+
+    override suspend fun requestConnectionPriority(priority: KmpBleConnectionPriority) {
+        withScope(scope) { Outcome.Ok(nordicManager.requestConnectionPriority(priority)) }
+    }
 
     override suspend fun disconnect(): Outcome<Unit, KmpBleError> =
         withScope(scope) { Outcome.Ok(nordicManager.disconnect().suspend()) }

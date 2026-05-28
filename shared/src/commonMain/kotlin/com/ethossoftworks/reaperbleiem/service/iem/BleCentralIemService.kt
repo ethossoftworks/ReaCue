@@ -5,6 +5,7 @@ package com.ethossoftworks.reaperbleiem.service.iem
 import co.touchlab.kermit.Logger
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBleCentralManager
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBlePeripheral
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleConnectionPriority
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleConnectionStatus
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleWriteMode
 import com.outsidesource.oskitkmp.lib.toUShort
@@ -59,6 +60,8 @@ class BleCentralIemService(private val bleCentralManager: IKmpBleCentralManager)
         }
 
         peripheral.connectionStatus.onEach { if (it == KmpBleConnectionStatus.Disconnected) cancel() }.launchIn(this)
+
+        peripheral.requestConnectionPriority(KmpBleConnectionPriority.High)
 
         // Subscribe to notifications
         val job =

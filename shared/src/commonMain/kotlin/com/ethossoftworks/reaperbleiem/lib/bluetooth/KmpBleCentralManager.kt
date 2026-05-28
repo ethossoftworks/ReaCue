@@ -6,6 +6,8 @@ import com.outsidesource.oskitkmp.concurrency.KmpDispatchers
 import com.outsidesource.oskitkmp.lib.containsAny
 import com.outsidesource.oskitkmp.outcome.Outcome
 import io.ktor.utils.io.CancellationException
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -17,8 +19,6 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filter
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
 data class KmpBleScanRecord(
     val name: String,
@@ -61,6 +61,12 @@ interface IKmpBlePeripheral {
      * @param [size] The size in bytes of the MTU to request. Valid values are 23-517
      */
     suspend fun requestMtu(size: Int): Outcome<Int, KmpBleError>
+
+    /**
+     * Requests the connection priority or latency. On Apple platforms this is a no-op as Apple does not expose this API
+     * to centrals.
+     */
+    suspend fun requestConnectionPriority(priority: KmpBleConnectionPriority)
 
     suspend fun disconnect(): Outcome<Unit, KmpBleError>
 
@@ -162,9 +168,7 @@ internal suspend inline fun <T> withScope(
     scope: CoroutineScope,
     crossinline block: suspend () -> Outcome<T, KmpBleError>,
 ): Outcome<T, KmpBleError> {
-    val task = scope.async(start = CoroutineStart.UNDISPATCHED) {
-        block()
-    }
+    val task = scope.async(start = CoroutineStart.UNDISPATCHED) { block() }
 
     return try {
         task.await()

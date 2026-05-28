@@ -8,11 +8,12 @@ import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleAdvertisementCharacte
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleAdvertisementData
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleAdvertisementService
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleCentralId
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleConnectionPriority
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattPermission
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattProperty
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralEvent
-import com.outsidesource.oskitkmp.io.toKmpIoSink
 import kotlin.math.ceil
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlinx.atomicfu.atomic
@@ -34,8 +35,6 @@ import kotlinx.io.readByteArray
 import kotlinx.io.writeUShort
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 
 val REAPER_BLE_IEM_SERVICE_UUID = Uuid.parseHexDash("fa6e666c-2c23-43f1-84e4-4653ebf930f4")
 val REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID = Uuid.parseHexDash("319893ca-5fa2-4c21-9f51-bc2b1116a352")
@@ -101,7 +100,9 @@ class BlePeripheralIemService(
                     when (event) {
                         is KmpBlePeripheralEvent.Error -> cancel()
                         KmpBlePeripheralEvent.Advertising -> isAdvertising.complete(Unit)
-                        is KmpBlePeripheralEvent.CentralSubscribed -> {}
+                        is KmpBlePeripheralEvent.CentralSubscribed -> {
+                            peripheralManager.requestConnectionPriority(KmpBleConnectionPriority.High, event.centralId)
+                        }
                         is KmpBlePeripheralEvent.CentralUnsubscribed -> {}
                         is KmpBlePeripheralEvent.ReadRequest -> {}
                         is KmpBlePeripheralEvent.WriteRequest -> onWriteRequest(event, ::send)
@@ -214,7 +215,9 @@ class BlePeripheralIemService(
                     write(payload, startIndex, minOf(startIndex + packetSize.toInt(), payload.size))
                 }
 
-                Logger.i { "Sending notification packet: Packet Size: ${buffer.size}, Request Id - $requestId - ${packetIndex.toInt() + 1}/$packetCount" }
+                Logger.i {
+                    "Sending notification packet: Packet Size: ${buffer.size}, Request Id - $requestId - ${packetIndex.toInt() + 1}/$packetCount"
+                }
                 peripheralManager.notify(
                     REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID,
                     buffer.readByteArray(),

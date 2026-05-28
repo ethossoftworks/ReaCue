@@ -55,6 +55,9 @@ import platform.CoreBluetooth.CBManagerStateUnknown
 import platform.CoreBluetooth.CBMutableCharacteristic
 import platform.CoreBluetooth.CBMutableService
 import platform.CoreBluetooth.CBPeripheralManager
+import platform.CoreBluetooth.CBPeripheralManagerConnectionLatencyHigh
+import platform.CoreBluetooth.CBPeripheralManagerConnectionLatencyLow
+import platform.CoreBluetooth.CBPeripheralManagerConnectionLatencyMedium
 import platform.CoreBluetooth.CBPeripheralManagerDelegateProtocol
 import platform.CoreBluetooth.CBService
 import platform.CoreBluetooth.CBUUID
@@ -108,6 +111,19 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
 
     override fun subscribedCentrals(characteristic: Uuid): Set<KmpBleCentralId> {
         return localCentralSubscriptions.value[characteristic] ?: emptySet()
+    }
+
+    override suspend fun requestConnectionPriority(priority: KmpBleConnectionPriority, centralId: KmpBleCentralId) {
+        val latency =
+            when (priority) {
+                KmpBleConnectionPriority.High -> CBPeripheralManagerConnectionLatencyLow
+                KmpBleConnectionPriority.Balanced -> CBPeripheralManagerConnectionLatencyMedium
+                KmpBleConnectionPriority.Low -> CBPeripheralManagerConnectionLatencyHigh
+            }
+        peripheralManager.setDesiredConnectionLatency(
+            latency = latency,
+            forCentral = localCentrals.value[centralId] ?: return,
+        )
     }
 
     override suspend fun advertise(advertisementData: KmpBleAdvertisementData): Flow<KmpBlePeripheralEvent> =

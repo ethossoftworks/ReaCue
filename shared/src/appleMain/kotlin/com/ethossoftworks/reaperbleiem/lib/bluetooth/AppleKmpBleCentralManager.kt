@@ -281,6 +281,10 @@ private class AppleKmpBlePeripheral(
     override suspend fun requestMtu(size: Int): Outcome<Int, KmpBleError> =
         Outcome.Ok(mtu(mode = KmpBleWriteMode.WithResponse))
 
+    override suspend fun requestConnectionPriority(priority: KmpBleConnectionPriority) {
+        // Noop
+    }
+
     override suspend fun disconnect(): Outcome<Unit, KmpBleError> =
         withScope(scope) {
             appleKmpBle.centralManager.cancelPeripheralConnection(peripheral)

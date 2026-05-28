@@ -2,13 +2,16 @@
 
 package com.ethossoftworks.reaperbleiem.lib.bluetooth
 
-import kotlinx.coroutines.flow.Flow
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.flow.Flow
 
 interface IKmpBlePeripheralManager {
     fun maximumUpdateValueLengthForCentral(central: KmpBleCentralId): UInt
+
     fun subscribedCentrals(characteristic: Uuid): Set<KmpBleCentralId>
+
+    suspend fun requestConnectionPriority(priority: KmpBleConnectionPriority, centralId: KmpBleCentralId)
 
     suspend fun advertise(advertisementData: KmpBleAdvertisementData): Flow<KmpBlePeripheralEvent>
 
@@ -27,14 +30,23 @@ typealias KmpBleCentralId = String
 
 sealed class KmpBlePeripheralGattResult {
     data object Success : KmpBlePeripheralGattResult()
+
     data object ReadNotPermitted : KmpBlePeripheralGattResult()
+
     data object WriteNotPermitted : KmpBlePeripheralGattResult()
+
     data object RequestNotSupported : KmpBlePeripheralGattResult()
+
     data object InsufficientAuthentication : KmpBlePeripheralGattResult()
+
     data object InsufficientEncryption : KmpBlePeripheralGattResult()
+
     data object InvalidOffset : KmpBlePeripheralGattResult()
+
     data object InvalidAttributeLength : KmpBlePeripheralGattResult()
+
     data object Failure : KmpBlePeripheralGattResult()
+
     /** `value` must be 0x80 - 0x9F */
     data class UserDefined(val value: Byte) : KmpBlePeripheralGattResult()
 }
@@ -62,11 +74,9 @@ sealed class KmpBlePeripheralEvent {
 
     data object Advertising : KmpBlePeripheralEvent()
 
-    data class CentralSubscribed(val centralId: KmpBleCentralId, val characteristic: Uuid) :
-        KmpBlePeripheralEvent()
+    data class CentralSubscribed(val centralId: KmpBleCentralId, val characteristic: Uuid) : KmpBlePeripheralEvent()
 
-    data class CentralUnsubscribed(val centralId: KmpBleCentralId, val characteristic: Uuid) :
-        KmpBlePeripheralEvent()
+    data class CentralUnsubscribed(val centralId: KmpBleCentralId, val characteristic: Uuid) : KmpBlePeripheralEvent()
 
     data class ReadRequest(
         val central: KmpBleCentralId,
