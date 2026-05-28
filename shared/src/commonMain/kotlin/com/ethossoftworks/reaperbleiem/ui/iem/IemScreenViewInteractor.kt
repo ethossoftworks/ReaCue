@@ -123,6 +123,10 @@ class IemScreenViewInteractor(
         interactorScope.launch { iemInteractor.setReceiveVolume(trackId, receiveId, value) }
     }
 
+    fun onReceivePanChange(trackId: Int, receiveId: Int, value: Float) {
+        interactorScope.launch { iemInteractor.setReceivePan(trackId, receiveId, value) }
+    }
+
     private fun start() {
         subscriptionJob.value?.cancel()
         interactorScope

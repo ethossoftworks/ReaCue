@@ -138,7 +138,7 @@ fun AppButton(
                     color = Color.Black.copy(alpha = .25f),
                     shape = shape,
                 )
-                .background(brush = theme.controlBg, shape = shape)
+                .background(brush = theme.bgControl, shape = shape)
                 .background(
                     color = if (buttonType == AppButtonType.Error) theme.errorTint else Color.Transparent,
                     shape = shape,

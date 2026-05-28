@@ -3,6 +3,7 @@ package com.ethossoftworks.reaperbleiem.ui.iem
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -24,10 +25,12 @@ import com.ethossoftworks.reaperbleiem.service.iem.IemContext
 import com.ethossoftworks.reaperbleiem.ui.app.AppToolbar
 import com.ethossoftworks.reaperbleiem.ui.app.Screen
 import com.ethossoftworks.reaperbleiem.ui.form.AppButton
+import com.ethossoftworks.reaperbleiem.ui.form.AppButtonType
 import com.ethossoftworks.reaperbleiem.ui.form.AppDropdown
 import com.ethossoftworks.reaperbleiem.ui.form.AppDropdownItem
 import com.ethossoftworks.reaperbleiem.ui.form.AppLoadingIndicator
 import com.ethossoftworks.reaperbleiem.ui.form.AppSlider
+import com.ethossoftworks.reaperbleiem.ui.form.Knob
 import com.ethossoftworks.reaperbleiem.ui.form.NumberEntryModal
 import com.ethossoftworks.reaperbleiem.ui.theme.AppTheme
 import com.outsidesource.oskitcompose.form.DpAxisSize
@@ -60,6 +63,7 @@ import reaper_ble_iem.shared.generated.resources.select_monitor
 import reaper_ble_iem.shared.generated.resources.set_all_0db
 import reaper_ble_iem.shared.generated.resources.set_all_n
 import reaper_ble_iem.shared.generated.resources.untitled
+import reaper_ble_iem.shared.generated.resources.volume_mute
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -224,15 +228,26 @@ fun IemScreen(
                 )
 
                 for (receive in track.receives) {
-                    AppSlider(
-                        value = receive.value.volume * 100f,
-                        range = 0f..100f,
-                        step = 1f,
-                        label = state.tracks[receive.value.trackId]?.name ?: continue,
-                        onChange = { interactor.onReceiveVolumeChange(track.id, receive.key, it / 100f) },
-                        valueFormatter = { "${it.roundToInt()}%" },
-                        ticks = ticks,
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        AppSlider(
+                            modifier = Modifier.weight(1f),
+                            value = receive.value.volume * 100f,
+                            range = 0f..100f,
+                            step = 1f,
+                            label = state.tracks[receive.value.trackId]?.name ?: continue,
+                            onChange = { interactor.onReceiveVolumeChange(track.id, receive.key, it / 100f) },
+                            valueFormatter = { "${it.roundToInt()}%" },
+                            ticks = ticks,
+                        )
+                        Knob(
+                            value = receive.value.pan,
+                            onValueChange = { interactor.onReceivePanChange(track.id, receive.key, it) },
+                            onDoubleTap = { interactor.onReceivePanChange(track.id, receive.key, .5f) },
+                        )
+                    }
                 }
             }
         }

@@ -19,10 +19,11 @@ open class AppColors {
     open val bgPrimary20 = Color.Black
     open val bgPrimary30 = Color.Black
     open val bgSurface = Color.Black
+    open val bgControl: Brush = SolidColor(Color.Black)
     open val strokePrimary = Color.Black
+    open val strokeControl: Brush = SolidColor(Color.Black)
 
     open val sliderTrackBg: Brush = SolidColor(Color.Black)
-    open val controlBg: Brush = SolidColor(Color.Black)
 }
 
 @Immutable
@@ -38,13 +39,18 @@ data object LightAppColors : AppColors() {
     override val bgPrimary20 = Color(0xFF171c22)
     override val bgPrimary30 = Color(0xFF242b38)
     override val bgSurface = Color(0xFF12161a)
-    override val strokePrimary = Color(0xFF383c42)
-
-    override val sliderTrackBg = Brush.verticalGradient(0.0f to bgPrimary20, 0.8f to bgPrimary20, .95f to strokePrimary)
-    override val controlBg =
+    override val bgControl =
         Brush.linearGradient(
             colors = listOf(bgPrimary20, bgPrimary10),
             start = Offset.Zero,
             end = Offset(x = 0f, y = Float.POSITIVE_INFINITY),
         )
+    override val strokePrimary = Color(0xFF383c42)
+    override val strokeControl = Brush.verticalGradient(
+        0.0f to Color(0xFFaaabb1),
+        0.9f to Color(0xFF51585a),
+        1.0f to Color(0xFF0a0c0f),
+    )
+
+    override val sliderTrackBg = Brush.verticalGradient(0.0f to bgPrimary20, 0.8f to bgPrimary20, .95f to strokePrimary)
 }

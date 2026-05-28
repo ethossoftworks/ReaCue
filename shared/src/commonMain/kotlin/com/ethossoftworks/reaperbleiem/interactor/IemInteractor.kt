@@ -90,6 +90,11 @@ class IemInteractor(private val iemService: IIemService) :
         iemService.setReceiveVolume(trackId, receiveId, value)
     }
 
+    suspend fun setReceivePan(trackId: Int, receiveId: Int, value: Float) {
+        updateReceive(trackId, receiveId) { it.copy(pan = value) }
+        iemService.setReceivePan(trackId, receiveId, value)
+    }
+
     suspend fun refresh() {
         iemService.refresh()
     }

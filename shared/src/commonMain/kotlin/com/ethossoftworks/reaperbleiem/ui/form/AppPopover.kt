@@ -55,7 +55,7 @@ fun AppPopover(content: @Composable ColumnScope.() -> Unit) {
                     shape = shape,
                 )
                 .clip(shape)
-                .background(brush = theme.controlBg, shape = shape)
+                .background(brush = theme.bgControl, shape = shape)
                 .width(200.dp)
     ) {
         content()
