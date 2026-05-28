@@ -68,15 +68,15 @@ fun ScanScreen(interactor: ScanScreenViewInteractor = rememberInjectForRoute()) 
         ) {
             if (state.bluetoothStatus is CapabilityStatus.NoPermission) {
                 if (state.bluetoothStatus.reason == NoPermissionReason.NotRequested) {
-                    Text(text = stringResource(Res.string.ble_permission_request_message))
+                    Text(text = stringResource(Res.string.ble_permission_request_message), textAlign = TextAlign.Center)
                     AppButton(label = "Request", onClick = interactor::onRequestBlePermissionClick)
                 } else {
-                    Text(text = stringResource(Res.string.ble_permission_denied_message))
+                    Text(text = stringResource(Res.string.ble_permission_denied_message), textAlign = TextAlign.Center)
                 }
             }
 
             if (state.bluetoothStatus == CapabilityStatus.NotEnabled) {
-                Text(text = stringResource(Res.string.ble_disabled_message))
+                Text(text = stringResource(Res.string.ble_disabled_message), textAlign = TextAlign.Center)
             }
 
             if (state.bluetoothStatus == CapabilityStatus.Ready) {
@@ -86,7 +86,7 @@ fun ScanScreen(interactor: ScanScreenViewInteractor = rememberInjectForRoute()) 
 
                 if (state.devices.isEmpty() && state.isScanning) {
                     Spacer(modifier = Modifier.weight(1f))
-                    Text(text = stringResource(Res.string.scanning))
+                    Text(text = stringResource(Res.string.scanning), textAlign = TextAlign.Center)
                     AppLoadingIndicator()
                 }
 
@@ -103,7 +103,7 @@ fun ScanScreen(interactor: ScanScreenViewInteractor = rememberInjectForRoute()) 
                 }
 
                 if (state.devices.isNotEmpty() && state.isScanning) {
-                    Text(text = stringResource(Res.string.scanning))
+                    Text(text = stringResource(Res.string.scanning), textAlign = TextAlign.Center)
                     AppLoadingIndicator()
                 }
             }

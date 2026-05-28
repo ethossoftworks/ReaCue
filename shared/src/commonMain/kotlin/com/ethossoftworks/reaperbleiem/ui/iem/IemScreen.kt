@@ -17,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.ethossoftworks.reaperbleiem.interactor.ServiceStatus
 import com.ethossoftworks.reaperbleiem.service.iem.IemContext
@@ -138,7 +139,7 @@ fun IemScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text(text = stringResource(Res.string.connecting))
+                Text(text = stringResource(Res.string.connecting), textAlign = TextAlign.Center)
                 AppLoadingIndicator()
             }
             return@Screen
@@ -149,9 +150,9 @@ fun IemScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 if (context is IemContext.Central) {
-                    Text(text = stringResource(Res.string.disconnected_from_peripheral))
+                    Text(text = stringResource(Res.string.disconnected_from_peripheral), textAlign = TextAlign.Center)
                 } else {
-                    Text(text = stringResource(Res.string.disconnected_from_reaper))
+                    Text(text = stringResource(Res.string.disconnected_from_reaper), textAlign = TextAlign.Center)
                 }
                 AppButton(label = stringResource(Res.string.connect), onClick = interactor::onConnectClick)
                 if (context is IemContext.Central) {
@@ -170,7 +171,7 @@ fun IemScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text(text = stringResource(Res.string.refreshing))
+                Text(text = stringResource(Res.string.refreshing), textAlign = TextAlign.Center)
                 AppLoadingIndicator()
             }
             return@Screen
