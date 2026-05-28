@@ -108,10 +108,7 @@ private fun KmpSliderScope.AppManualEntryModal(
     val shape = remember { RoundedCornerShape(12.dp) }
 
     Modal(
-        modifier =
-            Modifier.widthIn(max = maxWidth)
-                .modalSurface(theme, shape)
-                .padding(16.dp),
+        modifier = Modifier.widthIn(max = maxWidth).modalSurface(theme, shape).padding(16.dp),
         isVisible = isVisible,
         styles = ModalStyles.UserDefinedContent,
         onDismissRequest = onCancel,
@@ -135,7 +132,8 @@ private fun KmpSliderScope.AppManualEntryModal(
                 modifier =
                     Modifier.fillMaxWidth().focusRequester(focusRequester).onKeyEvent {
                         if (!isEnabled) return@onKeyEvent false
-                        if ((it.key != Key.Enter && it.key != Key.NumPadEnter) || it.type != KeyEventType.KeyUp) return@onKeyEvent false
+                        if ((it.key != Key.Enter && it.key != Key.NumPadEnter) || it.type != KeyEventType.KeyUp)
+                            return@onKeyEvent false
                         onCommit()
                         return@onKeyEvent true
                     },

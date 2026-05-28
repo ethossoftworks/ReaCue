@@ -2,9 +2,7 @@ package com.ethossoftworks.reaperbleiem.interactor
 
 import com.outsidesource.oskitkmp.interactor.Interactor
 
-data class AboutViewState(
-    val isOssDisclaimerVisible: Boolean = false,
-)
+data class AboutViewState(val isOssDisclaimerVisible: Boolean = false)
 
 class AboutViewInteractor : Interactor<AboutViewState>(initialState = AboutViewState(), dependencies = listOf()) {
 

@@ -16,10 +16,8 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -65,21 +63,20 @@ fun AppThemeProvider(colorsOverride: AppColors? = null, content: @Composable Box
     val typography = remember(colors, dimensions) { AppTypography(colors, dimensions) }
 
     val textSelectionColors = remember {
-        TextSelectionColors(
-            handleColor = colors.accent,
-            backgroundColor = colors.accent.copy(alpha = .15f),
-        )
+        TextSelectionColors(handleColor = colors.accent, backgroundColor = colors.accent.copy(alpha = .15f))
     }
 
     MaterialTheme(
-        typography = Typography(
-            fontFamily = AppTheme.typography.defaultFontFamily,
-            bodyLarge = MaterialTheme.typography.bodyLarge.copy(
+        typography =
+            Typography(
                 fontFamily = AppTheme.typography.defaultFontFamily,
-                lineHeight = TextUnit.Unspecified,
-                color = colors.textPrimary,
+                bodyLarge =
+                    MaterialTheme.typography.bodyLarge.copy(
+                        fontFamily = AppTheme.typography.defaultFontFamily,
+                        lineHeight = TextUnit.Unspecified,
+                        color = colors.textPrimary,
+                    ),
             )
-        )
     ) {
         CompositionLocalProvider(
             LocalTextSelectionColors provides textSelectionColors,

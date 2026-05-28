@@ -101,10 +101,11 @@ class IemScreenViewInteractor(
         interactorScope.launch {
             val track = state.tracks[state.selectedIemId] ?: return@launch
             for ((_, receive) in track.receives) {
-                val clampedValue = when (modalType) {
-                    NumberInputModalType.Adjust -> (receive.volume + (value / 100f)).coerceIn(0f..1f)
-                    NumberInputModalType.Set -> (value / 100f).coerceIn(0f, 1f)
-                }
+                val clampedValue =
+                    when (modalType) {
+                        NumberInputModalType.Adjust -> (receive.volume + (value / 100f)).coerceIn(0f..1f)
+                        NumberInputModalType.Set -> (value / 100f).coerceIn(0f, 1f)
+                    }
                 iemInteractor.setReceiveVolume(track.id, receive.id, clampedValue)
             }
         }
@@ -124,18 +125,20 @@ class IemScreenViewInteractor(
 
     private fun start() {
         subscriptionJob.value?.cancel()
-        interactorScope.launch {
-            iemInteractor.subscribe(iemContext).collect {
-                when (it) {
-                    is IemEvent.Refreshed -> {
-                        val trackMatch =
-                            it.tracks.values.firstOrNull { track -> track.name == state.lastSelectedIemName }
-                        update { state -> state.copy(selectedIemId = trackMatch?.id) }
-                    }
+        interactorScope
+            .launch {
+                iemInteractor.subscribe(iemContext).collect {
+                    when (it) {
+                        is IemEvent.Refreshed -> {
+                            val trackMatch =
+                                it.tracks.values.firstOrNull { track -> track.name == state.lastSelectedIemName }
+                            update { state -> state.copy(selectedIemId = trackMatch?.id) }
+                        }
 
-                    else -> {}
+                        else -> {}
+                    }
                 }
             }
-        }.let { subscriptionJob.value = it }
+            .let { subscriptionJob.value = it }
     }
 }

@@ -3,7 +3,8 @@ package com.ethossoftworks.reaperbleiem.ui.theme
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.unit.dp
 
-@Immutable open class AppDimensions {
+@Immutable
+open class AppDimensions {
     val screenPadding = 24.dp
 }
 

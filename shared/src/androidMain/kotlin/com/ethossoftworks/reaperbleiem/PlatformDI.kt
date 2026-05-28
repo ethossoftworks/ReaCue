@@ -2,10 +2,8 @@ package com.ethossoftworks.reaperbleiem
 
 import android.content.Context
 import com.ethossoftworks.reaperbleiem.lib.ActivityHolder
-import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBlePeripheralManager
 import com.ethossoftworks.reaperbleiem.service.bluetooth.KmpBleCentralManager
 import com.ethossoftworks.reaperbleiem.service.iem.BleCentralIemService
-import com.ethossoftworks.reaperbleiem.service.iem.BlePeripheralIemService
 import com.ethossoftworks.reaperbleiem.service.iem.IIemService
 import com.outsidesource.oskitkmp.storage.KmpKvStore
 import org.koin.core.module.Module

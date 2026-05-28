@@ -75,8 +75,5 @@ fun AppToolbar(
         }
     }
 
-    AboutModal(
-        isVisible = state.isAboutVisible,
-        onDismissRequest = interactor::onAboutDismiss,
-    )
+    AboutModal(isVisible = state.isAboutVisible, onDismissRequest = interactor::onAboutDismiss)
 }

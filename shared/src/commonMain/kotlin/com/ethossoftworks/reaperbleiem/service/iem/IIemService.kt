@@ -48,10 +48,8 @@ sealed class IemEvent {
 
     @Serializable
     @SerialName("2")
-    data class Refreshed(
-        @CborLabel(1) val projectName: String,
-        @CborLabel(2) val tracks: PersistentMap<Int, Track>
-    ) : IemEvent()
+    data class Refreshed(@CborLabel(1) val projectName: String, @CborLabel(2) val tracks: PersistentMap<Int, Track>) :
+        IemEvent()
 
     @Serializable
     @SerialName("3")

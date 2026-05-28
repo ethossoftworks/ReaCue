@@ -22,7 +22,5 @@ class AppCoordinator :
 
     fun onBackClick() = pop()
 
-    fun onSettingsClick() {
-
-    }
+    fun onSettingsClick() {}
 }

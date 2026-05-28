@@ -28,7 +28,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleScanRecord
 import com.ethossoftworks.reaperbleiem.ui.app.AppToolbar
 import com.ethossoftworks.reaperbleiem.ui.app.Screen

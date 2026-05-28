@@ -128,9 +128,7 @@ fun NumberEntryModal(
                 onChange = { value = it },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 keyboardActions =
-                    KeyboardActions(
-                        onDone = { onCommit(sanitizeValue(value) ?: return@KeyboardActions) }
-                    ),
+                    KeyboardActions(onDone = { onCommit(sanitizeValue(value) ?: return@KeyboardActions) }),
                 singleLine = true,
                 maxLines = 1,
             )
@@ -140,10 +138,7 @@ fun NumberEntryModal(
                 horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.End),
             ) {
                 AppButton(label = "Cancel", onClick = onCancel)
-                AppButton(
-                    label = "Ok",
-                    onClick = { onCommit(sanitizeValue(value) ?: return@AppButton) },
-                )
+                AppButton(label = "Ok", onClick = { onCommit(sanitizeValue(value) ?: return@AppButton) })
             }
         }
     }
