@@ -11,6 +11,7 @@ import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleCentralId
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattPermission
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattProperty
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralEvent
+import com.outsidesource.oskitkmp.io.toKmpIoSink
 import kotlin.math.ceil
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -139,15 +140,19 @@ class BlePeripheralIemService(
                     sendBleNotification(lastRefreshedEvent.value ?: return, setOf(request.central))
                     return
                 }
+
                 IemEvent.Reset -> {
                     networkIemService.refresh()
                     return
                 }
+
                 is IemEvent.OutputVolumeUpdated -> networkIemService.setOutputVolume(event.trackId, event.value)
                 is IemEvent.ReceivePanUpdated ->
                     networkIemService.setReceivePan(event.trackId, event.receiveId, event.value)
+
                 is IemEvent.ReceiveVolumeUpdated ->
                     networkIemService.setReceiveVolume(event.trackId, event.receiveId, event.value)
+
                 is IemEvent.Error,
                 IemEvent.Refreshing,
                 is IemEvent.Refreshed,
@@ -192,6 +197,7 @@ class BlePeripheralIemService(
         val payload = cbor.encodeToByteArray(IemEvent.serializer(), event)
         val centrals = centralList ?: peripheralManager.subscribedCentrals(REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID)
         val requestId = notificationId.getAndUpdate { it.inc() }
+        val buffer = Buffer()
 
         Logger.i { "Sending notification to ${centrals.size} centrals - $event" }
 
@@ -200,15 +206,15 @@ class BlePeripheralIemService(
             val packetCount = ceil(payload.size.toDouble() / packetSize.toDouble()).toUInt()
 
             for (packetIndex in 0u until packetCount) {
-                val buffer =
-                    Buffer().apply {
-                        writeUShort(requestId)
-                        writeUShort((packetCount - 1u - packetIndex).toUShort())
-                        val startIndex = (packetIndex * packetSize).toInt()
-                        write(payload, startIndex, minOf(startIndex + packetSize.toInt(), payload.size))
-                    }
+                buffer.apply {
+                    clear()
+                    writeUShort(requestId)
+                    writeUShort((packetCount - 1u - packetIndex).toUShort())
+                    val startIndex = (packetIndex * packetSize).toInt()
+                    write(payload, startIndex, minOf(startIndex + packetSize.toInt(), payload.size))
+                }
 
-                Logger.i { "Sending notification packet: Request Id - $requestId - ${packetIndex.toInt() + 1}/$packetCount" }
+                Logger.i { "Sending notification packet: Packet Size: ${buffer.size}, Request Id - $requestId - ${packetIndex.toInt() + 1}/$packetCount" }
                 peripheralManager.notify(
                     REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID,
                     buffer.readByteArray(),
@@ -238,6 +244,7 @@ class BlePeripheralIemService(
                             }
                     )
                 }
+
             is IemEvent.ReceivePanUpdated ->
                 lastRefreshedEvent.update {
                     val state = it ?: return@update null
@@ -256,6 +263,7 @@ class BlePeripheralIemService(
                             }
                     )
                 }
+
             is IemEvent.ReceiveVolumeUpdated ->
                 lastRefreshedEvent.update {
                     val state = it ?: return@update null
@@ -274,6 +282,7 @@ class BlePeripheralIemService(
                             }
                     )
                 }
+
             is IemEvent.Refreshed -> lastRefreshedEvent.update { event }
             is IemEvent.TrackNameUpdated ->
                 lastRefreshedEvent.update {
@@ -286,6 +295,7 @@ class BlePeripheralIemService(
                             }
                     )
                 }
+
             IemEvent.Refresh,
             IemEvent.Refreshing,
             IemEvent.Reset,
