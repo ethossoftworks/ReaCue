@@ -3,9 +3,9 @@ package com.ethossoftworks.reaperbleiem.ui.iem
 import com.ethossoftworks.reaperbleiem.coordinator.AppCoordinator
 import com.ethossoftworks.reaperbleiem.interactor.CapabilityInteractor
 import com.ethossoftworks.reaperbleiem.interactor.IemInteractor
-import com.ethossoftworks.reaperbleiem.interactor.InfoMessageInteractor
 import com.ethossoftworks.reaperbleiem.interactor.ServiceStatus
 import com.ethossoftworks.reaperbleiem.service.iem.IemContext
+import com.ethossoftworks.reaperbleiem.service.iem.IemEvent
 import com.ethossoftworks.reaperbleiem.service.iem.Track
 import com.outsidesource.oskitkmp.capability.CapabilityStatus
 import com.outsidesource.oskitkmp.interactor.Interactor
@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 data class IemScreenViewState(
     val bluetoothStatus: CapabilityStatus = CapabilityStatus.Unknown,
     val selectedIemId: Int? = null,
+    val lastSelectedIemName: String? = null,
     val tracks: Map<Int, Track> = emptyMap(),
     val projectName: String = "Unknown",
     val serviceStatus: ServiceStatus = ServiceStatus.Disconnected,
@@ -60,7 +61,7 @@ class IemScreenViewInteractor(
     }
 
     fun onIemSelect(id: Int) {
-        update { state -> state.copy(selectedIemId = id) }
+        update { state -> state.copy(selectedIemId = id, lastSelectedIemName = state.tracks[id]?.name) }
     }
 
     fun onConnectClick() {
@@ -123,6 +124,18 @@ class IemScreenViewInteractor(
 
     private fun start() {
         subscriptionJob.value?.cancel()
-        interactorScope.launch { iemInteractor.subscribe(iemContext).collect {} }.let { subscriptionJob.value = it }
+        interactorScope.launch {
+            iemInteractor.subscribe(iemContext).collect {
+                when (it) {
+                    is IemEvent.Refreshed -> {
+                        val trackMatch =
+                            it.tracks.values.firstOrNull { track -> track.name == state.lastSelectedIemName }
+                        update { state -> state.copy(selectedIemId = trackMatch?.id) }
+                    }
+
+                    else -> {}
+                }
+            }
+        }.let { subscriptionJob.value = it }
     }
 }
