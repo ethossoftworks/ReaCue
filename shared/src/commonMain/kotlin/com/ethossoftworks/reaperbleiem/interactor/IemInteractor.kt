@@ -1,6 +1,7 @@
 package com.ethossoftworks.reaperbleiem.interactor
 
 import com.ethossoftworks.reaperbleiem.service.iem.BleCentralIemService
+import com.ethossoftworks.reaperbleiem.service.iem.FaderInfo
 import com.ethossoftworks.reaperbleiem.service.iem.IIemService
 import com.ethossoftworks.reaperbleiem.service.iem.IemContext
 import com.ethossoftworks.reaperbleiem.service.iem.IemEvent
@@ -18,6 +19,7 @@ import kotlinx.io.files.Path
 
 data class IemState(
     val projectName: String = "Unknown",
+    val faderInfo: FaderInfo = FaderInfo(),
     val tracks: PersistentMap<Int, Track> = persistentMapOf(),
     val serviceStatus: ServiceStatus = ServiceStatus.Disconnected,
     val isRefreshing: Boolean = false,
@@ -52,6 +54,7 @@ class IemInteractor(private val iemService: IIemService) :
                             state.copy(
                                 projectName = Path(path = event.projectName).name.removeSuffix(".RPP"),
                                 tracks = event.tracks,
+                                faderInfo = event.faderInfo,
                                 serviceStatus = ServiceStatus.Connected,
                                 isRefreshing = false,
                             )

@@ -4,6 +4,7 @@ import com.ethossoftworks.reaperbleiem.coordinator.AppCoordinator
 import com.ethossoftworks.reaperbleiem.interactor.CapabilityInteractor
 import com.ethossoftworks.reaperbleiem.interactor.IemInteractor
 import com.ethossoftworks.reaperbleiem.interactor.ServiceStatus
+import com.ethossoftworks.reaperbleiem.service.iem.FaderInfo
 import com.ethossoftworks.reaperbleiem.service.iem.IemContext
 import com.ethossoftworks.reaperbleiem.service.iem.IemEvent
 import com.ethossoftworks.reaperbleiem.service.iem.Track
@@ -18,6 +19,7 @@ data class IemScreenViewState(
     val selectedIemId: Int? = null,
     val lastSelectedIemName: String? = null,
     val tracks: Map<Int, Track> = emptyMap(),
+    val faderInfo: FaderInfo = FaderInfo(),
     val projectName: String = "Unknown",
     val serviceStatus: ServiceStatus = ServiceStatus.Disconnected,
     val isRefreshing: Boolean = false,
@@ -47,6 +49,7 @@ class IemScreenViewInteractor(
             bluetoothStatus = capabilityInteractor.state.bluetoothStatus,
             tracks = iemInteractor.state.tracks,
             projectName = iemInteractor.state.projectName,
+            faderInfo = iemInteractor.state.faderInfo,
             serviceStatus = iemInteractor.state.serviceStatus,
             isRefreshing = iemInteractor.state.isRefreshing,
         )

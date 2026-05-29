@@ -205,6 +205,24 @@ class NetworkIemService(
         }
     }
 
+    private suspend fun getFaderInfo(): FaderInfo {
+        return try {
+            val response = httpClient.get("$restDomain/_/GET/EXTSTATE/ReaCue/FaderInfo")
+            if (!response.status.isSuccess()) return FaderInfo()
+            val rawFaderInfo = response.bodyAsText().split("\t")[3].split(";")
+
+            FaderInfo(
+                curve = rawFaderInfo[0].toFloat(),
+                minDb = rawFaderInfo[1].toFloat(),
+                maxDb = rawFaderInfo[2].toFloat(),
+            )
+        } catch (t: CancellationException) {
+            throw t
+        } catch (t: Throwable) {
+            FaderInfo()
+        }
+    }
+
     private fun List<OscMessage>.toIemEvents(): List<IemEvent> = mapNotNull { message ->
         val parts = message.address.trimStart('/').split("/")
         val trackId = parts[1].toInt()

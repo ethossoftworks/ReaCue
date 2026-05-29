@@ -5,6 +5,7 @@ package com.ethossoftworks.reaperbleiem.service.iem
 
 import com.ethossoftworks.reaperbleiem.lib.PersistentMapSerializer
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleScanRecord
+import kotlin.math.pow
 import kotlinx.collections.immutable.PersistentMap
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -18,6 +19,9 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlin.math.log10
+import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 interface IIemService {
     fun subscribe(context: IemContext): Flow<IemEvent>
@@ -29,8 +33,6 @@ interface IIemService {
     suspend fun setReceiveVolume(trackId: Int, receiveId: Int, value: Float)
 
     suspend fun setReceivePan(trackId: Int, receiveId: Int, value: Float)
-
-    suspend fun setReceiveMute(trackId: Int, receiveId: Int, isMuted: Boolean)
 }
 
 sealed class IemContext {
@@ -42,14 +44,21 @@ sealed class IemContext {
 @Serializable
 @SerialName("IemEvent")
 sealed class IemEvent {
-    @Serializable @SerialName("0") data object Refresh : IemEvent()
+    @Serializable
+    @SerialName("0")
+    data object Refresh : IemEvent()
 
-    @Serializable @SerialName("1") data object Refreshing : IemEvent()
+    @Serializable
+    @SerialName("1")
+    data object Refreshing : IemEvent()
 
     @Serializable
     @SerialName("2")
-    data class Refreshed(@CborLabel(1) val projectName: String, @CborLabel(2) val tracks: PersistentMap<Int, Track>) :
-        IemEvent()
+    data class Refreshed(
+        @CborLabel(1) val projectName: String,
+        @CborLabel(2) val tracks: PersistentMap<Int, Track>,
+        @CborLabel(3) val faderInfo: FaderInfo,
+    ) : IemEvent()
 
     @Serializable
     @SerialName("3")
@@ -75,7 +84,8 @@ sealed class IemEvent {
     @SerialName("7")
     data class OutputVolumeUpdated(@CborLabel(1) val trackId: Int, @CborLabel(2) val value: Float) : IemEvent()
 
-    @SerialName("8") data object Reset : IemEvent()
+    @SerialName("8")
+    data object Reset : IemEvent()
 
     @Serializable(with = IemErrorEventSerializer::class)
     @SerialName("9")
@@ -101,6 +111,51 @@ object IemErrorEventSerializer : KSerializer<IemEvent.Error> {
 
     override fun serialize(encoder: Encoder, value: IemEvent.Error) {
         encoder.encodeString(value.error.toString())
+    }
+}
+
+@Serializable
+data class FaderInfo(
+    @CborLabel(1) val curve: Float = -1f,
+    @CborLabel(2) val minDb: Float = -72f,
+    @CborLabel(3) val maxDb: Float = 12f,
+) {
+
+    fun normalizedToDb(value: Float): Float = when (curve) {
+        -1f -> {
+            if (value <= 0f) return Float.NEGATIVE_INFINITY
+            val x = value.coerceIn(0f, 1f)
+            val taper = (x * x * x + x * x * x * x * x * x) / 2f
+            return 20f * log10(taper) + maxDb
+        }
+
+        else -> {
+            if (value <= 0f) return Float.NEGATIVE_INFINITY
+            val x = value.coerceIn(0f, 1f)
+            val x0 = (1000f * (-minDb) / (maxDb - minDb)).roundToInt() / 1000f
+            return if (x >= x0) {
+                maxDb * ((x - x0) / (1f - x0)).pow(curve)
+            } else {
+                minDb * ((x0 - x) / x0).pow(curve)
+            }
+        }
+    }
+
+    fun dbToNormalized(db: Float): Float = when (curve) {
+        -1f -> {
+            val g = 10f.pow((db - maxDb) / 20f)
+            val u = (-1f + sqrt(1f + 8f * g)) / 2f
+            return u.pow(1f / 3f).coerceIn(0f, 1f)
+        }
+
+        else -> {
+            val x0 = (1000f * (-minDb) / (maxDb - minDb)).roundToInt() / 1000f
+            return if (db >= 0f) {
+                x0 + (1f - x0) * (db / maxDb).pow(1f / curve)
+            } else {
+                x0 - x0 * (db / minDb).pow(1f / curve)
+            }
+        }
     }
 }
 

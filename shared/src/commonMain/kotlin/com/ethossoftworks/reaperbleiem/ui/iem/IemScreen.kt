@@ -20,12 +20,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.ethossoftworks.reaperbleiem.interactor.ServiceStatus
+import com.ethossoftworks.reaperbleiem.service.iem.FaderInfo
 import com.ethossoftworks.reaperbleiem.service.iem.IemContext
 import com.ethossoftworks.reaperbleiem.ui.app.AppToolbar
 import com.ethossoftworks.reaperbleiem.ui.app.Screen
 import com.ethossoftworks.reaperbleiem.ui.form.AppButton
-import com.ethossoftworks.reaperbleiem.ui.form.AppButtonType
 import com.ethossoftworks.reaperbleiem.ui.form.AppDropdown
 import com.ethossoftworks.reaperbleiem.ui.form.AppDropdownItem
 import com.ethossoftworks.reaperbleiem.ui.form.AppLoadingIndicator
@@ -42,6 +43,7 @@ import com.outsidesource.oskitcompose.interactor.collectAsState
 import com.outsidesource.oskitcompose.lib.rememberInjectForRoute
 import com.outsidesource.oskitcompose.systemui.KmpWindowInsets
 import com.outsidesource.oskitcompose.systemui.top
+import com.outsidesource.oskitkmp.text.KmpNumberFormatter
 import kotlin.collections.forEach
 import kotlin.math.roundToInt
 import org.jetbrains.compose.resources.stringResource
@@ -63,7 +65,6 @@ import reaper_ble_iem.shared.generated.resources.select_monitor
 import reaper_ble_iem.shared.generated.resources.set_all_0db
 import reaper_ble_iem.shared.generated.resources.set_all_n
 import reaper_ble_iem.shared.generated.resources.untitled
-import reaper_ble_iem.shared.generated.resources.volume_mute
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,6 +75,7 @@ fun IemScreen(
     val state = interactor.collectAsState()
     val dimensions = AppTheme.dimensions
     val colors = AppTheme.colors
+    val dbFormatter = remember { KmpNumberFormatter(minimumFractionDigits = 1, maximumFractionDigits = 1) }
 
     DisposableEffect(Unit) {
         interactor.onMount()
@@ -215,15 +217,24 @@ fun IemScreen(
                         .padding(bottom = dimensions.screenPadding),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                val ticks = rememberTicks()
+                val ticks = rememberTicks(state.faderInfo)
 
                 AppSlider(
-                    value = (hardwareOut?.volume ?: 0f) * 100f,
-                    range = 0f..100f,
-                    step = 1f,
+                    value = (hardwareOut?.volume ?: 0f),
+                    range = 0f..1f,
+                    step = .01f,
                     label = stringResource(Res.string.output),
-                    onChange = { interactor.onOutputVolumeChange(track.id, it / 100f) },
-                    valueFormatter = { "${it.roundToInt()}%" },
+                    onChange = { interactor.onOutputVolumeChange(track.id, it) },
+                    valueFormatter = {
+                        val db = state.faderInfo.normalizedToDb(it)
+                        "${if (db > 0f) "+" else ""}${dbFormatter.format(db)} dB"
+                    },
+                    onDoubleTap = {
+                        interactor.onOutputVolumeChange(
+                            track.id,
+                            state.faderInfo.dbToNormalized(0f)
+                        )
+                    },
                     ticks = ticks,
                 )
 
@@ -234,19 +245,44 @@ fun IemScreen(
                     ) {
                         AppSlider(
                             modifier = Modifier.weight(1f),
-                            value = receive.value.volume * 100f,
-                            range = 0f..100f,
-                            step = 1f,
+                            value = receive.value.volume,
+                            range = 0f..1f,
+                            step = .01f,
                             label = state.tracks[receive.value.trackId]?.name ?: continue,
-                            onChange = { interactor.onReceiveVolumeChange(track.id, receive.key, it / 100f) },
-                            valueFormatter = { "${it.roundToInt()}%" },
+                            onChange = { interactor.onReceiveVolumeChange(track.id, receive.key, it) },
+                            valueFormatter = {
+                                val db = state.faderInfo.normalizedToDb(it)
+                                "${if (db > 0f) "+" else ""}${dbFormatter.format(db)} dB"
+                            },
+                            onDoubleTap = {
+                                interactor.onReceiveVolumeChange(
+                                    track.id,
+                                    receive.key,
+                                    state.faderInfo.dbToNormalized(0f)
+                                )
+                            },
                             ticks = ticks,
                         )
-                        Knob(
-                            value = receive.value.pan,
-                            onValueChange = { interactor.onReceivePanChange(track.id, receive.key, it) },
-                            onDoubleTap = { interactor.onReceivePanChange(track.id, receive.key, .5f) },
-                        )
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text(
+                                text = when {
+                                    receive.value.pan < .5f -> "${(((.5f - receive.value.pan) * 2f) * 100).roundToInt()}%L"
+                                    receive.value.pan == .5f -> "C"
+                                    receive.value.pan > .5f -> "${(((receive.value.pan - .5f) * 2f) * 100).roundToInt()}%R"
+                                    else -> ""
+                                },
+                                color = colors.textSecondary,
+                                fontSize = 12.sp,
+                            )
+                            Knob(
+                                value = receive.value.pan,
+                                onValueChange = { interactor.onReceivePanChange(track.id, receive.key, it) },
+                                onDoubleTap = { interactor.onReceivePanChange(track.id, receive.key, .5f) },
+                            )
+                        }
                     }
                 }
             }
@@ -275,12 +311,12 @@ fun IemScreen(
 }
 
 @Composable
-private fun rememberTicks(): List<KmpSliderTick> {
+private fun rememberTicks(faderInfo: FaderInfo): List<KmpSliderTick> {
     val theme = AppTheme.colors
-    return remember {
+    return remember(faderInfo) {
         listOf(
             KmpSliderTick(
-                value = .716f * 100f,
+                value = faderInfo.dbToNormalized(0f),
                 style =
                     KmpSliderTickStyle(
                         shapeBrush = SolidColor(theme.strokePrimary),
@@ -289,7 +325,7 @@ private fun rememberTicks(): List<KmpSliderTick> {
                     ),
             ),
             KmpSliderTick(
-                value = .716f * 100f,
+                value = faderInfo.dbToNormalized(0f),
                 style =
                     KmpSliderTickStyle(
                         shapeBrush = SolidColor(theme.strokePrimary),
