@@ -45,7 +45,7 @@ fun Knob(
     sensitivity: Float = .005f,
     step: Float = 0.01f,
     size: Dp = 44.dp,
-    maxAngle: Float = 180f,
+    maxAngle: Float = 180f, // Must be 0f..180f
 ) {
     val colors = AppTheme.colors
     val latestValue by rememberUpdatedState(value)

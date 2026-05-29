@@ -281,6 +281,7 @@ fun IemScreen(
                                 value = receive.value.pan,
                                 onValueChange = { interactor.onReceivePanChange(track.id, receive.key, it) },
                                 onDoubleTap = { interactor.onReceivePanChange(track.id, receive.key, .5f) },
+                                maxAngle = 160f,
                             )
                         }
                     }
