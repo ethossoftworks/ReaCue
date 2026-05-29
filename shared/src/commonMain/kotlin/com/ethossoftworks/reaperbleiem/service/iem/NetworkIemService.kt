@@ -23,7 +23,6 @@ import kotlinx.atomicfu.update
 import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.NonCancellable.isActive
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.currentCoroutineContext
@@ -103,7 +102,9 @@ class NetworkIemService(
         val tracks = getTracks()
         trackCache.update { tracks }
         val projectName = getProjectName()
-        events.emit(IemEvent.Refreshed(projectName = projectName, tracks = tracks))
+        val faderInfo = getFaderInfo()
+
+        events.emit(IemEvent.Refreshed(projectName = projectName, tracks = tracks, faderInfo = faderInfo))
         oscSetTrackNotificationCount(tracks.size - 1) // -1 because master is reported regardless
         oscSetReceiveNotificationCount(tracks.values.maxOf { if (it.isIem) it.receives.size else 0 })
         oscReset()
@@ -119,10 +120,6 @@ class NetworkIemService(
 
     override suspend fun setReceivePan(trackId: Int, receiveId: Int, value: Float) {
         oscSendCommand("/track/$trackId/recv/$receiveId/pan", value)
-    }
-
-    override suspend fun setReceiveMute(trackId: Int, receiveId: Int, isMuted: Boolean) {
-        // TODO
     }
 
     private fun closeSocket() {
@@ -233,6 +230,7 @@ class NetworkIemService(
                 if (trackCache.value[trackId]?.isIem != true) return@mapNotNull null
                 IemEvent.OutputVolumeUpdated(trackId = trackId, message.arguments[0] as Float)
             }
+
             "recv" -> {
                 if (trackCache.value[trackId]?.isIem != true) return@mapNotNull null
                 val receiveId = parts[3].toInt()
@@ -243,15 +241,18 @@ class NetworkIemService(
                             receiveId = receiveId,
                             value = message.arguments[0] as Float,
                         )
+
                     "volume" ->
                         IemEvent.ReceiveVolumeUpdated(
                             trackId = trackId,
                             receiveId = receiveId,
                             value = message.arguments[0] as Float,
                         )
+
                     else -> return@mapNotNull null
                 }
             }
+
             else -> null
         }
     }

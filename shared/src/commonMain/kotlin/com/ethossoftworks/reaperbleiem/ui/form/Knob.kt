@@ -23,8 +23,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.input.pointer.isCtrlPressed
+import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.ethossoftworks.reaperbleiem.ui.theme.AppTheme
@@ -37,8 +41,11 @@ fun Knob(
     value: Float,
     onValueChange: (Float) -> Unit,
     onDoubleTap: () -> Unit = {},
+    onLongPress: () -> Unit = {},
     sensitivity: Float = .005f,
     step: Float = 0.01f,
+    size: Dp = 44.dp,
+    maxAngle: Float = 180f,
 ) {
     val colors = AppTheme.colors
     val latestValue by rememberUpdatedState(value)
@@ -47,82 +54,77 @@ fun Knob(
     val displayValue = if (isDragging) localDragValue else value
 
     Box(
-        modifier = Modifier.size(44.dp)
-            .kmpOuterShadow(
-                blur = 12.dp,
-                color = Color.Black.copy(alpha = 0.25f),
-                shape = CircleShape,
-                offset = DpOffset(x = 0.dp, y = 6.dp)
-            )
-            .pointerInput(sensitivity, step) {
-                var totalDelta = 0f
-
-                detectDragGestures(
-                    onDragStart = {
-                        isDragging = true
-                        localDragValue = latestValue
-                        totalDelta = 0f
-                    },
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        totalDelta += ((dragAmount.x - dragAmount.y).toDp().value * sensitivity)
-                        if (totalDelta.absoluteValue < step) return@detectDragGestures
-
-                        val stepsTaken = (totalDelta / step).toInt()
-                        val snappedChange = stepsTaken * step
-                        val newValue = (localDragValue + snappedChange).coerceIn(0f, 1f)
-                        if (newValue == localDragValue) return@detectDragGestures
-
-                        totalDelta = 0f
-                        localDragValue = newValue
-                        onValueChange(newValue)
-                    },
-                    onDragEnd = {
-                        isDragging = false
-                        totalDelta = 0f
-                    },
-                    onDragCancel = {
-                        isDragging = false
-                        totalDelta = 0f
-                    }
+        modifier =
+            Modifier.size(size)
+                .kmpOuterShadow(
+                    blur = 12.dp,
+                    color = Color.Black.copy(alpha = 0.25f),
+                    shape = CircleShape,
+                    offset = DpOffset(x = 0.dp, y = 6.dp),
                 )
-            }
-            .pointerInput(Unit) {
-                detectTapGestures(onDoubleTap = { onDoubleTap() })
-            }
-            .background(colors.bgControl, CircleShape)
-            .drawWithCache {
-                val width = 4.dp.toPx()
+                .pointerInput(sensitivity, step) {
+                    var totalDelta = 0f
 
-                onDrawWithContent {
-                    val topLeft = Offset(size.width / 2f - width / 2f, -2f)
-                    val size = Size(width, size.height / 2f)
+                    detectDragGestures(
+                        onDragStart = {
+                            isDragging = true
+                            localDragValue = latestValue
+                            totalDelta = 0f
+                        },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            totalDelta += ((dragAmount.x - dragAmount.y).toDp().value * sensitivity)
+                            if (totalDelta.absoluteValue < step) return@detectDragGestures
 
-                    this@onDrawWithContent.drawContent()
-                    val degrees = ((360f * displayValue) - 180f).coerceIn(-180f, 180f)
+                            val stepsTaken = (totalDelta / step).toInt()
+                            val snappedChange = stepsTaken * step
+                            val newValue = (localDragValue + snappedChange).coerceIn(0f, 1f)
+                            if (newValue == localDragValue) return@detectDragGestures
 
-                    rotate(degrees) {
-                        drawRoundRect(
-                            color = colors.accent,
-                            cornerRadius = CornerRadius(50f, 50f),
-                            topLeft = topLeft,
-                            size = size
-                        )
+                            totalDelta = 0f
+                            localDragValue = newValue
+                            onValueChange(newValue)
+                        },
+                        onDragEnd = {
+                            isDragging = false
+                            totalDelta = 0f
+                        },
+                        onDragCancel = {
+                            isDragging = false
+                            totalDelta = 0f
+                        },
+                    )
+                }
+                .pointerInput(Unit) {
+                    detectTapGestures(onDoubleTap = { onDoubleTap() }, onLongPress = { onLongPress() })
+                }
+                .background(colors.bgControl, CircleShape)
+                .drawWithCache {
+                    val width = 4.dp.toPx()
+
+                    onDrawWithContent {
+                        val topLeft = Offset(this@drawWithCache.size.width / 2f - width / 2f, -2f)
+                        val size = Size(width, this@drawWithCache.size.height / 2f)
+
+                        this@onDrawWithContent.drawContent()
+                        val degrees = ((maxAngle * 2f * displayValue) - maxAngle).coerceIn(-maxAngle, maxAngle)
+
+                        rotate(degrees) {
+                            drawRoundRect(
+                                color = colors.accent,
+                                cornerRadius = CornerRadius(50f, 50f),
+                                topLeft = topLeft,
+                                size = size,
+                            )
+                        }
                     }
                 }
-            }
-            .border(width = 1.dp, brush = colors.strokeControl, shape = CircleShape)
+                .border(width = 1.dp, brush = colors.strokeControl, shape = CircleShape)
     )
 }
 
 @Composable
 @Preview
 private fun KnobPreview() {
-    AppThemeProvider {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(16.dp),
-        ) {
-            Knob(.5f, onValueChange = {})
-        }
-    }
+    AppThemeProvider { Column(modifier = Modifier.fillMaxSize().padding(16.dp)) { Knob(.5f, onValueChange = {}) } }
 }

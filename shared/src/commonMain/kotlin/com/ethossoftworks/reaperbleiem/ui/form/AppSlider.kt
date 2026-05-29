@@ -1,5 +1,6 @@
 package com.ethossoftworks.reaperbleiem.ui.form
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,14 +9,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -24,6 +29,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -38,18 +45,26 @@ import androidx.compose.ui.unit.sp
 import com.ethossoftworks.reaperbleiem.ui.theme.AppTheme
 import com.ethossoftworks.reaperbleiem.ui.theme.AppThemeProvider
 import com.ethossoftworks.reaperbleiem.ui.theme.modalSurface
+import com.outsidesource.oskitcompose.form.DpAxisSize
 import com.outsidesource.oskitcompose.form.KmpSlider
+import com.outsidesource.oskitcompose.form.KmpSliderAlignment
+import com.outsidesource.oskitcompose.form.KmpSliderDirection
 import com.outsidesource.oskitcompose.form.KmpSliderScope
 import com.outsidesource.oskitcompose.form.KmpSliderStyle
 import com.outsidesource.oskitcompose.form.KmpSliderTick
+import com.outsidesource.oskitcompose.form.KmpSliderTickPosition
+import com.outsidesource.oskitcompose.form.KmpSliderTickStyle
+import com.outsidesource.oskitcompose.form.MultiThumbMode
 import com.outsidesource.oskitcompose.popup.Modal
 import com.outsidesource.oskitcompose.popup.ModalStyles
+import com.outsidesource.oskitkmp.text.KmpNumberFormatter
 import kotlin.math.roundToInt
 
 @Composable
 fun AppSlider(
     value: Float,
     range: ClosedRange<Float>,
+    onDoubleTap: () -> Unit = {},
     onChange: (Float) -> Unit,
     label: String,
     step: Float,
@@ -82,6 +97,7 @@ fun AppSlider(
         label = label,
         valueFormatter = valueFormatter,
         ticks = ticks,
+        onDoubleTap = onDoubleTap,
         manualEntrySlot = { isVisible, valueString, onTextChange, onCancel, onCommit ->
             AppManualEntryModal(
                 isVisible = isVisible,
@@ -174,5 +190,242 @@ fun AppSliderPreview() {
                 valueFormatter = { "${(it * 100f).roundToInt()}%" },
             )
         }
+    }
+}
+
+@Preview
+@Composable
+private fun KmpSliderPreview() {
+    Column(
+        modifier = Modifier
+            .verticalScroll(rememberScrollState())
+            .background(Color.White)
+            .systemBarsPadding()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
+    ) {
+        val testValues = remember { mutableStateOf(mapOf("0" to -20f, "1" to 0f, "2" to 20f)) }
+        var isDisabled by remember { mutableStateOf(false) }
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(0.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Disabled")
+        }
+
+        KmpSlider(
+            label = "Group",
+            isEnabled = !isDisabled,
+            multiThumbMode = MultiThumbMode.Group,
+            values = testValues.value,
+            range = -100f..100f,
+            styles = KmpSliderStyle().copy(),
+            ticks = remember {
+                (-100..100 step 10).map {
+                    KmpSliderTick(
+                        value = it.toFloat(),
+                        label = if (it % 20 == 0) it.toString() else null,
+                        style = if (it % 20 == 0) KmpSliderTickStyle.Line.Medium else KmpSliderTickStyle.Line.Short,
+                    )
+                }
+            },
+            onChange = {
+                testValues.value = testValues.value.toMutableMap().apply {
+                    it.forEach { (key, value) -> this[key] = value }
+                }
+            },
+        )
+
+        KmpSlider(
+            values = remember { derivedStateOf { mapOf("0" to (testValues.value["0"] ?: 0f)) } }.value,
+            label = "Start Alignment",
+            isEnabled = !isDisabled,
+            units = "%",
+            range = -100f..100f,
+            styles = KmpSliderStyle().copy(),
+            ticks = remember {
+                (-100..100 step 20).map {
+                    KmpSliderTick(
+                        value = it.toFloat(),
+                        label = it.toString(),
+                    )
+                }
+            },
+            onChange = {
+                testValues.value = testValues.value.toMutableMap().apply {
+                    it.forEach { (key, value) -> this[key] = value }
+                }
+            },
+        )
+
+        KmpSlider(
+            values = remember { derivedStateOf { mapOf("1" to (testValues.value["1"] ?: 0f)) } }.value,
+            label = "Center Alignment",
+            isEnabled = !isDisabled,
+            units = "%",
+            range = -100f..100f,
+            styles = KmpSliderStyle().copy(
+                trackFill = Brush.linearGradient(
+                    0f to Color.Blue,
+                    1f to Color.Red,
+                ),
+                trackFillAlignment = KmpSliderAlignment.Center,
+            ),
+            ticks = remember {
+                (-100..100 step 20).map {
+                    KmpSliderTick(
+                        value = it.toFloat(),
+                        label = it.toString(),
+                        style = KmpSliderTickStyle.Line.Medium,
+                    )
+                }
+            },
+            onChange = {
+                testValues.value = testValues.value.toMutableMap().apply {
+                    it.forEach { (key, value) -> this[key] = value }
+                }
+            },
+        )
+
+        KmpSlider(
+            values = remember { derivedStateOf { mapOf("2" to (testValues.value["2"] ?: 0f)) } }.value,
+            label = "End Alignment",
+            isEnabled = !isDisabled,
+            units = "%",
+            range = -100f..100f,
+            styles = KmpSliderStyle().copy(
+                trackFill = Brush.linearGradient(
+                    0f to Color.Blue,
+                    1f to Color.LightGray,
+                ),
+                trackFillAlignment = KmpSliderAlignment.End,
+            ),
+            ticks = remember {
+                (-100..100 step 20).map {
+                    KmpSliderTick(
+                        value = it.toFloat(),
+                        label = it.toString(),
+                        style = KmpSliderTickStyle.Line.Medium,
+                    )
+                }
+            },
+            onChange = {
+                testValues.value = testValues.value.toMutableMap().apply {
+                    it.forEach { (key, value) -> this[key] = value }
+                }
+            },
+        )
+
+        KmpSlider(
+            values = remember {
+                derivedStateOf {
+                    mapOf(
+                        "0" to (testValues.value["0"] ?: 0f),
+                        "2" to (testValues.value["2"] ?: 0f)
+                    )
+                }
+            }.value,
+            label = "Range",
+            isEnabled = !isDisabled,
+            range = -100f..100f,
+            styles = KmpSliderStyle().copy(),
+            deadband = 1f,
+            ticks = remember {
+                buildList {
+                    KmpSliderTick(
+                        value = -100f,
+                        label = "0",
+                        style = KmpSliderTickStyle(
+                            labelPosition = KmpSliderTickPosition(alignment = KmpSliderAlignment.End, offset = 4.dp),
+                            shapeSize = DpAxisSize(0.dp, 0.dp),
+                        ),
+                    ).let { add(it) }
+                    KmpSliderTick(
+                        value = 100f,
+                        label = "100",
+                        style = KmpSliderTickStyle(
+                            labelPosition = KmpSliderTickPosition(alignment = KmpSliderAlignment.End, offset = 4.dp),
+                            shapeSize = DpAxisSize(0.dp, 0.dp),
+                        ),
+                    ).let { add(it) }
+                    for (i in -90..90 step 10) {
+                        KmpSliderTick(
+                            value = i.toFloat(),
+                            style = KmpSliderTickStyle.Circle.copy(
+                                shapeBrush = SolidColor(Color.White.copy(alpha = .75f)),
+                                shapePosition = KmpSliderTickPosition(alignment = KmpSliderAlignment.Center),
+                            ),
+                        ).let { add(it) }
+                    }
+                }
+            },
+            onChange = {
+                testValues.value = testValues.value.toMutableMap().apply {
+                    it.forEach { (key, value) -> this[key] = value }
+                }
+            },
+        )
+
+        val logValues = remember { mutableStateOf(mapOf("0" to 50f)) }
+        KmpSlider(
+            values = logValues.value,
+            isEnabled = !isDisabled,
+            label = "Logarithmic",
+            range = 20f..20_000f,
+            valueFormatter = remember {
+                val numberFormatter = KmpNumberFormatter(maximumFractionDigits = 0)
+                return@remember { numberFormatter.format(it) }
+            },
+            units = "hz",
+            logarithmic = true,
+            styles = KmpSliderStyle().copy(),
+            ticks = remember {
+                buildList {
+                    add(KmpSliderTick(value = 20f, label = "20hz"))
+                    add(KmpSliderTick(value = 50f, label = "50"))
+                    add(KmpSliderTick(value = 100f, label = "100"))
+                    add(KmpSliderTick(value = 200f, label = "200"))
+                    add(KmpSliderTick(value = 500f, label = "500"))
+                    add(KmpSliderTick(value = 1_000f, label = "1k"))
+                    add(KmpSliderTick(value = 2_000f, label = "2k"))
+                    add(KmpSliderTick(value = 5_000f, label = "5k"))
+                    add(KmpSliderTick(value = 10_000f, label = "10k"))
+                    add(KmpSliderTick(value = 20_000f, label = "20k"))
+                }
+            },
+            onChange = remember {
+                {
+                    logValues.value = logValues.value.toMutableMap().apply {
+                        it.forEach { (key, value) -> this[key] = value }
+                    }
+                }
+            },
+        )
+
+        KmpSlider(
+            modifier = Modifier.height(300.dp),
+            values = testValues.value,
+            isEnabled = !isDisabled,
+            direction = KmpSliderDirection.Vertical,
+            multiThumbMode = MultiThumbMode.Group,
+            label = "Basic".uppercase(),
+            units = "%",
+            range = -100f..100f,
+            styles = KmpSliderStyle().copy(),
+            ticks = remember {
+                (-100..100 step 20).map {
+                    KmpSliderTick(
+                        value = it.toFloat(),
+                        label = it.toString(),
+                    )
+                }
+            },
+            onChange = {
+                testValues.value = testValues.value.toMutableMap().apply {
+                    it.forEach { (key, value) -> this[key] = value }
+                }
+            },
+        )
     }
 }

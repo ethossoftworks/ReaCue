@@ -131,8 +131,4 @@ class BleCentralIemService(private val bleCentralManager: IKmpBleCentralManager)
             cbor.encodeToByteArray(IemEvent.serializer(), IemEvent.ReceivePanUpdated(trackId, receiveId, value))
         peripheral.value?.write(REAPER_BLE_IEM_COMMAND_CHARACTERISTIC_UUID, payload, KmpBleWriteMode.WithoutResponse)
     }
-
-    override suspend fun setReceiveMute(trackId: Int, receiveId: Int, isMuted: Boolean) {
-        TODO("Not yet implemented")
-    }
 }

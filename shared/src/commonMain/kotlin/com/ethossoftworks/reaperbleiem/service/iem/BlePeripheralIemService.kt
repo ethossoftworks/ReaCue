@@ -188,11 +188,6 @@ class BlePeripheralIemService(
         sendBleNotification(IemEvent.ReceivePanUpdated(trackId, receiveId, value))
     }
 
-    override suspend fun setReceiveMute(trackId: Int, receiveId: Int, isMuted: Boolean) {
-        networkIemService.setReceiveMute(trackId, receiveId, isMuted)
-        // TODO: Notify receive mute
-    }
-
     private suspend fun sendBleNotification(event: IemEvent, centralList: Set<KmpBleCentralId>? = null) {
         updateLastRefreshedEvent(event)
         val payload = cbor.encodeToByteArray(IemEvent.serializer(), event)
