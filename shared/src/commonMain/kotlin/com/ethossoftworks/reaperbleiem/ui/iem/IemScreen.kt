@@ -286,20 +286,15 @@ fun IemScreen(
 
     NumberEntryModal(
         isVisible = state.numberInputModalType != null,
-        valueFormatter = { it.roundToInt().toString() },
-        units = "%",
+        valueFormatter = { formatDb(it, state.faderInfo) },
+        units = "",
         label =
             when (state.numberInputModalType) {
                 NumberInputModalType.Adjust -> stringResource(Res.string.adjust_all_n)
                 NumberInputModalType.Set -> stringResource(Res.string.set_all_n)
                 null -> ""
             },
-        range =
-            when (state.numberInputModalType) {
-                NumberInputModalType.Adjust -> -100f..100f
-                NumberInputModalType.Set -> 0f..100f
-                null -> 0f..0f
-            },
+        range = state.faderInfo.minDb..state.faderInfo.maxDb,
         onCancel = interactor::onNumberModalDismiss,
         onCommit = interactor::onNumberModalCommit,
     )
