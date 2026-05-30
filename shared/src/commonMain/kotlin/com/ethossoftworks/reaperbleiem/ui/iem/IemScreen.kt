@@ -44,6 +44,7 @@ import com.outsidesource.oskitcompose.lib.rememberInjectForRoute
 import com.outsidesource.oskitcompose.systemui.KmpWindowInsets
 import com.outsidesource.oskitcompose.systemui.top
 import com.outsidesource.oskitkmp.text.KmpNumberFormatter
+import com.outsidesource.oskitkmp.text.parseFloatOrNull
 import kotlin.collections.forEach
 import kotlin.math.roundToInt
 import org.jetbrains.compose.resources.stringResource
@@ -226,6 +227,11 @@ fun IemScreen(
                     label = stringResource(Res.string.output),
                     onChange = { interactor.onOutputVolumeChange(track.id, it) },
                     valueFormatter = { formatDb(it, state.faderInfo) },
+                    stringToValue = { new, current ->
+                        state.faderInfo.dbToNormalized(
+                            new.parseFloatOrNull() ?: return@AppSlider current
+                        )
+                    },
                     onDoubleTap = {
                         interactor.onOutputVolumeChange(
                             track.id,
@@ -248,6 +254,11 @@ fun IemScreen(
                             label = state.tracks[receive.value.trackId]?.name ?: continue,
                             onChange = { interactor.onReceiveVolumeChange(track.id, receive.key, it) },
                             valueFormatter = { formatDb(it, state.faderInfo) },
+                            stringToValue = { new, current ->
+                                state.faderInfo.dbToNormalized(
+                                    new.parseFloatOrNull() ?: return@AppSlider current
+                                )
+                            },
                             onDoubleTap = {
                                 interactor.onReceiveVolumeChange(
                                     track.id,

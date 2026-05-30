@@ -1,7 +1,10 @@
 package com.ethossoftworks.reaperbleiem.ui.form
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,9 +12,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -27,10 +32,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -58,6 +65,11 @@ import com.outsidesource.oskitcompose.form.MultiThumbMode
 import com.outsidesource.oskitcompose.popup.Modal
 import com.outsidesource.oskitcompose.popup.ModalStyles
 import com.outsidesource.oskitkmp.text.KmpNumberFormatter
+import com.outsidesource.oskitkmp.text.parseFloatOrNull
+import org.jetbrains.compose.resources.painterResource
+import reaper_ble_iem.shared.generated.resources.Res
+import reaper_ble_iem.shared.generated.resources.add
+import reaper_ble_iem.shared.generated.resources.remove
 import kotlin.math.roundToInt
 
 @Composable
@@ -69,6 +81,7 @@ fun AppSlider(
     label: String,
     step: Float,
     valueFormatter: (Float) -> String,
+    stringToValue: (String, Float) -> Float = { new, current -> new.toFloatOrNull() ?: current },
     modifier: Modifier = Modifier,
     ticks: List<KmpSliderTick> = emptyList(),
 ) {
@@ -96,6 +109,7 @@ fun AppSlider(
         styles = styles,
         label = label,
         valueFormatter = valueFormatter,
+        stringToValue = stringToValue,
         ticks = ticks,
         onDoubleTap = onDoubleTap,
         manualEntrySlot = { isVisible, valueString, onTextChange, onCancel, onCommit ->
@@ -120,11 +134,11 @@ private fun KmpSliderScope.AppManualEntryModal(
     onCommit: () -> Unit,
 ) {
     val focusRequester = remember { FocusRequester() }
-    val theme = AppTheme.colors
+    val colors = AppTheme.colors
     val shape = remember { RoundedCornerShape(12.dp) }
 
     Modal(
-        modifier = Modifier.widthIn(max = maxWidth).modalSurface(theme, shape).padding(16.dp),
+        modifier = Modifier.widthIn(max = maxWidth).modalSurface(colors, shape).padding(16.dp),
         isVisible = isVisible,
         styles = ModalStyles.UserDefinedContent,
         onDismissRequest = onCancel,
@@ -132,6 +146,7 @@ private fun KmpSliderScope.AppManualEntryModal(
         LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
         var value by remember { mutableStateOf("") }
+        var isNegative by remember { mutableStateOf(false) }
 
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             label?.let { label ->
@@ -140,7 +155,7 @@ private fun KmpSliderScope.AppManualEntryModal(
                     fontSize = 12.sp,
                     text =
                         "${valueFormatter(range.start)}${units ?: ""} \u2014 " +
-                            "${valueFormatter(range.endInclusive)}${units ?: ""}",
+                                "${valueFormatter(range.endInclusive)}${units ?: ""}",
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -154,6 +169,34 @@ private fun KmpSliderScope.AppManualEntryModal(
                         return@onKeyEvent true
                     },
                 value = value,
+                iconStart = {
+                    Box(
+                        modifier =
+                            Modifier.size(28.dp)
+                                .clip(CircleShape)
+                                .clickable(onClick = {
+                                    isNegative = !isNegative
+                                    value = "${if (isNegative) "-" else "+"}${value.trimStart('+', '-')}"
+                                    onTextChange(value)
+                                })
+                                .background(colors.accentTint, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Image(
+                            modifier = Modifier.size(10.dp),
+                            painter =
+                                painterResource(
+                                    if (isNegative) {
+                                        Res.drawable.remove
+                                    } else {
+                                        Res.drawable.add
+                                    }
+                                ),
+                            contentDescription = null,
+                            colorFilter = ColorFilter.tint(colors.textPrimary),
+                        )
+                    }
+                },
                 placeholder = valueString,
                 onChange = {
                     value = it
