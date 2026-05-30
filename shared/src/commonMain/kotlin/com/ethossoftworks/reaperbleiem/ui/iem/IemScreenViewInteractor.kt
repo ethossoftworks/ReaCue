@@ -83,7 +83,7 @@ class IemScreenViewInteractor(
         interactorScope.launch {
             val track = state.tracks[state.selectedIemId] ?: return@launch
             for ((_, receive) in track.receives) {
-                iemInteractor.setReceiveVolume(track.id, receive.id, .716f)
+                iemInteractor.setReceiveVolume(track.id, receive.id, state.faderInfo.dbToNormalized(0.0f))
             }
         }
     }

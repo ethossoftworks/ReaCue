@@ -65,6 +65,7 @@ import reaper_ble_iem.shared.generated.resources.select_monitor
 import reaper_ble_iem.shared.generated.resources.set_all_0db
 import reaper_ble_iem.shared.generated.resources.set_all_n
 import reaper_ble_iem.shared.generated.resources.untitled
+import kotlin.math.absoluteValue
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,7 +76,6 @@ fun IemScreen(
     val state = interactor.collectAsState()
     val dimensions = AppTheme.dimensions
     val colors = AppTheme.colors
-    val dbFormatter = remember { KmpNumberFormatter(minimumFractionDigits = 1, maximumFractionDigits = 1) }
 
     DisposableEffect(Unit) {
         interactor.onMount()
@@ -222,13 +222,10 @@ fun IemScreen(
                 AppSlider(
                     value = (hardwareOut?.volume ?: 0f),
                     range = 0f..1f,
-                    step = .01f,
+                    step = state.faderInfo.sliderStep,
                     label = stringResource(Res.string.output),
                     onChange = { interactor.onOutputVolumeChange(track.id, it) },
-                    valueFormatter = {
-                        val db = state.faderInfo.normalizedToDb(it)
-                        "${if (db > 0f) "+" else ""}${dbFormatter.format(db)} dB"
-                    },
+                    valueFormatter = { formatDb(it, state.faderInfo) },
                     onDoubleTap = {
                         interactor.onOutputVolumeChange(
                             track.id,
@@ -241,19 +238,16 @@ fun IemScreen(
                 for (receive in track.receives) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(24.dp),
                     ) {
                         AppSlider(
                             modifier = Modifier.weight(1f),
                             value = receive.value.volume,
                             range = 0f..1f,
-                            step = .01f,
+                            step = state.faderInfo.sliderStep,
                             label = state.tracks[receive.value.trackId]?.name ?: continue,
                             onChange = { interactor.onReceiveVolumeChange(track.id, receive.key, it) },
-                            valueFormatter = {
-                                val db = state.faderInfo.normalizedToDb(it)
-                                "${if (db > 0f) "+" else ""}${dbFormatter.format(db)} dB"
-                            },
+                            valueFormatter = { formatDb(it, state.faderInfo) },
                             onDoubleTap = {
                                 interactor.onReceiveVolumeChange(
                                     track.id,
@@ -309,6 +303,19 @@ fun IemScreen(
         onCancel = interactor::onNumberModalDismiss,
         onCommit = interactor::onNumberModalCommit,
     )
+}
+
+val dbFormatter = KmpNumberFormatter(minimumFractionDigits = 2, maximumFractionDigits = 2)
+
+private fun formatDb(normalized: Float, faderInfo: FaderInfo): String {
+    val roundedDb = (faderInfo.normalizedToDb(normalized) * 100f).roundToInt() / 100f
+    // Adjust dB because the default curve doesn't actually land exactly on 0.00 dB
+    val adjustedDb = if (roundedDb.absoluteValue <= .01f) 0.0f else roundedDb
+    return if (adjustedDb <= -150f) {
+        "-\u221e dB"
+    } else {
+        "${if (adjustedDb >= 0f) "+" else ""}${dbFormatter.format(adjustedDb)} dB"
+    }
 }
 
 @Composable

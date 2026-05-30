@@ -121,6 +121,12 @@ data class FaderInfo(
     @CborLabel(3) val maxDb: Float = 12f,
 ) {
 
+    val sliderStep by lazy {
+        val normalizedZero = dbToNormalized(0f)
+        val detentsBelowZero = 100f
+        normalizedZero / detentsBelowZero
+    }
+
     fun normalizedToDb(value: Float): Float = when (curve) {
         -1f -> {
             if (value <= 0f) return Float.NEGATIVE_INFINITY
