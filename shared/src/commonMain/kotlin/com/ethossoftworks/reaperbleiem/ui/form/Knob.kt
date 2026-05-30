@@ -38,7 +38,7 @@ import kotlin.math.absoluteValue
 
 @Composable
 fun Knob(
-    value: Float,
+    value: Float, // Normalized 0f..1f
     onValueChange: (Float) -> Unit,
     onDoubleTap: () -> Unit = {},
     onLongPress: () -> Unit = {},
