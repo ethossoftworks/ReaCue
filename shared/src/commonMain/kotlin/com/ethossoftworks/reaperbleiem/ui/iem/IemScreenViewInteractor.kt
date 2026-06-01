@@ -125,15 +125,15 @@ class IemScreenViewInteractor(
     }
 
     fun onOutputVolumeChange(trackId: Int, value: Float) {
-        interactorScope.launch { iemInteractor.setOutputVolume(trackId, value) }
+        iemInteractor.setOutputVolume(trackId, value)
     }
 
     fun onReceiveVolumeChange(trackId: Int, receiveId: Int, value: Float) {
-        interactorScope.launch { iemInteractor.setReceiveVolume(trackId, receiveId, value) }
+        iemInteractor.setReceiveVolume(trackId, receiveId, value)
     }
 
     fun onReceivePanChange(trackId: Int, receiveId: Int, value: Float) {
-        interactorScope.launch { iemInteractor.setReceivePan(trackId, receiveId, value) }
+        iemInteractor.setReceivePan(trackId, receiveId, value)
     }
 
     private fun start() {
