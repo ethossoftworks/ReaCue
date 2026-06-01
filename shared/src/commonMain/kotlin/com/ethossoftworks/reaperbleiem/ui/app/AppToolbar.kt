@@ -20,6 +20,8 @@ import com.outsidesource.oskitcompose.interactor.collectAsState
 import com.outsidesource.oskitcompose.lib.rememberInjectForRoute
 import com.outsidesource.oskitcompose.systemui.KmpWindowInsets
 import com.outsidesource.oskitcompose.systemui.top
+import com.outsidesource.oskitkmp.lib.Platform
+import com.outsidesource.oskitkmp.lib.current
 import org.jetbrains.compose.resources.stringResource
 import reaper_ble_iem.shared.generated.resources.Res
 import reaper_ble_iem.shared.generated.resources.about
@@ -58,13 +60,15 @@ fun AppToolbar(
         }
         AppPopoverButton(icon = Res.drawable.menu) { close ->
             additionalMenuItems(close)
-            AppDropdownItem(
-                text = stringResource(Res.string.settings),
-                onClick = {
-                    close()
-                    interactor.onSettingsClick()
-                },
-            )
+            if (Platform.current.isDesktop && state.isSettingsOptionVisible) {
+                AppDropdownItem(
+                    text = stringResource(Res.string.settings),
+                    onClick = {
+                        close()
+                        interactor.onSettingsClick()
+                    },
+                )
+            }
             AppDropdownItem(
                 text = stringResource(Res.string.about),
                 onClick = {

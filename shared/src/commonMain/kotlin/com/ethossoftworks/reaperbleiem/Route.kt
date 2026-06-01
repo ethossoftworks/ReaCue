@@ -7,4 +7,6 @@ sealed class Route : IRoute {
     data object Scan : Route()
 
     data class Iem(val context: IemContext) : Route()
+
+    data object Settings : Route()
 }

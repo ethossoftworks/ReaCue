@@ -26,4 +26,10 @@
     <string name="about">About</string>
     <string name="mix_project">Mix - %1$s</string>
     <string name="mix">Mix</string>
+    <string name="save">Save</string>
+    <string name="host_id">Host ID</string>
+    <string name="host_passcode">Host Passcode</string>
+    <string name="reaper_web_port">Reaper Web Port</string>
+    <string name="reaper_osc_device_port">Reaper OSC Device Port</string>
+    <string name="reaper_osc_listen_port">Reaper OSC Listen Port</string>
 </resources>

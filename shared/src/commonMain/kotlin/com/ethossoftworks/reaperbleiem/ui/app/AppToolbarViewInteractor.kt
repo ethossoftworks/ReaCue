@@ -1,14 +1,28 @@
 package com.ethossoftworks.reaperbleiem.ui.app
 
+import com.ethossoftworks.reaperbleiem.Route
 import com.ethossoftworks.reaperbleiem.coordinator.AppCoordinator
 import com.outsidesource.oskitkmp.coordinator.Coordinator
 import com.outsidesource.oskitkmp.interactor.Interactor
 
-data class AppToolbarViewState(val hasBackStack: Boolean = false, val isAboutVisible: Boolean = false)
+data class AppToolbarViewState(
+    val hasBackStack: Boolean = false,
+    val isSettingsOptionVisible: Boolean = true,
+    val isAboutVisible: Boolean = false,
+)
 
 class AppToolbarViewInteractor(val coordinator: AppCoordinator) :
     Interactor<AppToolbarViewState>(
-        initialState = AppToolbarViewState(hasBackStack = Coordinator.createObserver(coordinator).hasBackStack()),
+        initialState =
+            run {
+                val coordinatorObserver = Coordinator.createObserver(coordinator)
+                println(coordinatorObserver.routeFlow.value)
+
+                AppToolbarViewState(
+                    hasBackStack = coordinatorObserver.hasBackStack(),
+                    isSettingsOptionVisible = coordinatorObserver.routeFlow.value.route != Route.Settings,
+                )
+            },
         dependencies = emptyList(),
     ) {
 
