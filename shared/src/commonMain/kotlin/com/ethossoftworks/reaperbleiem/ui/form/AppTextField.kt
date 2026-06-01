@@ -39,6 +39,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.ethossoftworks.reaperbleiem.ui.theme.AppTheme
 import com.ethossoftworks.reaperbleiem.ui.theme.AppThemeProvider
 import com.outsidesource.oskitcompose.modifier.kmpOuterShadow
@@ -49,6 +50,7 @@ import reaper_ble_iem.shared.generated.resources.close
 
 @Composable
 fun AppTextField(
+    label: String? = null,
     value: String,
     onChange: (String) -> Unit,
     iconStart: (@Composable () -> Unit)? = null,
@@ -67,59 +69,64 @@ fun AppTextField(
     val isHovered by interactionSource.collectIsHoveredAsState()
     val textStyle = remember { TextStyle(fontFamily = defaultFontFamily, color = theme.textPrimary) }
 
-    BasicTextField(
-        modifier = modifier,
-        value = value,
-        onValueChange = onChange,
-        cursorBrush = SolidColor(theme.textPrimary),
-        textStyle = textStyle,
-        keyboardOptions = keyboardOptions,
-        keyboardActions = keyboardActions,
-        singleLine = singleLine,
-        maxLines = maxLines,
-        decorationBox = { field ->
-            Row(
-                modifier =
-                    modifier
-                        .heightIn(min = 44.dp)
-                        .semantics { role = Role.Button }
-                        .border(1.dp, color = theme.strokePrimary, shape = shape)
-                        .kmpOuterShadow(
-                            blur = 4.dp,
-                            offset = DpOffset(0.dp, 4.dp),
-                            color = Color.Black.copy(alpha = .25f),
-                            shape = shape,
-                        )
-                        .background(brush = theme.bgControl, shape = shape)
-                        .background(
-                            color =
-                                if (isHovered) {
-                                    theme.accentTint
-                                } else {
-                                    Color.Transparent
-                                },
-                            shape = shape,
-                        )
-                        .clip(shape)
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                iconStart?.let { iconStart() }
-                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                    if (value.isEmpty() && placeholder != null) {
-                        Text(modifier = Modifier.alpha(.5f), text = placeholder, style = textStyle)
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (label != null) {
+            Text(text = label, fontSize = 14.sp, color = theme.textPrimary)
+        }
+        BasicTextField(
+            modifier = Modifier.fillMaxWidth(),
+            value = value,
+            onValueChange = onChange,
+            cursorBrush = SolidColor(theme.textPrimary),
+            textStyle = textStyle,
+            keyboardOptions = keyboardOptions,
+            keyboardActions = keyboardActions,
+            singleLine = singleLine,
+            maxLines = maxLines,
+            decorationBox = { field ->
+                Row(
+                    modifier =
+                        modifier
+                            .heightIn(min = 44.dp)
+                            .semantics { role = Role.Button }
+                            .border(1.dp, color = theme.strokePrimary, shape = shape)
+                            .kmpOuterShadow(
+                                blur = 4.dp,
+                                offset = DpOffset(0.dp, 4.dp),
+                                color = Color.Black.copy(alpha = .25f),
+                                shape = shape,
+                            )
+                            .background(brush = theme.bgControl, shape = shape)
+                            .background(
+                                color =
+                                    if (isHovered) {
+                                        theme.accentTint
+                                    } else {
+                                        Color.Transparent
+                                    },
+                                shape = shape,
+                            )
+                            .clip(shape)
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    iconStart?.let { iconStart() }
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                        if (value.isEmpty() && placeholder != null) {
+                            Text(modifier = Modifier.alpha(.5f), text = placeholder, style = textStyle)
+                        }
+                        field()
                     }
-                    field()
+                    if (iconEnd != null) {
+                        iconEnd()
+                    } else {
+                        AppTextFieldButton(icon = Res.drawable.close, onClick = { onChange("") })
+                    }
                 }
-                if (iconEnd != null) {
-                    iconEnd()
-                } else {
-                    AppTextFieldButton(icon = Res.drawable.close, onClick = { onChange("") })
-                }
-            }
-        },
-    )
+            },
+        )
+    }
 }
 
 @Composable

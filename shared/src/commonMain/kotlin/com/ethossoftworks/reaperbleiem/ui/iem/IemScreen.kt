@@ -46,6 +46,7 @@ import com.outsidesource.oskitcompose.systemui.top
 import com.outsidesource.oskitkmp.text.KmpNumberFormatter
 import com.outsidesource.oskitkmp.text.parseFloatOrNull
 import kotlin.collections.forEach
+import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 import org.jetbrains.compose.resources.stringResource
 import org.koin.core.parameter.parametersOf
@@ -66,7 +67,6 @@ import reaper_ble_iem.shared.generated.resources.select_monitor
 import reaper_ble_iem.shared.generated.resources.set_all_0db
 import reaper_ble_iem.shared.generated.resources.set_all_n
 import reaper_ble_iem.shared.generated.resources.untitled
-import kotlin.math.absoluteValue
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -228,16 +228,9 @@ fun IemScreen(
                     onChange = { interactor.onOutputVolumeChange(track.id, it) },
                     valueFormatter = { formatDb(it, state.faderInfo) },
                     stringToValue = { new, current ->
-                        state.faderInfo.dbToNormalized(
-                            new.parseFloatOrNull() ?: return@AppSlider current
-                        )
+                        state.faderInfo.dbToNormalized(new.parseFloatOrNull() ?: return@AppSlider current)
                     },
-                    onDoubleTap = {
-                        interactor.onOutputVolumeChange(
-                            track.id,
-                            state.faderInfo.dbToNormalized(0f)
-                        )
-                    },
+                    onDoubleTap = { interactor.onOutputVolumeChange(track.id, state.faderInfo.dbToNormalized(0f)) },
                     ticks = ticks,
                 )
 
@@ -255,15 +248,13 @@ fun IemScreen(
                             onChange = { interactor.onReceiveVolumeChange(track.id, receive.key, it) },
                             valueFormatter = { formatDb(it, state.faderInfo) },
                             stringToValue = { new, current ->
-                                state.faderInfo.dbToNormalized(
-                                    new.parseFloatOrNull() ?: return@AppSlider current
-                                )
+                                state.faderInfo.dbToNormalized(new.parseFloatOrNull() ?: return@AppSlider current)
                             },
                             onDoubleTap = {
                                 interactor.onReceiveVolumeChange(
                                     track.id,
                                     receive.key,
-                                    state.faderInfo.dbToNormalized(0f)
+                                    state.faderInfo.dbToNormalized(0f),
                                 )
                             },
                             ticks = ticks,
@@ -273,12 +264,15 @@ fun IemScreen(
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             Text(
-                                text = when {
-                                    receive.value.pan < .5f -> "${(((.5f - receive.value.pan) * 2f) * 100).roundToInt()}%L"
-                                    receive.value.pan == .5f -> "C"
-                                    receive.value.pan > .5f -> "${(((receive.value.pan - .5f) * 2f) * 100).roundToInt()}%R"
-                                    else -> ""
-                                },
+                                text =
+                                    when {
+                                        receive.value.pan < .5f ->
+                                            "${(((.5f - receive.value.pan) * 2f) * 100).roundToInt()}%L"
+                                        receive.value.pan == .5f -> "C"
+                                        receive.value.pan > .5f ->
+                                            "${(((receive.value.pan - .5f) * 2f) * 100).roundToInt()}%R"
+                                        else -> ""
+                                    },
                                 color = colors.textSecondary,
                                 fontSize = 12.sp,
                             )

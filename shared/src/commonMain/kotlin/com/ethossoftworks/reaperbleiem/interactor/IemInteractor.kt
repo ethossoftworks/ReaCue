@@ -8,10 +8,9 @@ import com.ethossoftworks.reaperbleiem.service.iem.IemEvent
 import com.ethossoftworks.reaperbleiem.service.iem.Mix
 import com.ethossoftworks.reaperbleiem.service.iem.Track
 import com.outsidesource.oskitkmp.interactor.Interactor
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
-import kotlinx.atomicfu.updateAndGet
-import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.mutate
 import kotlinx.collections.immutable.persistentMapOf
@@ -178,7 +177,9 @@ class IemInteractor(private val iemService: IIemService) :
     }
 
     private fun getThrottledChannel(key: ThrottleKey): Channel<Float> {
-        throttles.value[key]?.let { return it }
+        throttles.value[key]?.let {
+            return it
+        }
 
         val throttle = Channel<Float>(capacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
         throttles.update { it.mutate { it[key] = throttle } }

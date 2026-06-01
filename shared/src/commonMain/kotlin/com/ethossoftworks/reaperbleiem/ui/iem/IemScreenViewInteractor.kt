@@ -107,11 +107,8 @@ class IemScreenViewInteractor(
             for ((_, receive) in track.receives) {
                 val clampedValue =
                     when (modalType) {
-                        NumberInputModalType.Adjust -> (state.faderInfo.dbToNormalized(
-                            state.faderInfo.normalizedToDb(
-                                receive.volume
-                            ) + value
-                        ))
+                        NumberInputModalType.Adjust ->
+                            (state.faderInfo.dbToNormalized(state.faderInfo.normalizedToDb(receive.volume) + value))
 
                         NumberInputModalType.Set -> state.faderInfo.dbToNormalized(value)
                     }
