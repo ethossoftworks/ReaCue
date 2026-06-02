@@ -1,6 +1,7 @@
 package com.ethossoftworks.reaperbleiem.interactor
 
 import com.ethossoftworks.reaperbleiem.service.iem.BleCentralIemService
+import com.ethossoftworks.reaperbleiem.service.iem.BlePeripheralIemService
 import com.ethossoftworks.reaperbleiem.service.iem.FaderInfo
 import com.ethossoftworks.reaperbleiem.service.iem.IIemService
 import com.ethossoftworks.reaperbleiem.service.iem.IemContext
@@ -109,6 +110,10 @@ class IemInteractor(private val iemService: IIemService) :
             .onCompletion {
                 update { state -> state.copy(tracks = persistentMapOf(), serviceStatus = ServiceStatus.Disconnected) }
             }
+    }
+
+    fun sendDisconnectEvent() {
+        if (iemService is BlePeripheralIemService) iemService.sendDisconnectEvent()
     }
 
     fun setOutputVolume(trackId: Int, value: Float) {

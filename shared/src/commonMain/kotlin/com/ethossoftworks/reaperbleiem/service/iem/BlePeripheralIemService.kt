@@ -181,6 +181,10 @@ class BlePeripheralIemService(
         }
     }
 
+    fun sendDisconnectEvent() {
+        sendBleNotification(IemEvent.Error("Peripheral is disconnected"))
+    }
+
     override suspend fun refresh() {
         return networkIemService.refresh()
     }
@@ -200,7 +204,7 @@ class BlePeripheralIemService(
         sendBleNotification(IemEvent.ReceivePanUpdated(trackId, receiveId, value))
     }
 
-    private suspend fun sendBleNotification(event: IemEvent, centralList: Set<KmpBleCentralId>? = null) {
+    private fun sendBleNotification(event: IemEvent, centralList: Set<KmpBleCentralId>? = null) {
         updateLastRefreshedEvent(event)
         val payload = cbor.encodeToByteArray(IemEvent.serializer(), event)
         val centrals = centralList ?: peripheralManager.subscribedCentrals(REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID)

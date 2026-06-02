@@ -60,6 +60,7 @@ class IemScreenViewInteractor(
     }
 
     fun onUnmount() {
+        if (iemContext is IemContext.Peripheral) iemInteractor.sendDisconnectEvent()
         subscriptionJob.value?.cancel()
     }
 
