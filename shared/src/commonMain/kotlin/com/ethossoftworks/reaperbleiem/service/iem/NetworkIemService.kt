@@ -47,7 +47,7 @@ class NetworkIemService(
     private val preferencesService: PreferencesService,
 ) : IIemService {
 
-    private val oscIp = ""
+    private val oscIp = "127.0.0.1"
     private var restDomain = ""
     private var oscNotificationPort: Int = 0
     private var oscCommandPort: Int = 0
