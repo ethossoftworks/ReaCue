@@ -28,10 +28,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -62,19 +70,32 @@ fun AppTextField(
     singleLine: Boolean = false,
     maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
     modifier: Modifier = Modifier,
+    fieldModifier: Modifier = Modifier,
 ) {
     val defaultFontFamily = AppTheme.typography.defaultFontFamily
     val theme = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
     val textStyle = remember { TextStyle(fontFamily = defaultFontFamily, color = theme.textPrimary) }
+    val focusManager = LocalFocusManager.current
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (label != null) {
             Text(text = label, fontSize = 14.sp, color = theme.textPrimary)
         }
         BasicTextField(
-            modifier = Modifier.fillMaxWidth(),
+            modifier =
+                Modifier.fillMaxWidth()
+                    .onPreviewKeyEvent { e ->
+                        if (e.type == KeyEventType.KeyDown && e.key == Key.Tab) {
+                            focusManager.moveFocus(
+                                if (e.isShiftPressed) FocusDirection.Previous else FocusDirection.Next
+                            )
+                            return@onPreviewKeyEvent true
+                        }
+                        false
+                    }
+                    .then(fieldModifier),
             value = value,
             onValueChange = onChange,
             cursorBrush = SolidColor(theme.textPrimary),
