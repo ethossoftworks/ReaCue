@@ -1,6 +1,7 @@
 package com.ethossoftworks.reaperbleiem.service.iem
 
 import co.touchlab.kermit.Logger
+import com.ethossoftworks.reaperbleiem.service.preferences.PreferencesService
 import com.outsidesource.oskitkmp.concurrency.KmpDispatchers
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
@@ -43,11 +44,13 @@ import kotlinx.io.writeFloat
 import kotlinx.io.writeString
 
 class NetworkIemService(
-    val restDomain: String = "http://localhost:8000",
-    val oscIp: String = "127.0.0.1",
-    val oscNotificationPort: Int = 9000,
-    val oscCommandPort: Int = 8000,
+    private val preferencesService: PreferencesService,
 ) : IIemService {
+
+    private val oscIp = ""
+    private var restDomain = ""
+    private var oscNotificationPort: Int = 0
+    private var oscCommandPort: Int = 0
 
     private val httpClient = HttpClient(CIO)
     private val selectorManager = SelectorManager(KmpDispatchers.IO)
@@ -58,6 +61,8 @@ class NetworkIemService(
 
     override fun subscribe(context: IemContext): Flow<IemEvent> = callbackFlow {
         try {
+            loadUserSettings()
+
             val socketListeningStarted = CompletableDeferred<Unit>()
             val eventsListeningStarted = CompletableDeferred<Unit>()
 
@@ -95,6 +100,13 @@ class NetworkIemService(
         }
 
         awaitClose { closeSocket() }
+    }
+
+    private suspend fun loadUserSettings() {
+        val settings = preferencesService.awaitSettings()
+        restDomain = "http://localhost:${settings.reaperWebPort}"
+        oscNotificationPort = settings.reaperOscDevicePort
+        oscCommandPort = settings.reaperOscListenPort
     }
 
     override suspend fun refresh() {

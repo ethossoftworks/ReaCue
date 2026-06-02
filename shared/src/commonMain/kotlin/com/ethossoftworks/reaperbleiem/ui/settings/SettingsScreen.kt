@@ -3,6 +3,7 @@ package com.ethossoftworks.reaperbleiem.ui.settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -10,6 +11,8 @@ import com.ethossoftworks.reaperbleiem.ui.app.AppToolbar
 import com.ethossoftworks.reaperbleiem.ui.app.Screen
 import com.ethossoftworks.reaperbleiem.ui.form.AppButton
 import com.ethossoftworks.reaperbleiem.ui.form.AppTextField
+import com.outsidesource.oskitcompose.interactor.collectAsState
+import com.outsidesource.oskitcompose.lib.rememberInject
 import org.jetbrains.compose.resources.stringResource
 import reaper_ble_iem.shared.generated.resources.Res
 import reaper_ble_iem.shared.generated.resources.host_id
@@ -21,14 +24,46 @@ import reaper_ble_iem.shared.generated.resources.save
 import reaper_ble_iem.shared.generated.resources.settings
 
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(interactor: SettingsScreenViewInteractor = rememberInject()) {
+    val state = interactor.collectAsState()
+
+    DisposableEffect(Unit) {
+        interactor.onMount()
+        onDispose { interactor.onUnmount() }
+    }
+
     Screen(toolbar = { AppToolbar(title = stringResource(Res.string.settings)) }) {
         Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
-            AppTextField(label = stringResource(Res.string.host_id), value = "", onChange = {})
-            AppTextField(label = stringResource(Res.string.host_passcode), value = "", onChange = {})
-            AppTextField(label = stringResource(Res.string.reaper_web_port), value = "", onChange = {})
-            AppTextField(label = stringResource(Res.string.reaper_osc_device_port), value = "", onChange = {})
-            AppTextField(label = stringResource(Res.string.reaper_osc_listen_port), value = "", onChange = {})
+            AppTextField(
+                label = stringResource(Res.string.host_id),
+                value = state.hostId,
+                placeholder = state.originalAppSettings.hostId,
+                onChange = interactor::onHostIdChange,
+            )
+            AppTextField(
+                label = stringResource(Res.string.host_passcode),
+                value = state.hostPasscode,
+                placeholder = state.originalAppSettings.hostPasscode,
+                onChange = interactor::onHostPasscodeChange,
+            )
+            AppTextField(
+                label = stringResource(Res.string.reaper_web_port),
+                value = state.reaperWebPort,
+                placeholder = state.originalAppSettings.reaperWebPort.toString(),
+                onChange = interactor::onReaperWebPortChange,
+            )
+            AppTextField(
+                label = stringResource(Res.string.reaper_osc_device_port),
+                value = state.reaperOscDevicePort,
+                placeholder = state.originalAppSettings.reaperOscDevicePort.toString(),
+                onChange = interactor::onReaperOscDevicePortChange,
+            )
+            AppTextField(
+                label = stringResource(Res.string.reaper_osc_listen_port),
+                value = state.reaperOscListenPort,
+                placeholder = state.originalAppSettings.reaperOscListenPort.toString(),
+                onChange = interactor::onReaperOscListenerPortChange,
+            )
             AppButton(modifier = Modifier.align(Alignment.End), label = stringResource(Res.string.save), onClick = {})
         }
     }

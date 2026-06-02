@@ -12,6 +12,7 @@ import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleConnectionPriority
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattPermission
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattProperty
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralEvent
+import com.ethossoftworks.reaperbleiem.service.preferences.PreferencesService
 import kotlin.math.ceil
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.uuid.ExperimentalUuidApi
@@ -44,7 +45,11 @@ val REAPER_BLE_IEM_COMMAND_CHARACTERISTIC_UUID = Uuid.parseHexDash("aa57c9ce-ada
 class BlePeripheralIemService(
     private val networkIemService: NetworkIemService,
     private val peripheralManager: IKmpBlePeripheralManager,
+    private val preferencesService: PreferencesService,
 ) : IIemService {
+
+    private var hostName: String = "ReaCue"
+    private var hostPasscode: String = ""
 
     private val lastRefreshedEvent = atomic<IemEvent.Refreshed?>(null)
     private val bleNotificationChannel = Channel<IemEvent>(capacity = Channel.UNLIMITED)
@@ -56,7 +61,7 @@ class BlePeripheralIemService(
 
     private val advertisementData =
         KmpBleAdvertisementData(
-            name = "ReaCue",
+            name = hostName,
             services =
                 listOf(
                     KmpBleAdvertisementService(
@@ -80,6 +85,7 @@ class BlePeripheralIemService(
         )
 
     override fun subscribe(context: IemContext): Flow<IemEvent> = channelFlow {
+        loadUserSettings()
         val isAdvertising = CompletableDeferred<Unit>()
 
         val bleChannelJob = launch {
@@ -95,7 +101,7 @@ class BlePeripheralIemService(
 
         val advertiseJob =
             peripheralManager
-                .advertise(advertisementData)
+                .advertise(advertisementData.copy(name = hostName))
                 .onEach { event ->
                     when (event) {
                         is KmpBlePeripheralEvent.Error -> cancel()
@@ -128,6 +134,12 @@ class BlePeripheralIemService(
             advertiseJob.cancel()
             networkJob.cancel()
         }
+    }
+
+    private suspend fun loadUserSettings() {
+        val settings = preferencesService.awaitSettings()
+        hostName = settings.hostId
+        hostPasscode = settings.hostPasscode
     }
 
     private suspend fun onWriteRequest(request: KmpBlePeripheralEvent.WriteRequest, send: suspend (IemEvent) -> Unit) {

@@ -8,6 +8,6 @@ import org.koin.dsl.bind
 import org.koin.dsl.module
 
 val macOsDiModule = module {
-    single { BlePeripheralIemService(get(), get()) } bind IIemService::class
+    single { BlePeripheralIemService(get(), get(), get()) } bind IIemService::class
     single { KmpBlePeripheralManager() } bind IKmpBlePeripheralManager::class
 }
