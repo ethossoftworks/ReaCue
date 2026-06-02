@@ -2,8 +2,14 @@ package com.ethossoftworks.reaperbleiem.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -11,8 +17,12 @@ import com.ethossoftworks.reaperbleiem.ui.app.AppToolbar
 import com.ethossoftworks.reaperbleiem.ui.app.Screen
 import com.ethossoftworks.reaperbleiem.ui.form.AppButton
 import com.ethossoftworks.reaperbleiem.ui.form.AppTextField
+import com.ethossoftworks.reaperbleiem.ui.theme.AppTheme
 import com.outsidesource.oskitcompose.interactor.collectAsState
 import com.outsidesource.oskitcompose.lib.rememberInject
+import com.outsidesource.oskitcompose.scrollbars.KmpScrollbarStyle
+import com.outsidesource.oskitcompose.scrollbars.KmpVerticalScrollbar
+import com.outsidesource.oskitcompose.scrollbars.rememberKmpScrollbarAdapter
 import org.jetbrains.compose.resources.stringResource
 import reaper_ble_iem.shared.generated.resources.Res
 import reaper_ble_iem.shared.generated.resources.host_id
@@ -27,14 +37,25 @@ import reaper_ble_iem.shared.generated.resources.settings
 @Composable
 fun SettingsScreen(interactor: SettingsScreenViewInteractor = rememberInject()) {
     val state = interactor.collectAsState()
+    val colors = AppTheme.colors
 
     DisposableEffect(Unit) {
         interactor.onMount()
         onDispose { interactor.onUnmount() }
     }
 
-    Screen(toolbar = { AppToolbar(title = stringResource(Res.string.settings)) }) {
-        Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+    val scrollState = rememberScrollState()
+
+    Screen(
+        toolbar = { AppToolbar(title = stringResource(Res.string.settings)) },
+        contentPadding = PaddingValues.Zero,
+    ) {
+        Column(
+            modifier =
+                Modifier.verticalScroll(state = (scrollState))
+                    .padding(PaddingValues(AppTheme.dimensions.screenPadding)),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+        ) {
             AppTextField(
                 label = stringResource(Res.string.host_id),
                 value = state.hostId,
@@ -72,5 +93,18 @@ fun SettingsScreen(interactor: SettingsScreenViewInteractor = rememberInject()) 
                 enabled = !state.isSaving,
             )
         }
+        KmpVerticalScrollbar(
+            modifier = Modifier.align(Alignment.TopEnd).padding(2.dp).fillMaxHeight(),
+            adapter = rememberKmpScrollbarAdapter(scrollState),
+            style =
+                remember {
+                    KmpScrollbarStyle(
+                        minimalHeight = 48.dp,
+                        thickness = 8.dp,
+                        unhoverColor = colors.bgPrimary20,
+                        hoverColor = colors.accentTint,
+                    )
+                },
+        )
     }
 }
