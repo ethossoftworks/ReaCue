@@ -21,7 +21,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import com.ethossoftworks.reaperbleiem.ui.form.AppLoadingIndicator
 import com.ethossoftworks.reaperbleiem.ui.theme.AppTheme
-import com.ethossoftworks.reaperbleiem.ui.theme.modalSurface
+import com.ethossoftworks.reaperbleiem.ui.theme.appModalSurface
 import com.outsidesource.oskitcompose.markdown.Markdown
 import com.outsidesource.oskitcompose.markdown.MarkdownStyles
 import com.outsidesource.oskitcompose.popup.Modal
@@ -39,13 +39,12 @@ fun OssDisclaimerModal(isVisible: Boolean, onDismissRequest: () -> Unit) {
     val dimensions = AppTheme.dimensions
     val typography = AppTheme.typography
     val defaultFont = typography.defaultFontFamily
-    val shape = remember { RoundedCornerShape(12.dp) }
 
     val markdownContent by
         produceState(initialValue = "") { value = Res.readBytes("files/open-source-licenses.md").decodeToString() }
 
     Modal(
-        modifier = Modifier.padding(dimensions.screenPadding).modalSurface(colors, shape),
+        modifier = Modifier.padding(dimensions.screenPadding).appModalSurface(),
         isVisible = isVisible,
         styles = ModalStyles.UserDefinedContent,
         onDismissRequest = onDismissRequest,

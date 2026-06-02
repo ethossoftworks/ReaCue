@@ -32,4 +32,7 @@
     <string name="reaper_web_port">Reaper Web Port</string>
     <string name="reaper_osc_device_port">Reaper OSC Device Port</string>
     <string name="reaper_osc_listen_port">Reaper OSC Listen Port</string>
+    <string name="settings_saved">Setting saved.</string>
+    <string name="settings_error">There was an error saving settings.</string>
+    <string name="saving">Saving...</string>
 </resources>

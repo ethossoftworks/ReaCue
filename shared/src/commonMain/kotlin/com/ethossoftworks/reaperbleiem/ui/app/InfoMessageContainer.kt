@@ -3,31 +3,28 @@ package com.ethossoftworks.reaperbleiem.ui.app
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.ethossoftworks.reaperbleiem.interactor.InfoMessageInteractor
+import com.ethossoftworks.reaperbleiem.interactor.InfoMessageType
+import com.ethossoftworks.reaperbleiem.ui.theme.AppTheme
+import com.ethossoftworks.reaperbleiem.ui.theme.appModalSurface
 import com.outsidesource.oskitcompose.interactor.collectAsState
 import com.outsidesource.oskitcompose.lib.rememberInject
-import com.outsidesource.oskitcompose.modifier.kmpOuterShadow
 import com.outsidesource.oskitcompose.popup.KmpPopup
 import com.outsidesource.oskitcompose.popup.PopupPositionProvider
 
@@ -35,6 +32,7 @@ import com.outsidesource.oskitcompose.popup.PopupPositionProvider
 fun InfoMessageContainer(modifier: Modifier = Modifier, interactor: InfoMessageInteractor = rememberInject()) {
     val state = interactor.collectAsState()
     val message = state.currentMessage ?: return
+    val colors = AppTheme.colors
 
     KmpPopup(
         isFullScreen = false,
@@ -72,19 +70,15 @@ fun InfoMessageContainer(modifier: Modifier = Modifier, interactor: InfoMessageI
                     .padding(bottom = 16.dp)
                     .heightIn(min = 48.dp)
                     .padding(horizontal = 16.dp)
-                    .kmpOuterShadow(
-                        blur = 8.dp,
-                        color = Color.Black.copy(alpha = .25f),
-                        offset = DpOffset(0.dp, 2.dp),
-                        shape = CircleShape,
-                    )
-                    .clip(CircleShape)
-                    .background(Color.White)
+                    .appModalSurface()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(text = message.text)
+            Text(
+                text = message.text,
+                color = if (message.type == InfoMessageType.Info) colors.textPrimary else colors.error,
+            )
         }
     }
 }

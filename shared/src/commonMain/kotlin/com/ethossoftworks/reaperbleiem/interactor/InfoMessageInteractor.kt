@@ -7,15 +7,20 @@ import kotlinx.coroutines.launch
 
 data class InfoMessageState(val queue: List<InfoMessage> = emptyList(), val currentMessage: InfoMessage? = null)
 
-data class InfoMessage(val id: Int, val text: String)
+data class InfoMessage(val id: Int, val text: String, val type: InfoMessageType)
+
+enum class InfoMessageType {
+    Info,
+    Error,
+}
 
 class InfoMessageInteractor : Interactor<InfoMessageState>(initialState = InfoMessageState(), dependencies = listOf()) {
 
     private var counter = atomic(0)
 
-    fun enqueueMessage(message: String) {
+    fun enqueueMessage(message: String, type: InfoMessageType = InfoMessageType.Info) {
         update { state ->
-            val newMessage = InfoMessage(id = counter.incrementAndGet(), text = message)
+            val newMessage = InfoMessage(id = counter.incrementAndGet(), text = message, type = type)
 
             state.copy(
                 queue = if (state.currentMessage == null) state.queue else state.queue + newMessage,

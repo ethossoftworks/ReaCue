@@ -1,12 +1,19 @@
 package com.ethossoftworks.reaperbleiem.ui.settings
 
+import com.ethossoftworks.reaperbleiem.interactor.InfoMessageInteractor
+import com.ethossoftworks.reaperbleiem.interactor.InfoMessageType
 import com.ethossoftworks.reaperbleiem.service.preferences.AppSettings
 import com.ethossoftworks.reaperbleiem.service.preferences.PreferencesService
 import com.outsidesource.oskitkmp.interactor.Interactor
+import com.outsidesource.oskitkmp.outcome.runOnError
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.getString
+import reaper_ble_iem.shared.generated.resources.Res
+import reaper_ble_iem.shared.generated.resources.settings_error
+import reaper_ble_iem.shared.generated.resources.settings_saved
 
 data class SettingsState(
     val originalAppSettings: AppSettings = AppSettings(),
@@ -15,12 +22,15 @@ data class SettingsState(
     val reaperWebPort: String = "",
     val reaperOscDevicePort: String = "",
     val reaperOscListenPort: String = "",
+    val isSaving: Boolean = false,
 )
 
-val intRegexReplace = Regex("""^[0-9]""")
+private val intRegexReplace = Regex("""[^0-9]""")
 
-class SettingsScreenViewInteractor(private val preferencesService: PreferencesService) :
-    Interactor<SettingsState>(initialState = SettingsState()) {
+class SettingsScreenViewInteractor(
+    private val preferencesService: PreferencesService,
+    private val infoMessageInteractor: InfoMessageInteractor,
+) : Interactor<SettingsState>(initialState = SettingsState()) {
 
     fun onMount() {
         preferencesService.settings
@@ -35,29 +45,39 @@ class SettingsScreenViewInteractor(private val preferencesService: PreferencesSe
     }
 
     fun onSaveClick() {
-        // TODO: handle errors
         interactorScope.launch {
-            if (state.hostId != state.originalAppSettings.hostId) {
-                preferencesService.setHostId(state.hostId)
+            update { state -> state.copy(isSaving = true) }
+            var hasError = false
+
+            if (state.hostId != "") {
+                preferencesService.setHostId(state.hostId).runOnError { hasError = true }
             }
+
             if (state.hostPasscode != "") {
-                preferencesService.setHostPasscode(state.hostPasscode)
+                preferencesService.setHostPasscode(state.hostPasscode).runOnError { hasError = true }
             }
 
             val sanitizedReaperWebPort = state.reaperWebPort.toIntOrNull()
             if (sanitizedReaperWebPort != null) {
-                preferencesService.setReaperWebPort(sanitizedReaperWebPort)
+                preferencesService.setReaperWebPort(sanitizedReaperWebPort).runOnError { hasError = true }
             }
 
             val sanitizedReaperOscDevicePort = state.reaperOscDevicePort.toIntOrNull()
             if (sanitizedReaperOscDevicePort != null) {
-                preferencesService.setReaperOscDevicePort(sanitizedReaperOscDevicePort)
+                preferencesService.setReaperOscDevicePort(sanitizedReaperOscDevicePort).runOnError { hasError = true }
             }
 
             val sanitizedReaperOscListenPort = state.reaperOscListenPort.toIntOrNull()
             if (sanitizedReaperOscListenPort != null) {
-                preferencesService.setReaperOscDevicePort(sanitizedReaperOscListenPort)
+                preferencesService.setReaperOscDevicePort(sanitizedReaperOscListenPort).runOnError { hasError = true }
             }
+
+            update { state -> state.copy(isSaving = false) }
+
+            infoMessageInteractor.enqueueMessage(
+                message = if (hasError) getString(Res.string.settings_error) else getString(Res.string.settings_saved),
+                type = if (hasError) InfoMessageType.Error else InfoMessageType.Info
+            )
         }
     }
 

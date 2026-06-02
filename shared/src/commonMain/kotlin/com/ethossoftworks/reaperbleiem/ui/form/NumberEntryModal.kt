@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
@@ -40,7 +39,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ethossoftworks.reaperbleiem.ui.theme.AppTheme
-import com.ethossoftworks.reaperbleiem.ui.theme.modalSurface
+import com.ethossoftworks.reaperbleiem.ui.theme.appModalSurface
 import com.outsidesource.oskitcompose.popup.Modal
 import com.outsidesource.oskitcompose.popup.ModalStyles
 import com.outsidesource.oskitkmp.text.parseFloatOrNull
@@ -62,10 +61,9 @@ fun NumberEntryModal(
 ) {
     val focusRequester = remember { FocusRequester() }
     val colors = AppTheme.colors
-    val shape = remember { RoundedCornerShape(12.dp) }
 
     Modal(
-        modifier = Modifier.widthIn(max = maxWidth).modalSurface(colors, shape).padding(16.dp),
+        modifier = Modifier.widthIn(max = maxWidth).appModalSurface().padding(16.dp),
         isVisible = isVisible,
         styles = ModalStyles.UserDefinedContent,
         onDismissRequest = onCancel,

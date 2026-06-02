@@ -116,6 +116,7 @@ fun AppButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     buttonType: AppButtonType = AppButtonType.Default,
+    enabled: Boolean = true,
 ) {
     val theme = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
@@ -153,7 +154,12 @@ fun AppButton(
                     shape = shape,
                 )
                 .clip(shape)
-                .clickable(onClick = onClick, interactionSource = interactionSource, indication = ripple)
+                .clickable(
+                    onClick = onClick,
+                    interactionSource = interactionSource,
+                    indication = ripple,
+                    enabled = enabled,
+                )
                 .padding(padding),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),

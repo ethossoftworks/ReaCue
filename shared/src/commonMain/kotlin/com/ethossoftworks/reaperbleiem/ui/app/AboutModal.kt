@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.sp
 import com.ethossoftworks.reaperbleiem.interactor.AboutViewInteractor
 import com.ethossoftworks.reaperbleiem.ui.form.AppButton
 import com.ethossoftworks.reaperbleiem.ui.theme.AppTheme
-import com.ethossoftworks.reaperbleiem.ui.theme.modalSurface
+import com.ethossoftworks.reaperbleiem.ui.theme.appModalSurface
 import com.outsidesource.kmpbuild.KmpBuildEnvironment
 import com.outsidesource.kmpbuild.KmpBuildInfo
 import com.outsidesource.oskitcompose.interactor.collectAsState
@@ -38,7 +38,6 @@ import reaper_ble_iem.shared.generated.resources.app_name
 fun AboutModal(isVisible: Boolean, onDismissRequest: () -> Unit, interactor: AboutViewInteractor = rememberInject()) {
     val state = interactor.collectAsState()
     val theme = AppTheme.colors
-    val shape = remember { RoundedCornerShape(12.dp) }
 
     val environment = KmpBuildInfo.environment
     val versionText = remember {
@@ -51,7 +50,7 @@ fun AboutModal(isVisible: Boolean, onDismissRequest: () -> Unit, interactor: Abo
     }
 
     Modal(
-        modifier = Modifier.widthIn(max = 300.dp).modalSurface(theme, shape).padding(AppTheme.dimensions.screenPadding),
+        modifier = Modifier.widthIn(max = 300.dp).appModalSurface().padding(AppTheme.dimensions.screenPadding),
         isVisible = isVisible,
         styles = ModalStyles.UserDefinedContent,
         onDismissRequest = onDismissRequest,

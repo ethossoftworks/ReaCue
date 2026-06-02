@@ -82,7 +82,7 @@ fun commonModule() = module {
     factory { AboutViewInteractor() }
     factory { ScanScreenViewInteractor(get(), get(), get()) }
     factory { AppToolbarViewInteractor(get()) }
-    factory { SettingsScreenViewInteractor(get()) }
+    factory { SettingsScreenViewInteractor(get(), get()) }
 }
 
 fun mockModule() = module {}

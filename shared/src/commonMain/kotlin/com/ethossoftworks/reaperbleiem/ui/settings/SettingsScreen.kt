@@ -21,6 +21,7 @@ import reaper_ble_iem.shared.generated.resources.reaper_osc_device_port
 import reaper_ble_iem.shared.generated.resources.reaper_osc_listen_port
 import reaper_ble_iem.shared.generated.resources.reaper_web_port
 import reaper_ble_iem.shared.generated.resources.save
+import reaper_ble_iem.shared.generated.resources.saving
 import reaper_ble_iem.shared.generated.resources.settings
 
 @Composable
@@ -64,7 +65,12 @@ fun SettingsScreen(interactor: SettingsScreenViewInteractor = rememberInject()) 
                 placeholder = state.originalAppSettings.reaperOscListenPort.toString(),
                 onChange = interactor::onReaperOscListenerPortChange,
             )
-            AppButton(modifier = Modifier.align(Alignment.End), label = stringResource(Res.string.save), onClick = {})
+            AppButton(
+                modifier = Modifier.align(Alignment.End),
+                label = stringResource(if (state.isSaving) Res.string.saving else Res.string.save),
+                onClick = interactor::onSaveClick,
+                enabled = !state.isSaving,
+            )
         }
     }
 }

@@ -51,7 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ethossoftworks.reaperbleiem.ui.theme.AppTheme
 import com.ethossoftworks.reaperbleiem.ui.theme.AppThemeProvider
-import com.ethossoftworks.reaperbleiem.ui.theme.modalSurface
+import com.ethossoftworks.reaperbleiem.ui.theme.appModalSurface
 import com.outsidesource.oskitcompose.form.DpAxisSize
 import com.outsidesource.oskitcompose.form.KmpSlider
 import com.outsidesource.oskitcompose.form.KmpSliderAlignment
@@ -134,10 +134,9 @@ private fun KmpSliderScope.AppManualEntryModal(
 ) {
     val focusRequester = remember { FocusRequester() }
     val colors = AppTheme.colors
-    val shape = remember { RoundedCornerShape(12.dp) }
 
     Modal(
-        modifier = Modifier.widthIn(max = maxWidth).modalSurface(colors, shape).padding(16.dp),
+        modifier = Modifier.widthIn(max = maxWidth).appModalSurface().padding(16.dp),
         isVisible = isVisible,
         styles = ModalStyles.UserDefinedContent,
         onDismissRequest = onCancel,
