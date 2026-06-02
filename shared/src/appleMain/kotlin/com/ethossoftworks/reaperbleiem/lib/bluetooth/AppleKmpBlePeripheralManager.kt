@@ -174,6 +174,7 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
 
             awaitClose {
                 peripheralManager.stopAdvertising()
+                peripheralManager.removeAllServices()
                 localCharacteristics.update { emptyMap() }
                 localCentrals.update { emptyMap() }
                 localCentralSubscriptions.update { emptyMap() }

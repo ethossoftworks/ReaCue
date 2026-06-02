@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew :shared:compileCommonMainKotlinMetadata --console=plain)",
+      "Bash(find ~/.gradle/caches ~/.konan -path \"*oskit*\" -name \"*.jar\" 2>/dev/null | grep -i source | head; echo \"---KLIB/sources---\"; find ~/.gradle/caches -path \"*oskit*\" 2>/dev/null | grep -iE \"kvstore|storage\" | head)",
+      "Bash(./gradlew :shared:compileKotlinMetadata -q)"
+    ]
+  }
+}
