@@ -40,6 +40,8 @@ sealed class KmpBleError {
     data class Unknown(val error: Any) : KmpBleError()
 
     object NotBonded : KmpBleError()
+
+    data class WriteError(val code: KmpBlePeripheralGattResult) : KmpBleError()
 }
 
 enum class KmpBleConnectionPriority {

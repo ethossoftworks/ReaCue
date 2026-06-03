@@ -21,6 +21,7 @@ import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleConnectionStatus
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleError
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattProperty
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralDisconnect
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralGattResult
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralId
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleScanRecord
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleWriteMode
@@ -51,6 +52,7 @@ import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import no.nordicsemi.android.ble.BleManager
+import no.nordicsemi.android.ble.exception.RequestFailedException
 import no.nordicsemi.android.ble.ktx.asFlow
 import no.nordicsemi.android.ble.ktx.suspend
 import no.nordicsemi.android.ble.observer.ConnectionObserver
@@ -157,8 +159,31 @@ private class NordicManagerProxy(private val context: Context) : BleManager(cont
         return readCharacteristic(char).suspend().value ?: byteArrayOf()
     }
 
-    suspend fun writeExternal(char: BluetoothGattCharacteristic, data: ByteArray, mode: Int) {
-        writeCharacteristic(char, data, mode).suspend()
+    suspend fun writeExternal(
+        char: BluetoothGattCharacteristic,
+        data: ByteArray,
+        mode: Int,
+    ): Outcome<Unit, KmpBleError> {
+        return try {
+            writeCharacteristic(char, data, mode).suspend()
+            Outcome.Ok(Unit)
+        } catch (e: RequestFailedException) {
+            val error =
+                when (e.status) {
+                    BluetoothGatt.GATT_FAILURE -> KmpBlePeripheralGattResult.Failure
+                    BluetoothGatt.GATT_INSUFFICIENT_AUTHENTICATION ->
+                        KmpBlePeripheralGattResult.InsufficientAuthentication
+                    BluetoothGatt.GATT_INSUFFICIENT_ENCRYPTION -> KmpBlePeripheralGattResult.InsufficientEncryption
+                    BluetoothGatt.GATT_INVALID_ATTRIBUTE_LENGTH -> KmpBlePeripheralGattResult.InvalidAttributeLength
+                    BluetoothGatt.GATT_INVALID_OFFSET -> KmpBlePeripheralGattResult.InvalidOffset
+                    BluetoothGatt.GATT_READ_NOT_PERMITTED -> KmpBlePeripheralGattResult.ReadNotPermitted
+                    BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED -> KmpBlePeripheralGattResult.RequestNotSupported
+                    BluetoothGatt.GATT_WRITE_NOT_PERMITTED -> KmpBlePeripheralGattResult.WriteNotPermitted
+                    else if (e.status in 0x80..0x9F) -> KmpBlePeripheralGattResult.UserDefined(e.status.toByte())
+                    else -> KmpBlePeripheralGattResult.Failure
+                }
+            Outcome.Error(KmpBleError.WriteError(error))
+        }
     }
 
     suspend fun enableNotificationsExternal(char: BluetoothGattCharacteristic) {
@@ -358,7 +383,7 @@ private class AndroidKmpBleCharacteristic(
                     KmpBleWriteMode.WithResponse -> WRITE_TYPE_DEFAULT
                     KmpBleWriteMode.WithoutResponse -> WRITE_TYPE_NO_RESPONSE
                 }
-            Outcome.Ok(manager.writeExternal(characteristic, data, platformMode))
+            manager.writeExternal(characteristic, data, platformMode)
         }
 
     override suspend fun notifications(bufferSize: Int, bufferOverflow: BufferOverflow): Flow<ByteArray> {

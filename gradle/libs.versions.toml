@@ -2,13 +2,13 @@
 desugar_jdk_libs = "2.1.5"
 kotlin = "2.3.21"
 agp = "9.0.1"
-composeMultiplatform = "1.11.0"
+composeMultiplatform = "1.11.1"
 material3 = "1.11.0-alpha07"
 android-compileSdk = "36"
 android-minSdk = "28"
 android-targetSdk = "36"
 androidx-activityCompose = "1.13.0"
-atomicfu = "0.32.1"
+atomicfu = "0.33.0"
 oskitCompose = "4.2.0-alpha1"
 oskitKmp = "5.2.0-alpha1"
 kotlinxCoroutinesCore = "1.11.0"
@@ -19,13 +19,14 @@ nordic-ble = "2.11.0"
 nordic-ble-kotlin = "1.3.1"
 ktor = "3.5.0"
 detekt = "2.0.0-alpha.3"
-detektCompose = "0.5.8"
+detektCompose = "0.5.9"
 ktfmt = "0.26.0"
 navigationEvent = "1.1.1"
 navigationEventCompose = "1.1.0"
 serializationCbor = "1.11.0"
 kotlinxImmutableCollections = "0.5.0-beta01"
 kotlinxDateTime = "0.8.0"
+cryptography = "0.6.0"
 
 [libraries]
 desugar_jdk_libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar_jdk_libs" }
@@ -57,7 +58,10 @@ compose-resources = { module = "org.jetbrains.compose.components:components-reso
 compose-material = { module = "org.jetbrains.compose.material3:material3", version.ref = "material3" }
 navigationEvent-compose = { module = "org.jetbrains.androidx.navigationevent:navigationevent-compose", version.ref = "navigationEventCompose" }
 navigationEvent = { module = "androidx.navigationevent:navigationevent", version.ref = "navigationEvent" }
-kotlinxSerializationCbor = { module = "org.jetbrains.kotlinx:kotlinx-serialization-cbor", version.ref = "serializationCbor"}
+kotlinxSerializationCbor = { module = "org.jetbrains.kotlinx:kotlinx-serialization-cbor", version.ref = "serializationCbor" }
+cryptographyCore = { module = "dev.whyoleg.cryptography:cryptography-core", version.ref = "cryptography" }
+cryptographyRandom = { module = "dev.whyoleg.cryptography:cryptography-random", version.ref = "cryptography" }
+cryptographyOptimal = { module = "dev.whyoleg.cryptography:cryptography-provider-optimal", version.ref = "cryptography" }
 
 [plugins]
 androidMultiplatformLibrary = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }

@@ -46,6 +46,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
+import platform.CoreBluetooth.CBATTErrorDomain
+import platform.CoreBluetooth.CBATTErrorInsufficientAuthentication
+import platform.CoreBluetooth.CBATTErrorInsufficientEncryption
+import platform.CoreBluetooth.CBATTErrorInvalidAttributeValueLength
+import platform.CoreBluetooth.CBATTErrorInvalidOffset
+import platform.CoreBluetooth.CBATTErrorReadNotPermitted
+import platform.CoreBluetooth.CBATTErrorRequestNotSupported
+import platform.CoreBluetooth.CBATTErrorUnlikelyError
+import platform.CoreBluetooth.CBATTErrorWriteNotPermitted
+import platform.CoreBluetooth.CBAdvertisementDataLocalNameKey
 import platform.CoreBluetooth.CBAdvertisementDataManufacturerDataKey
 import platform.CoreBluetooth.CBAdvertisementDataServiceDataKey
 import platform.CoreBluetooth.CBAdvertisementDataServiceUUIDsKey
@@ -73,6 +83,7 @@ import platform.Foundation.NSData
 import platform.Foundation.NSDictionary
 import platform.Foundation.NSError
 import platform.Foundation.NSNumber
+import platform.Foundation.NSString
 import platform.Foundation.NSUUID
 import platform.Foundation.create
 import platform.Foundation.data
@@ -188,7 +199,10 @@ private class AppleCBCentralDelegate(
 
             val record =
                 KmpBleScanRecord(
-                    name = didDiscoverPeripheral.name ?: "",
+                    name =
+                        (advertisementData[CBAdvertisementDataLocalNameKey] as? NSString)?.toString()
+                            ?: didDiscoverPeripheral.name
+                            ?: "",
                     rssi = RSSI.intValue,
                     identifier = didDiscoverPeripheral.identifier.UUIDString,
                     manufacturerData = manufacturerData,
@@ -406,7 +420,28 @@ private class AppleKmpBlePeripheral(
                                 }
                                 .first()
 
-                        if (event.error != null) return@withScope Outcome.Error(KmpBleError.Unknown(event.error))
+                        if (event.error != null) {
+                            if (event.error.domain != CBATTErrorDomain)
+                                return@withScope Outcome.Error(KmpBleError.Unknown(event.error))
+                            val response =
+                                when (event.error.code) {
+                                    CBATTErrorUnlikelyError -> KmpBlePeripheralGattResult.Failure
+                                    CBATTErrorInsufficientAuthentication ->
+                                        KmpBlePeripheralGattResult.InsufficientAuthentication
+                                    CBATTErrorInsufficientEncryption ->
+                                        KmpBlePeripheralGattResult.InsufficientEncryption
+                                    CBATTErrorInvalidAttributeValueLength ->
+                                        KmpBlePeripheralGattResult.InvalidAttributeLength
+                                    CBATTErrorInvalidOffset -> KmpBlePeripheralGattResult.InvalidOffset
+                                    CBATTErrorReadNotPermitted -> KmpBlePeripheralGattResult.ReadNotPermitted
+                                    CBATTErrorRequestNotSupported -> KmpBlePeripheralGattResult.RequestNotSupported
+                                    CBATTErrorWriteNotPermitted -> KmpBlePeripheralGattResult.WriteNotPermitted
+                                    else if (event.error.code in 0x80..0x9F) ->
+                                        KmpBlePeripheralGattResult.UserDefined(event.error.code.toByte())
+                                    else -> KmpBlePeripheralGattResult.Failure
+                                }
+                            return@withScope Outcome.Error(KmpBleError.WriteError(response))
+                        }
                     }
                     Outcome.Ok(Unit)
                 }

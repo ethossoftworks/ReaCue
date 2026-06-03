@@ -12,6 +12,6 @@ fun initKoinIos() {
 }
 
 val iosDiModule = module {
-    single { BleCentralIemService(get()) } bind IIemService::class
+    single { BleCentralIemService(get(), get()) } bind IIemService::class
     single { KmpBleCentralManager() } bind IKmpBleCentralManager::class
 }

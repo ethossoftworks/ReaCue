@@ -8,9 +8,14 @@ import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBlePeripheral
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleConnectionPriority
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleConnectionStatus
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleWriteMode
+import com.ethossoftworks.reaperbleiem.service.preferences.PreferencesService
 import com.outsidesource.oskitkmp.lib.toUShort
 import com.outsidesource.oskitkmp.lib.update
 import com.outsidesource.oskitkmp.outcome.unwrapOrReturn
+import dev.whyoleg.cryptography.CryptographyProvider
+import dev.whyoleg.cryptography.algorithms.HMAC
+import dev.whyoleg.cryptography.algorithms.SHA256
+import io.ktor.utils.io.core.toByteArray
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.ExperimentalUuidApi
@@ -32,9 +37,14 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
 
 @OptIn(ExperimentalSerializationApi::class)
-class BleCentralIemService(private val bleCentralManager: IKmpBleCentralManager) : IIemService {
+class BleCentralIemService(
+    private val bleCentralManager: IKmpBleCentralManager,
+    private val preferencesService: PreferencesService,
+) : IIemService {
 
     private val peripheral = atomic<IKmpBlePeripheral?>(null)
+    private val crypto = CryptographyProvider.Default
+    private val hmac = crypto.get(HMAC)
     private val requestBuffers = atomic<Map<UShort, Buffer>>(emptyMap())
     private val cbor = Cbor {
         ignoreUnknownKeys = true
@@ -63,10 +73,24 @@ class BleCentralIemService(private val bleCentralManager: IKmpBleCentralManager)
 
         peripheral.requestConnectionPriority(KmpBleConnectionPriority.High)
 
+        // Auth Handshake
+        val nonce = peripheral.read(REACUE_HANDSHAKE_CHARACTERISTIC_UUID).unwrapOrReturn {
+            cancel()
+            return@callbackFlow
+        }
+
+        val hmacKey = hmac.keyDecoder(SHA256).decodeFromByteArray(HMAC.Key.Format.RAW, "QQeUVpXz".toByteArray())
+        val signature = hmacKey.signatureGenerator().generateSignature(nonce)
+
+        peripheral.write(REACUE_HANDSHAKE_CHARACTERISTIC_UUID, signature).unwrapOrReturn {
+            cancel()
+            return@callbackFlow
+        }
+
         // Subscribe to notifications
         val job =
             peripheral
-                .notifications(REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID)
+                .notifications(REACUE_EVENT_CHARACTERISTIC_UUID)
                 .onEach { notification ->
                     try {
                         val requestId = notification.toUShort(0)
@@ -108,27 +132,27 @@ class BleCentralIemService(private val bleCentralManager: IKmpBleCentralManager)
         }
     }
 
-    fun scan() = bleCentralManager.scan().filter { it.services.contains(REAPER_BLE_IEM_SERVICE_UUID) }
+    fun scan() = bleCentralManager.scan().filter { it.services.contains(REACUE_SERVICE_UUID) }
 
     override suspend fun refresh() {
         val payload = cbor.encodeToByteArray(IemEvent.serializer(), IemEvent.Refresh)
-        peripheral.value?.write(REAPER_BLE_IEM_COMMAND_CHARACTERISTIC_UUID, payload, KmpBleWriteMode.WithoutResponse)
+        peripheral.value?.write(REACUE_COMMAND_CHARACTERISTIC_UUID, payload, KmpBleWriteMode.WithoutResponse)
     }
 
     override suspend fun setOutputVolume(trackId: Int, value: Float) {
         val payload = cbor.encodeToByteArray(IemEvent.serializer(), IemEvent.OutputVolumeUpdated(trackId, value))
-        peripheral.value?.write(REAPER_BLE_IEM_COMMAND_CHARACTERISTIC_UUID, payload, KmpBleWriteMode.WithoutResponse)
+        peripheral.value?.write(REACUE_COMMAND_CHARACTERISTIC_UUID, payload, KmpBleWriteMode.WithoutResponse)
     }
 
     override suspend fun setReceiveVolume(trackId: Int, receiveId: Int, value: Float) {
         val payload =
             cbor.encodeToByteArray(IemEvent.serializer(), IemEvent.ReceiveVolumeUpdated(trackId, receiveId, value))
-        peripheral.value?.write(REAPER_BLE_IEM_COMMAND_CHARACTERISTIC_UUID, payload, KmpBleWriteMode.WithoutResponse)
+        peripheral.value?.write(REACUE_COMMAND_CHARACTERISTIC_UUID, payload, KmpBleWriteMode.WithoutResponse)
     }
 
     override suspend fun setReceivePan(trackId: Int, receiveId: Int, value: Float) {
         val payload =
             cbor.encodeToByteArray(IemEvent.serializer(), IemEvent.ReceivePanUpdated(trackId, receiveId, value))
-        peripheral.value?.write(REAPER_BLE_IEM_COMMAND_CHARACTERISTIC_UUID, payload, KmpBleWriteMode.WithoutResponse)
+        peripheral.value?.write(REACUE_COMMAND_CHARACTERISTIC_UUID, payload, KmpBleWriteMode.WithoutResponse)
     }
 }

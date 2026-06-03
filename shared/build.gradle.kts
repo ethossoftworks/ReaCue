@@ -82,6 +82,9 @@ kotlin {
             implementation(libs.kotlinxSerializationCbor)
             implementation(libs.kotlinxImmutableCollections)
             implementation(libs.kotlinxDateTime)
+            implementation(libs.cryptographyCore)
+            implementation(libs.cryptographyRandom)
+            implementation(libs.cryptographyOptimal)
         }
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)

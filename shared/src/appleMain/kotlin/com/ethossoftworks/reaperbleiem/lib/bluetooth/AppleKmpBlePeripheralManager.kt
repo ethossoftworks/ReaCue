@@ -272,7 +272,10 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
         localRequests.update { it.update { remove(requestId) } }
 
         peripheralManager.respondToRequest(
-            request = request,
+            request =
+                request.apply {
+                    setValue(value.toNSData())
+                },
             withResult =
                 when (result) {
                     KmpBlePeripheralGattResult.Failure -> CBATTErrorUnlikelyError
@@ -331,7 +334,7 @@ private class PeripheralManagerDelegate(
 
         events.tryEmit(
             KmpBlePeripheralEvent.ReadRequest(
-                central = centralUuid,
+                centralId = centralUuid,
                 characteristic = Uuid.fromByteArray(request.characteristic.UUID.data.toByteArray()),
                 requestId = requestId,
                 offset = request.offset.toInt(),
@@ -349,7 +352,7 @@ private class PeripheralManagerDelegate(
 
             events.tryEmit(
                 KmpBlePeripheralEvent.WriteRequest(
-                    central = centralUuid,
+                    centralId = centralUuid,
                     characteristic = Uuid.fromByteArray(request.characteristic.UUID.data.toByteArray()),
                     requestId = requestId,
                     offset = request.offset.toInt(),

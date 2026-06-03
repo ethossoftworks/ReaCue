@@ -12,11 +12,14 @@ import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleConnectionPriority
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattPermission
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattProperty
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralEvent
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralGattResult
 import com.ethossoftworks.reaperbleiem.service.preferences.PreferencesService
-import kotlin.math.ceil
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
+import com.outsidesource.oskitkmp.lib.update
+import dev.whyoleg.cryptography.CryptographyProvider
+import dev.whyoleg.cryptography.algorithms.HMAC
+import dev.whyoleg.cryptography.algorithms.SHA256
+import dev.whyoleg.cryptography.random.CryptographyRandom
+import io.ktor.utils.io.core.toByteArray
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.getAndUpdate
 import kotlinx.atomicfu.update
@@ -36,10 +39,15 @@ import kotlinx.io.readByteArray
 import kotlinx.io.writeUShort
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
+import kotlin.math.ceil
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
-val REAPER_BLE_IEM_SERVICE_UUID = Uuid.parseHexDash("fa6e666c-2c23-43f1-84e4-4653ebf930f4")
-val REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID = Uuid.parseHexDash("319893ca-5fa2-4c21-9f51-bc2b1116a352")
-val REAPER_BLE_IEM_COMMAND_CHARACTERISTIC_UUID = Uuid.parseHexDash("aa57c9ce-ada3-4779-88bb-efce418a297e")
+val REACUE_SERVICE_UUID = Uuid.parseHexDash("fa6e666c-2c23-43f1-84e4-4653ebf930f4")
+val REACUE_EVENT_CHARACTERISTIC_UUID = Uuid.parseHexDash("319893ca-5fa2-4c21-9f51-bc2b1116a352")
+val REACUE_COMMAND_CHARACTERISTIC_UUID = Uuid.parseHexDash("aa57c9ce-ada3-4779-88bb-efce418a297e")
+val REACUE_HANDSHAKE_CHARACTERISTIC_UUID = Uuid.parseHexDash("2575a2df-6aa2-4466-8eeb-7c13bade6734")
 
 @OptIn(ExperimentalSerializationApi::class)
 class BlePeripheralIemService(
@@ -47,6 +55,12 @@ class BlePeripheralIemService(
     private val peripheralManager: IKmpBlePeripheralManager,
     private val preferencesService: PreferencesService,
 ) : IIemService {
+
+    private val crypto = CryptographyProvider.Default
+    private val hmac = crypto.get(HMAC)
+    private val secureRandom = CryptographyRandom.Default
+    private val whitelistedCentrals = atomic<Set<KmpBleCentralId>>(emptySet())
+    private val centralNonces = atomic<Map<KmpBleCentralId, ByteArray>>(emptyMap())
 
     private var hostName: String = "ReaCue"
     private var hostPasscode: String = ""
@@ -65,19 +79,24 @@ class BlePeripheralIemService(
             services =
                 listOf(
                     KmpBleAdvertisementService(
-                        uuid = REAPER_BLE_IEM_SERVICE_UUID,
+                        uuid = REACUE_SERVICE_UUID,
                         isPrimaryService = true,
                         characteristics =
                             listOf(
                                 KmpBleAdvertisementCharacteristic(
-                                    uuid = REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID,
+                                    uuid = REACUE_EVENT_CHARACTERISTIC_UUID,
                                     properties = setOf(KmpBleGattProperty.Notify),
                                     permissions = setOf(KmpBleGattPermission.Readable),
                                 ),
                                 KmpBleAdvertisementCharacteristic(
-                                    uuid = REAPER_BLE_IEM_COMMAND_CHARACTERISTIC_UUID,
+                                    uuid = REACUE_COMMAND_CHARACTERISTIC_UUID,
                                     properties = setOf(KmpBleGattProperty.WriteWithoutResponse),
                                     permissions = setOf(KmpBleGattPermission.Writable),
+                                ),
+                                KmpBleAdvertisementCharacteristic(
+                                    uuid = REACUE_HANDSHAKE_CHARACTERISTIC_UUID,
+                                    properties = setOf(KmpBleGattProperty.Write, KmpBleGattProperty.Read),
+                                    permissions = setOf(KmpBleGattPermission.Writable, KmpBleGattPermission.Readable),
                                 ),
                             ),
                     )
@@ -106,12 +125,20 @@ class BlePeripheralIemService(
                     when (event) {
                         is KmpBlePeripheralEvent.Error -> cancel()
                         KmpBlePeripheralEvent.Advertising -> isAdvertising.complete(Unit)
-                        is KmpBlePeripheralEvent.CentralSubscribed -> {
+                        is KmpBlePeripheralEvent.CentralSubscribed ->
                             peripheralManager.requestConnectionPriority(KmpBleConnectionPriority.High, event.centralId)
-                        }
-                        is KmpBlePeripheralEvent.CentralUnsubscribed -> {}
-                        is KmpBlePeripheralEvent.ReadRequest -> {}
-                        is KmpBlePeripheralEvent.WriteRequest -> onWriteRequest(event, ::send)
+                        is KmpBlePeripheralEvent.CentralUnsubscribed ->
+                            whitelistedCentrals.update { it - event.centralId }
+                        is KmpBlePeripheralEvent.ReadRequest ->
+                            when (event.characteristic) {
+                                REACUE_HANDSHAKE_CHARACTERISTIC_UUID -> onHandshakeReadRequest(event)
+                                else -> {}
+                            }
+                        is KmpBlePeripheralEvent.WriteRequest ->
+                            when (event.characteristic) {
+                                REACUE_HANDSHAKE_CHARACTERISTIC_UUID -> onHandshakeWriteRequest(event)
+                                REACUE_COMMAND_CHARACTERISTIC_UUID -> onCommandWriteRequest(event, ::send)
+                            }
                     }
                 }
                 .launchIn(this)
@@ -142,15 +169,51 @@ class BlePeripheralIemService(
         hostPasscode = settings.hostPasscode
     }
 
-    private suspend fun onWriteRequest(request: KmpBlePeripheralEvent.WriteRequest, send: suspend (IemEvent) -> Unit) {
+    private suspend fun onHandshakeReadRequest(event: KmpBlePeripheralEvent.ReadRequest) {
+        val nonce = secureRandom.nextBytes(16)
+        centralNonces.update { it.update { this[event.centralId] = nonce } }
+
+        peripheralManager.respondToRequest(
+            central = event.centralId,
+            requestId = event.requestId,
+            result = KmpBlePeripheralGattResult.Success,
+            value = nonce,
+        )
+    }
+
+    private suspend fun onHandshakeWriteRequest(event: KmpBlePeripheralEvent.WriteRequest) {
+        val nonce = centralNonces.value[event.centralId] ?: byteArrayOf()
+        val keyBytes = preferencesService.settings.value.hostPasscode.toByteArray()
+        val hmacKey = hmac.keyDecoder(SHA256).decodeFromByteArray(HMAC.Key.Format.RAW, keyBytes)
+        val signatureVerifier = hmacKey.signatureVerifier()
+        val isValid = signatureVerifier.tryVerifySignature(nonce, event.data)
+
+        if (isValid) {
+            whitelistedCentrals.update { it + event.centralId }
+            centralNonces.update { it - event.centralId }
+        }
+
+        peripheralManager.respondToRequest(
+            central = event.centralId,
+            requestId = event.requestId,
+            result = if (isValid) KmpBlePeripheralGattResult.Success else KmpBlePeripheralGattResult.UserDefined(0x9F.toByte()),
+        )
+    }
+
+    private suspend fun onCommandWriteRequest(
+        request: KmpBlePeripheralEvent.WriteRequest,
+        send: suspend (IemEvent) -> Unit,
+    ) {
         try {
+            if (!whitelistedCentrals.value.contains(request.centralId)) return
+
             val event = cbor.decodeFromByteArray(IemEvent.serializer(), request.data)
             Logger.i { "Received command - $event" }
 
             when (event) {
                 IemEvent.Refresh -> {
-                    sendBleNotification(IemEvent.Refreshing, setOf(request.central))
-                    sendBleNotification(lastRefreshedEvent.value ?: return, setOf(request.central))
+                    sendBleNotification(IemEvent.Refreshing, setOf(request.centralId))
+                    sendBleNotification(lastRefreshedEvent.value ?: return, setOf(request.centralId))
                     return
                 }
 
@@ -172,8 +235,7 @@ class BlePeripheralIemService(
                 is IemEvent.TrackNameUpdated -> return
             }
 
-            val centrals =
-                peripheralManager.subscribedCentrals(REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID) - request.central
+            val centrals = peripheralManager.subscribedCentrals(REACUE_EVENT_CHARACTERISTIC_UUID) - request.centralId
             sendBleNotification(event, centrals)
             send(event)
         } catch (t: Throwable) {
@@ -207,13 +269,15 @@ class BlePeripheralIemService(
     private fun sendBleNotification(event: IemEvent, centralList: Set<KmpBleCentralId>? = null) {
         updateLastRefreshedEvent(event)
         val payload = cbor.encodeToByteArray(IemEvent.serializer(), event)
-        val centrals = centralList ?: peripheralManager.subscribedCentrals(REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID)
+        val centrals = centralList ?: peripheralManager.subscribedCentrals(REACUE_EVENT_CHARACTERISTIC_UUID)
         val requestId = notificationId.getAndUpdate { it.inc() }
         val buffer = Buffer()
 
         Logger.i { "Sending notification to ${centrals.size} centrals - $event" }
 
         for (central in centrals) {
+            if (!whitelistedCentrals.value.contains(central)) continue
+
             val packetSize = peripheralManager.maximumUpdateValueLengthForCentral(central) - headerSize
             val packetCount = ceil(payload.size.toDouble() / packetSize.toDouble()).toUInt()
 
@@ -230,7 +294,7 @@ class BlePeripheralIemService(
                     "Sending notification packet: Packet Size: ${buffer.size}, Request Id - $requestId - ${packetIndex.toInt() + 1}/$packetCount"
                 }
                 peripheralManager.notify(
-                    REAPER_BLE_IEM_EVENT_CHARACTERISTIC_UUID,
+                    REACUE_EVENT_CHARACTERISTIC_UUID,
                     buffer.readByteArray(),
                     centrals = listOf(central),
                 )

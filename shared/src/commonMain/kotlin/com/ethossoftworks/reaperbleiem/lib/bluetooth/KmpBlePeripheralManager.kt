@@ -20,9 +20,9 @@ interface IKmpBlePeripheralManager {
     suspend fun respondToRequest(
         central: KmpBleCentralId,
         requestId: Int,
-        offset: Int,
-        result: KmpBlePeripheralGattResult,
-        value: ByteArray,
+        offset: Int = 0,
+        result: KmpBlePeripheralGattResult = KmpBlePeripheralGattResult.Success,
+        value: ByteArray = byteArrayOf(),
     )
 }
 
@@ -79,14 +79,14 @@ sealed class KmpBlePeripheralEvent {
     data class CentralUnsubscribed(val centralId: KmpBleCentralId, val characteristic: Uuid) : KmpBlePeripheralEvent()
 
     data class ReadRequest(
-        val central: KmpBleCentralId,
+        val centralId: KmpBleCentralId,
         val characteristic: Uuid,
         val requestId: Int,
         val offset: Int,
     ) : KmpBlePeripheralEvent()
 
     data class WriteRequest(
-        val central: KmpBleCentralId,
+        val centralId: KmpBleCentralId,
         val characteristic: Uuid,
         val requestId: Int,
         val offset: Int,

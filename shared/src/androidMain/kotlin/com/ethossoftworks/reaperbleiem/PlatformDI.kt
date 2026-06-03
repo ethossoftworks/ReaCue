@@ -16,7 +16,7 @@ actual fun platformModule(platformContext: PlatformContext): Module = module {
     single { KmpKvStore(appContext = platformContext.context) }
     single { ActivityHolder() }
     single { KmpBleCentralManager(platformContext.context) }
-    single { BleCentralIemService(get()) } bind IIemService::class
+    single { BleCentralIemService(get(), get()) } bind IIemService::class
 }
 
 actual fun platformMockModule(platformContext: PlatformContext): Module = module {}
