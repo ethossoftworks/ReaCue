@@ -39,7 +39,7 @@ ReaCue requires three things configured in REAPER:
 1. Open REAPER and go to **Options > Preferences > Control/OSC/web**
 2. Click **Add**
 3. Select **Web browser interface**
-4. Set the port to **8000**
+4. Set the port to **8080**
 5. Click **OK**
 
 ### 2. Add the OSC Control Surface
@@ -51,10 +51,11 @@ ReaCue requires three things configured in REAPER:
 3. Click **Add**
 4. Select **OSC (Open Sound Control)**
 5. Set **Mode** to **Configure device IP+local port**
-6. Set **Device port** to **9000**
-7. Set **Local listen port** to **8000**
-8. Under **Pattern config**, select **ReaCue**
-9. Click **OK**
+6. Set **Device IP** to **127.0.0.1** 
+7. Set **Device port** to **9000**
+8. Set **Local listen port** to **8000**
+9. Under **Pattern config**, select **ReaCue**
+10. Click **OK**
 
 ### 3. Install the Lua Script
 
