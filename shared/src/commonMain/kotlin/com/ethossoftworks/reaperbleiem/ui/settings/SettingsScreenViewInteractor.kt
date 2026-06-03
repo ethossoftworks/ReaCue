@@ -69,7 +69,7 @@ class SettingsScreenViewInteractor(
 
             val sanitizedReaperOscListenPort = state.reaperOscListenPort.toIntOrNull()
             if (sanitizedReaperOscListenPort != null) {
-                preferencesService.setReaperOscDevicePort(sanitizedReaperOscListenPort).runOnError { hasError = true }
+                preferencesService.setReaperOscListenPort(sanitizedReaperOscListenPort).runOnError { hasError = true }
             }
 
             update { state -> state.copy(isSaving = false) }

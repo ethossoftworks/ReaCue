@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 data class AppSettings(
     val hostId: String = "",
     val hostPasscode: String = "",
-    val reaperWebPort: Int = 8000,
+    val reaperWebPort: Int = 8080,
     val reaperOscDevicePort: Int = 9000,
     val reaperOscListenPort: Int = 8000,
 )
@@ -56,7 +56,7 @@ class PreferencesService(private val kvStore: IKmpKvStore) {
                 AppSettings(
                     hostId = nodeResult.getString(KeyHostId) ?: ("ReaCue" + randomNumbers(2)),
                     hostPasscode = nodeResult.getString(KeyHostPasscode) ?: "",
-                    reaperWebPort = nodeResult.getInt(KeyReaperWebPort) ?: 8000,
+                    reaperWebPort = nodeResult.getInt(KeyReaperWebPort) ?: 8080,
                     reaperOscDevicePort = nodeResult.getInt(KeyReaperOscDevicePort) ?: 9000,
                     reaperOscListenPort = nodeResult.getInt(KeyReaperOscListenPort) ?: 8000,
                 )
