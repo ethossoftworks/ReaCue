@@ -121,7 +121,7 @@ fun AppButton(
     val theme = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val ripple = ripple(color = if (buttonType == AppButtonType.Error) theme.error else theme.accent)
+    val ripple = ripple(color = if (buttonType == AppButtonType.Destructive) theme.error else theme.accent)
 
     Row(
         modifier =
@@ -130,7 +130,7 @@ fun AppButton(
                 .semantics { role = Role.Button }
                 .border(
                     1.dp,
-                    color = if (buttonType == AppButtonType.Error) theme.error else theme.strokePrimary,
+                    color = if (buttonType == AppButtonType.Destructive) theme.error else theme.strokePrimary,
                     shape = shape,
                 )
                 .kmpOuterShadow(
@@ -141,13 +141,13 @@ fun AppButton(
                 )
                 .background(brush = theme.bgControl, shape = shape)
                 .background(
-                    color = if (buttonType == AppButtonType.Error) theme.errorTint else Color.Transparent,
+                    color = if (buttonType == AppButtonType.Destructive) theme.errorTint else Color.Transparent,
                     shape = shape,
                 )
                 .background(
                     color =
                         if (isHovered) {
-                            if (buttonType == AppButtonType.Error) theme.error else theme.accentTint
+                            if (buttonType == AppButtonType.Destructive) theme.errorTint20 else theme.accentTint
                         } else {
                             Color.Transparent
                         },
@@ -170,13 +170,13 @@ fun AppButton(
                 painter = painterResource(it),
                 contentDescription = null,
                 colorFilter =
-                    ColorFilter.tint(if (buttonType == AppButtonType.Error) theme.error else theme.textPrimary),
+                    ColorFilter.tint(if (buttonType == AppButtonType.Destructive) theme.error else theme.textPrimary),
             )
         }
         label?.let {
             Text(
                 text = it,
-                color = if (buttonType == AppButtonType.Error) theme.error else theme.textPrimary,
+                color = if (buttonType == AppButtonType.Destructive) theme.error else theme.textPrimary,
                 fontWeight = FontWeight.Normal,
             )
         }
@@ -187,7 +187,7 @@ fun AppButton(
                 painter = painterResource(it),
                 contentDescription = null,
                 colorFilter =
-                    ColorFilter.tint(if (buttonType == AppButtonType.Error) theme.error else theme.textPrimary),
+                    ColorFilter.tint(if (buttonType == AppButtonType.Destructive) theme.error else theme.textPrimary),
             )
         }
     }
@@ -195,7 +195,7 @@ fun AppButton(
 
 enum class AppButtonType {
     Default,
-    Error,
+    Destructive,
 }
 
 @Preview
@@ -206,7 +206,7 @@ private fun AppButtonPreview() {
             AppButton(label = "Test", onClick = {})
             AppButton(iconStart = Res.drawable.volume_up, label = "Test 2", onClick = {})
             AppButton(
-                buttonType = AppButtonType.Error,
+                buttonType = AppButtonType.Destructive,
                 iconStart = Res.drawable.volume_up,
                 label = "Test 2",
                 onClick = {},

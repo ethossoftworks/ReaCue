@@ -6,6 +6,7 @@ import com.ethossoftworks.reaperbleiem.service.preferences.AppSettings
 import com.ethossoftworks.reaperbleiem.service.preferences.PreferencesService
 import com.outsidesource.oskitkmp.interactor.Interactor
 import com.outsidesource.oskitkmp.outcome.runOnError
+import com.outsidesource.oskitkmp.outcome.unwrapOrReturn
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -23,6 +24,7 @@ data class SettingsState(
     val reaperOscDevicePort: String = "",
     val reaperOscListenPort: String = "",
     val isSaving: Boolean = false,
+    val isDefaultModalVisible: Boolean = false,
 )
 
 private val intRegexReplace = Regex("""[^0-9]""")
@@ -76,8 +78,42 @@ class SettingsScreenViewInteractor(
 
             infoMessageInteractor.enqueueMessage(
                 message = if (hasError) getString(Res.string.settings_error) else getString(Res.string.settings_saved),
-                type = if (hasError) InfoMessageType.Error else InfoMessageType.Info
+                type = if (hasError) InfoMessageType.Error else InfoMessageType.Info,
             )
+        }
+    }
+
+    fun onResetToDefaultClick() {
+        update { state -> state.copy(isDefaultModalVisible = true) }
+    }
+
+    fun onResetToDefaultCancel() {
+        update { state -> state.copy(isDefaultModalVisible = false) }
+    }
+
+    fun onResetToDefaultConfirmClick() {
+        update { state -> state.copy(isDefaultModalVisible = false) }
+
+        interactorScope.launch {
+            preferencesService.resetToDefaults().unwrapOrReturn {
+                infoMessageInteractor.enqueueMessage(
+                    message = getString(Res.string.settings_error),
+                    type = InfoMessageType.Error,
+                )
+                return@launch
+            }
+
+            update { state ->
+                state.copy(
+                    hostId = "",
+                    hostPasscode = "",
+                    reaperWebPort = "",
+                    reaperOscDevicePort = "",
+                    reaperOscListenPort = "",
+                )
+            }
+
+            infoMessageInteractor.enqueueMessage(message = getString(Res.string.settings_saved))
         }
     }
 

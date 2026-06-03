@@ -14,6 +14,7 @@ open class AppColors {
     open val accentTint = Color.Black
     open val error = Color.Black
     open val errorTint = Color.Black
+    open val errorTint20 = Color.Black
     open val bgPrimary = Color.Black
     open val bgPrimary10 = Color.Black
     open val bgPrimary20 = Color.Black
@@ -34,6 +35,7 @@ data object LightAppColors : AppColors() {
     override val accentTint = accent.copy(alpha = 0.15f)
     override val error = Color(0xFFfc5c55)
     override val errorTint = error.copy(alpha = 0.15f)
+    override val errorTint20 = error.copy(alpha = 0.25f)
     override val bgPrimary = Color(0xFF090d12)
     override val bgPrimary10 = Color(0xFF12161a)
     override val bgPrimary20 = Color(0xFF171c22)

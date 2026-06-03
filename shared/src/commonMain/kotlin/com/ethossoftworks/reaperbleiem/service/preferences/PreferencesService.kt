@@ -16,8 +16,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class AppSettings(
-    val hostId: String = "",
-    val hostPasscode: String = "",
+    val hostId: String = "ReaCue" + randomNumbers(2),
+    val hostPasscode: String = randomCharacters(8),
     val reaperWebPort: Int = 8080,
     val reaperOscDevicePort: Int = 9000,
     val reaperOscListenPort: Int = 8000,
@@ -44,21 +44,17 @@ class PreferencesService(private val kvStore: IKmpKvStore) {
                     return@launch
                 }
 
-            if (!nodeResult.contains(KeyHostId)) {
-                nodeResult.putString(KeyHostId, "ReaCue" + randomNumbers(2))
-            }
-
-            if (!nodeResult.contains(KeyHostPasscode)) {
-                nodeResult.putString(KeyHostPasscode, randomCharacters(8))
-            }
+            val default = AppSettings()
+            if (!nodeResult.contains(KeyHostId)) nodeResult.putString(KeyHostId, default.hostId)
+            if (!nodeResult.contains(KeyHostPasscode)) nodeResult.putString(KeyHostPasscode, default.hostPasscode)
 
             _settings.value =
                 AppSettings(
-                    hostId = nodeResult.getString(KeyHostId) ?: ("ReaCue" + randomNumbers(2)),
-                    hostPasscode = nodeResult.getString(KeyHostPasscode) ?: "",
-                    reaperWebPort = nodeResult.getInt(KeyReaperWebPort) ?: 8080,
-                    reaperOscDevicePort = nodeResult.getInt(KeyReaperOscDevicePort) ?: 9000,
-                    reaperOscListenPort = nodeResult.getInt(KeyReaperOscListenPort) ?: 8000,
+                    hostId = nodeResult.getString(KeyHostId) ?: default.hostId,
+                    hostPasscode = nodeResult.getString(KeyHostPasscode) ?: default.hostPasscode,
+                    reaperWebPort = nodeResult.getInt(KeyReaperWebPort) ?: default.reaperWebPort,
+                    reaperOscDevicePort = nodeResult.getInt(KeyReaperOscDevicePort) ?: default.reaperOscDevicePort,
+                    reaperOscListenPort = nodeResult.getInt(KeyReaperOscListenPort) ?: default.reaperOscListenPort,
                 )
 
             node.complete(nodeResult)
@@ -69,6 +65,28 @@ class PreferencesService(private val kvStore: IKmpKvStore) {
     suspend fun awaitSettings(): AppSettings {
         loaded.await()
         return settings.value
+    }
+
+    suspend fun resetToDefaults(): Outcome<Unit, Any> {
+        val settings = AppSettings()
+        setHostId(settings.hostId).unwrapOrReturn {
+            return it
+        }
+        setHostPasscode(settings.hostPasscode).unwrapOrReturn {
+            return it
+        }
+        setReaperWebPort(settings.reaperWebPort).unwrapOrReturn {
+            return it
+        }
+        setReaperOscDevicePort(settings.reaperOscDevicePort).unwrapOrReturn {
+            return it
+        }
+        setReaperOscListenPort(settings.reaperOscListenPort).unwrapOrReturn {
+            return it
+        }
+        _settings.value = settings
+
+        return Outcome.Ok(Unit)
     }
 
     suspend fun setHostId(value: String): Outcome<Unit, Any> {
@@ -100,14 +118,14 @@ class PreferencesService(private val kvStore: IKmpKvStore) {
         _settings.update { it.copy(reaperOscListenPort = value) }
         return result
     }
+}
 
-    private fun randomCharacters(length: Int): String {
-        val charPool = ('A'..'Z') + ('a'..'z') + ('0'..'9')
-        return CharArray(length) { charPool.random() }.concatToString()
-    }
+private fun randomCharacters(length: Int): String {
+    val charPool = ('A'..'Z') + ('a'..'z') + ('0'..'9')
+    return CharArray(length) { charPool.random() }.concatToString()
+}
 
-    private fun randomNumbers(length: Int): String {
-        val charPool = ('0'..'9')
-        return CharArray(length) { charPool.random() }.concatToString()
-    }
+private fun randomNumbers(length: Int): String {
+    val charPool = ('0'..'9')
+    return CharArray(length) { charPool.random() }.concatToString()
 }
