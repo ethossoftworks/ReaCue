@@ -53,7 +53,7 @@ val REACUE_HANDSHAKE_CHARACTERISTIC_UUID = Uuid.parseHexDash("2575a2df-6aa2-4466
 class BlePeripheralIemService(
     private val networkIemService: NetworkIemService,
     private val peripheralManager: IKmpBlePeripheralManager,
-    private val preferencesService: PreferencesService,
+    private val peripheralPreferencesService: PeripheralPreferencesService,
 ) : IIemService {
 
     private val crypto = CryptographyProvider.Default
@@ -164,8 +164,8 @@ class BlePeripheralIemService(
     }
 
     private suspend fun loadUserSettings() {
-        val settings = preferencesService.awaitSettings()
-        hostName = settings.hostId
+        val settings = peripheralPreferencesService.awaitSettings()
+        hostName = settings.hostName
         hostPasscode = settings.hostPasscode
     }
 
@@ -183,7 +183,7 @@ class BlePeripheralIemService(
 
     private suspend fun onHandshakeWriteRequest(event: KmpBlePeripheralEvent.WriteRequest) {
         val nonce = centralNonces.value[event.centralId] ?: byteArrayOf()
-        val keyBytes = preferencesService.settings.value.hostPasscode.toByteArray()
+        val keyBytes = peripheralPreferencesService.settings.value.hostPasscode.toByteArray()
         val hmacKey = hmac.keyDecoder(SHA256).decodeFromByteArray(HMAC.Key.Format.RAW, keyBytes)
         val signatureVerifier = hmacKey.signatureVerifier()
         val isValid = signatureVerifier.tryVerifySignature(nonce, event.data)
@@ -196,7 +196,12 @@ class BlePeripheralIemService(
         peripheralManager.respondToRequest(
             central = event.centralId,
             requestId = event.requestId,
-            result = if (isValid) KmpBlePeripheralGattResult.Success else KmpBlePeripheralGattResult.UserDefined(0x9F.toByte()),
+            result =
+                if (isValid) {
+                    KmpBlePeripheralGattResult.Success
+                } else {
+                    KmpBlePeripheralGattResult.UserDefined(0x9F.toByte())
+                },
         )
     }
 

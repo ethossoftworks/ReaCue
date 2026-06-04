@@ -48,7 +48,7 @@ import reaper_ble_iem.shared.generated.resources.saving
 import reaper_ble_iem.shared.generated.resources.settings
 
 @Composable
-fun SettingsScreen(interactor: SettingsScreenViewInteractor = rememberInject()) {
+fun PeripheralSettingsScreen(interactor: PeripheralSettingsScreenViewInteractor = rememberInject()) {
     val state = interactor.collectAsState()
     val colors = AppTheme.colors
 
@@ -85,31 +85,31 @@ fun SettingsScreen(interactor: SettingsScreenViewInteractor = rememberInject()) 
             AppTextField(
                 label = stringResource(Res.string.host_id),
                 value = state.hostId,
-                placeholder = state.originalAppSettings.hostId,
+                placeholder = state.originalPeripheralSettings.hostName,
                 onChange = interactor::onHostIdChange,
             )
             AppTextField(
                 label = stringResource(Res.string.host_passcode),
                 value = state.hostPasscode,
-                placeholder = state.originalAppSettings.hostPasscode,
+                placeholder = state.originalPeripheralSettings.hostPasscode,
                 onChange = interactor::onHostPasscodeChange,
             )
             AppTextField(
                 label = stringResource(Res.string.reaper_web_port),
                 value = state.reaperWebPort,
-                placeholder = state.originalAppSettings.reaperWebPort.toString(),
+                placeholder = state.originalPeripheralSettings.reaperWebPort.toString(),
                 onChange = interactor::onReaperWebPortChange,
             )
             AppTextField(
                 label = stringResource(Res.string.reaper_osc_device_port),
                 value = state.reaperOscDevicePort,
-                placeholder = state.originalAppSettings.reaperOscDevicePort.toString(),
+                placeholder = state.originalPeripheralSettings.reaperOscDevicePort.toString(),
                 onChange = interactor::onReaperOscDevicePortChange,
             )
             AppTextField(
                 label = stringResource(Res.string.reaper_osc_listen_port),
                 value = state.reaperOscListenPort,
-                placeholder = state.originalAppSettings.reaperOscListenPort.toString(),
+                placeholder = state.originalPeripheralSettings.reaperOscListenPort.toString(),
                 onChange = interactor::onReaperOscListenerPortChange,
             )
 

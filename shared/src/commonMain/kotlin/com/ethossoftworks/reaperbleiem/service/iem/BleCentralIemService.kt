@@ -8,7 +8,7 @@ import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBlePeripheral
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleConnectionPriority
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleConnectionStatus
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleWriteMode
-import com.ethossoftworks.reaperbleiem.service.preferences.PreferencesService
+import com.ethossoftworks.reaperbleiem.service.preferences.CentralPreferencesService
 import com.outsidesource.oskitkmp.lib.toUShort
 import com.outsidesource.oskitkmp.lib.update
 import com.outsidesource.oskitkmp.outcome.unwrapOrReturn
@@ -39,7 +39,7 @@ import kotlinx.serialization.cbor.Cbor
 @OptIn(ExperimentalSerializationApi::class)
 class BleCentralIemService(
     private val bleCentralManager: IKmpBleCentralManager,
-    private val preferencesService: PreferencesService,
+    private val centralPreferencesService: CentralPreferencesService,
 ) : IIemService {
 
     private val peripheral = atomic<IKmpBlePeripheral?>(null)

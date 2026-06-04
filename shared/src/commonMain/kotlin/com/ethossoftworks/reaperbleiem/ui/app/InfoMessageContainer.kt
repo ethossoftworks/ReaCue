@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -70,7 +71,7 @@ fun InfoMessageContainer(modifier: Modifier = Modifier, interactor: InfoMessageI
                     .padding(bottom = 16.dp)
                     .heightIn(min = 48.dp)
                     .padding(horizontal = 16.dp)
-                    .appModalSurface()
+                    .appModalSurface(CircleShape)
                     .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),

@@ -1,9 +1,11 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package com.ethossoftworks.reaperbleiem.ui.settings
 
 import com.ethossoftworks.reaperbleiem.interactor.InfoMessageInteractor
 import com.ethossoftworks.reaperbleiem.interactor.InfoMessageType
-import com.ethossoftworks.reaperbleiem.service.preferences.AppSettings
-import com.ethossoftworks.reaperbleiem.service.preferences.PreferencesService
+import com.ethossoftworks.reaperbleiem.service.preferences.PeripheralSettings
+import com.ethossoftworks.reaperbleiem.service.preferences.PeripheralPreferencesService
 import com.outsidesource.oskitkmp.interactor.Interactor
 import com.outsidesource.oskitkmp.outcome.runOnError
 import com.outsidesource.oskitkmp.outcome.unwrapOrReturn
@@ -15,9 +17,10 @@ import org.jetbrains.compose.resources.getString
 import reaper_ble_iem.shared.generated.resources.Res
 import reaper_ble_iem.shared.generated.resources.settings_error
 import reaper_ble_iem.shared.generated.resources.settings_saved
+import kotlin.uuid.ExperimentalUuidApi
 
-data class SettingsState(
-    val originalAppSettings: AppSettings = AppSettings(),
+data class PeripheralSettingsState(
+    val originalPeripheralSettings: PeripheralSettings = PeripheralSettings(),
     val hostId: String = "",
     val hostPasscode: String = "",
     val reaperWebPort: String = "",
@@ -29,15 +32,15 @@ data class SettingsState(
 
 private val intRegexReplace = Regex("""[^0-9]""")
 
-class SettingsScreenViewInteractor(
-    private val preferencesService: PreferencesService,
+class PeripheralSettingsScreenViewInteractor(
+    private val peripheralPreferencesService: PeripheralPreferencesService,
     private val infoMessageInteractor: InfoMessageInteractor,
-) : Interactor<SettingsState>(initialState = SettingsState()) {
+) : Interactor<PeripheralSettingsState>(initialState = PeripheralSettingsState()) {
 
     fun onMount() {
-        preferencesService.settings
+        peripheralPreferencesService.settings
             .onEach { preferences ->
-                update { state -> state.copy(originalAppSettings = preferences) }
+                update { state -> state.copy(originalPeripheralSettings = preferences) }
             }
             .launchIn(interactorScope)
     }
@@ -52,26 +55,26 @@ class SettingsScreenViewInteractor(
             var hasError = false
 
             if (state.hostId != "") {
-                preferencesService.setHostId(state.hostId).runOnError { hasError = true }
+                peripheralPreferencesService.setHostName(state.hostId).runOnError { hasError = true }
             }
 
             if (state.hostPasscode != "") {
-                preferencesService.setHostPasscode(state.hostPasscode).runOnError { hasError = true }
+                peripheralPreferencesService.setHostPasscode(state.hostPasscode).runOnError { hasError = true }
             }
 
             val sanitizedReaperWebPort = state.reaperWebPort.toIntOrNull()
             if (sanitizedReaperWebPort != null) {
-                preferencesService.setReaperWebPort(sanitizedReaperWebPort).runOnError { hasError = true }
+                peripheralPreferencesService.setReaperWebPort(sanitizedReaperWebPort).runOnError { hasError = true }
             }
 
             val sanitizedReaperOscDevicePort = state.reaperOscDevicePort.toIntOrNull()
             if (sanitizedReaperOscDevicePort != null) {
-                preferencesService.setReaperOscDevicePort(sanitizedReaperOscDevicePort).runOnError { hasError = true }
+                peripheralPreferencesService.setReaperOscDevicePort(sanitizedReaperOscDevicePort).runOnError { hasError = true }
             }
 
             val sanitizedReaperOscListenPort = state.reaperOscListenPort.toIntOrNull()
             if (sanitizedReaperOscListenPort != null) {
-                preferencesService.setReaperOscListenPort(sanitizedReaperOscListenPort).runOnError { hasError = true }
+                peripheralPreferencesService.setReaperOscListenPort(sanitizedReaperOscListenPort).runOnError { hasError = true }
             }
 
             update { state -> state.copy(isSaving = false) }
@@ -95,7 +98,7 @@ class SettingsScreenViewInteractor(
         update { state -> state.copy(isDefaultModalVisible = false) }
 
         interactorScope.launch {
-            preferencesService.resetToDefaults().unwrapOrReturn {
+            peripheralPreferencesService.resetToDefaults().unwrapOrReturn {
                 infoMessageInteractor.enqueueMessage(
                     message = getString(Res.string.settings_error),
                     type = InfoMessageType.Error,

@@ -44,7 +44,7 @@ import kotlinx.io.writeFloat
 import kotlinx.io.writeString
 
 class NetworkIemService(
-    private val preferencesService: PreferencesService,
+    private val peripheralPreferencesService: PeripheralPreferencesService,
 ) : IIemService {
 
     private val oscIp = "127.0.0.1"
@@ -103,7 +103,7 @@ class NetworkIemService(
     }
 
     private suspend fun loadUserSettings() {
-        val settings = preferencesService.awaitSettings()
+        val settings = peripheralPreferencesService.awaitSettings()
         restDomain = "http://localhost:${settings.reaperWebPort}"
         oscNotificationPort = settings.reaperOscDevicePort
         oscCommandPort = settings.reaperOscListenPort

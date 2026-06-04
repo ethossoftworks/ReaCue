@@ -49,7 +49,7 @@ data object LightAppColors : AppColors() {
         )
     override val strokePrimary = Color(0xFF383c42)
     override val strokeControl =
-        Brush.verticalGradient(0.0f to Color(0xFFaaabb1), 0.9f to Color(0xFF51585a), 1.0f to Color(0xFF0a0c0f))
+        Brush.verticalGradient(0.0f to Color(0xFFaaabb1), 0.9f to Color(0xFF51585a), 1.0f to Color(0xFF3a4143))
 
     override val sliderTrackBg = Brush.verticalGradient(0.0f to bgPrimary20, 0.8f to bgPrimary20, .95f to strokePrimary)
 }

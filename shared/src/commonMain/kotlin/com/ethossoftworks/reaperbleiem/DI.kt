@@ -7,11 +7,12 @@ import com.ethossoftworks.reaperbleiem.interactor.IemInteractor
 import com.ethossoftworks.reaperbleiem.interactor.InfoMessageInteractor
 import com.ethossoftworks.reaperbleiem.lib.KmpBuildEnvironmentOverrider
 import com.ethossoftworks.reaperbleiem.service.iem.NetworkIemService
-import com.ethossoftworks.reaperbleiem.service.preferences.PreferencesService
+import com.ethossoftworks.reaperbleiem.service.preferences.CentralPreferencesService
+import com.ethossoftworks.reaperbleiem.service.preferences.PeripheralPreferencesService
 import com.ethossoftworks.reaperbleiem.ui.app.AppToolbarViewInteractor
 import com.ethossoftworks.reaperbleiem.ui.iem.IemScreenViewInteractor
 import com.ethossoftworks.reaperbleiem.ui.scan.ScanScreenViewInteractor
-import com.ethossoftworks.reaperbleiem.ui.settings.SettingsScreenViewInteractor
+import com.ethossoftworks.reaperbleiem.ui.settings.PeripheralSettingsScreenViewInteractor
 import com.outsidesource.oskitkmp.capability.BluetoothCapabilityFlags
 import com.outsidesource.oskitkmp.capability.KmpCapabilities
 import org.koin.core.KoinApplication
@@ -70,7 +71,8 @@ fun commonModule() = module {
 
     // Services
     single { NetworkIemService(get()) }
-    single { PreferencesService(get()) }
+    single { PeripheralPreferencesService(get()) }
+    single { CentralPreferencesService(get()) }
 
     // App Interactors
     single { CapabilityInteractor(get()) }
@@ -82,7 +84,7 @@ fun commonModule() = module {
     factory { AboutViewInteractor() }
     factory { ScanScreenViewInteractor(get(), get(), get()) }
     factory { AppToolbarViewInteractor(get()) }
-    factory { SettingsScreenViewInteractor(get(), get()) }
+    factory { PeripheralSettingsScreenViewInteractor(get(), get()) }
 }
 
 fun mockModule() = module {}

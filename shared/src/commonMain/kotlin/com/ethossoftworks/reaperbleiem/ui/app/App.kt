@@ -5,7 +5,7 @@ import com.ethossoftworks.reaperbleiem.Route
 import com.ethossoftworks.reaperbleiem.coordinator.AppCoordinator
 import com.ethossoftworks.reaperbleiem.ui.iem.IemScreen
 import com.ethossoftworks.reaperbleiem.ui.scan.ScanScreen
-import com.ethossoftworks.reaperbleiem.ui.settings.SettingsScreen
+import com.ethossoftworks.reaperbleiem.ui.settings.PeripheralSettingsScreen
 import com.ethossoftworks.reaperbleiem.ui.theme.AppThemeProvider
 import com.outsidesource.oskitcompose.lib.rememberInject
 import com.outsidesource.oskitcompose.router.RouteSwitch
@@ -17,7 +17,7 @@ fun App(coordinator: AppCoordinator = rememberInject()) {
             when (it) {
                 is Route.Scan -> ScanScreen()
                 is Route.Iem -> IemScreen(context = it.context)
-                is Route.Settings -> SettingsScreen()
+                is Route.Settings -> PeripheralSettingsScreen()
             }
             InfoMessageContainer()
         }
