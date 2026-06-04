@@ -7,6 +7,7 @@ import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBleCentralManager
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBlePeripheral
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleConnectionPriority
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleConnectionStatus
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleError
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleWriteMode
 import com.ethossoftworks.reaperbleiem.service.preferences.CentralPreferencesService
 import com.outsidesource.oskitkmp.lib.toUShort
@@ -26,12 +27,14 @@ import kotlinx.atomicfu.update
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import kotlinx.io.Buffer
@@ -147,22 +150,29 @@ class BleCentralIemService(
             val hostId = Uuid.fromByteArray(buffer.readByteArray(16)).toHexString()
             val nonce = buffer.readByteArray(16)
 
-            val storedPasscode = centralPreferencesService.getPasscode(hostId)
-            val passcode = if (storedPasscode == null) {
+            val requestPasscode: suspend () -> String = {
                 val passcodeDeferred = CompletableDeferred<String>()
                 send(IemEvent.PasscodeRequired(passcodeDeferred))
-                val passcodeResult = passcodeDeferred.await()
-                centralPreferencesService.putPasscode(hostId, passcodeResult)
-                passcodeResult
-            } else {
-                storedPasscode
+                val passcode = passcodeDeferred.await()
+                centralPreferencesService.putPasscode(hostId, passcode)
+                passcode
             }
 
-            val hmacKey = hmac.keyDecoder(SHA256).decodeFromByteArray(HMAC.Key.Format.RAW, passcode.toByteArray())
-            val signature = hmacKey.signatureGenerator().generateSignature(nonce)
+            val verifyPasscode: suspend (passcode: String) -> Outcome<Unit, KmpBleError> = { passcode ->
+                val hmacKey = hmac.keyDecoder(SHA256).decodeFromByteArray(HMAC.Key.Format.RAW, passcode.toByteArray())
+                val signature = hmacKey.signatureGenerator().generateSignature(nonce)
+                peripheral.write(REACUE_HANDSHAKE_CHARACTERISTIC_UUID, signature)
+            }
 
-            peripheral.write(REACUE_HANDSHAKE_CHARACTERISTIC_UUID, signature).unwrapOrReturn {
-                return it
+            val passcode = centralPreferencesService.getPasscode(hostId) ?: requestPasscode()
+            val result = verifyPasscode(passcode)
+            if (result is Outcome.Ok) return result
+
+            while (currentCoroutineContext().isActive) {
+                delay(.5.seconds)
+                val passcodeRetry = requestPasscode()
+                val retryResult = verifyPasscode(passcodeRetry)
+                if (retryResult is Outcome.Ok) return retryResult
             }
 
             Outcome.Ok(Unit)
