@@ -7,6 +7,8 @@ import com.outsidesource.oskitkmp.outcome.Outcome
 import com.outsidesource.oskitkmp.outcome.unwrapOrReturn
 import com.outsidesource.oskitkmp.storage.IKmpKvStore
 import com.outsidesource.oskitkmp.storage.IKmpKvStoreNode
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -16,8 +18,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
 data class PeripheralSettings(
     val hostId: Uuid = Uuid.random(),
@@ -49,7 +49,6 @@ class PeripheralPreferencesService(private val kvStore: IKmpKvStore) {
                     Logger.i { "Could not open KvStore" }
                     return@launch
                 }
-
 
             val default = PeripheralSettings()
             if (!nodeResult.contains(KeyHostId)) nodeResult.putBytes(KeyHostId, default.hostId.toByteArray())

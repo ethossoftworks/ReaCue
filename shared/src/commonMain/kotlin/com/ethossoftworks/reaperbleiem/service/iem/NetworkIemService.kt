@@ -17,7 +17,7 @@ import io.ktor.utils.io.CancellationException
 import io.ktor.utils.io.core.buildPacket
 import io.ktor.utils.io.core.discard
 import kotlin.math.absoluteValue
-import kotlin.math.pow
+import kotlin.math.log10
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
@@ -42,10 +42,9 @@ import kotlinx.io.readFloat
 import kotlinx.io.readString
 import kotlinx.io.writeFloat
 import kotlinx.io.writeString
+import kotlin.collections.mapNotNull
 
-class NetworkIemService(
-    private val peripheralPreferencesService: PeripheralPreferencesService,
-) : IIemService {
+class NetworkIemService(private val peripheralPreferencesService: PeripheralPreferencesService) : IIemService {
 
     private val oscIp = "127.0.0.1"
     private var restDomain = ""
@@ -58,6 +57,7 @@ class NetworkIemService(
     private val paddingBuffer = byteArrayOf(0x00, 0x00, 0x00)
     private val events = MutableSharedFlow<IemEvent>()
     private val trackCache = atomic<Map<Int, Track>>(emptyMap())
+    private val webFaderInfo = FaderInfo()
 
     override fun subscribe(context: IemContext): Flow<IemEvent> = callbackFlow {
         try {
@@ -398,11 +398,12 @@ class NetworkIemService(
         return totalBytes - tokenLength
     }
 
+    // Web API reports volume as a linear gain multiplier (1.0 = 0 dB). OSC reports the normalized
+    // fader position. Convert the gain to dB then through the same fader curve OSC uses so both
+    // sources land on identical normalized values.
     private fun normalizeWebVolume(value: Double): Float {
         if (value <= 0.0) return 0.0.toFloat()
-        val maxGainLinear = 10.0.pow(12.0 / 20.0)
-        val oscValue = (value / maxGainLinear).pow(0.25)
-        return oscValue.coerceIn(0.0, 1.0).toFloat()
+        return webFaderInfo.dbToNormalized((20.0 * log10(value)).toFloat())
     }
 
     private fun normalizeWebPan(value: Double): Float {
