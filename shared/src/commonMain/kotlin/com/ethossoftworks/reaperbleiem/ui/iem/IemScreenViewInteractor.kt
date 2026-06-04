@@ -11,6 +11,7 @@ import com.ethossoftworks.reaperbleiem.service.iem.Track
 import com.outsidesource.oskitkmp.capability.CapabilityStatus
 import com.outsidesource.oskitkmp.interactor.Interactor
 import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
@@ -24,6 +25,7 @@ data class IemScreenViewState(
     val serviceStatus: ServiceStatus = ServiceStatus.Disconnected,
     val isRefreshing: Boolean = false,
     val numberInputModalType: NumberInputModalType? = null,
+    val passcodeEntry: CompletableDeferred<String>? = null,
 )
 
 enum class NumberInputModalType {
@@ -134,6 +136,10 @@ class IemScreenViewInteractor(
         iemInteractor.setReceivePan(trackId, receiveId, value)
     }
 
+    fun onPasscodeEntryDismiss() {
+        update { state -> state.copy(passcodeEntry = null) }
+    }
+
     private fun start() {
         subscriptionJob.value?.cancel()
         interactorScope
@@ -145,9 +151,7 @@ class IemScreenViewInteractor(
                                 it.tracks.values.firstOrNull { track -> track.name == state.lastSelectedIemName }
                             update { state -> state.copy(selectedIemId = trackMatch?.id) }
                         }
-                        is IemEvent.PasscodeRequired -> {
-
-                        }
+                        is IemEvent.PasscodeRequired -> update { state -> state.copy(passcodeEntry = it.passcode) }
                         else -> {}
                     }
                 }

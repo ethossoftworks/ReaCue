@@ -62,7 +62,7 @@ sealed class IemEvent {
     data class TrackNameUpdated(@CborLabel(1) val trackId: Int, @CborLabel(2) val name: String) : IemEvent()
 
     @Serializable
-    @SerialName("5")
+    @SerialName("4")
     data class ReceivePanUpdated(
         @CborLabel(1) val trackId: Int,
         @CborLabel(2) val receiveId: Int,
@@ -70,7 +70,7 @@ sealed class IemEvent {
     ) : IemEvent()
 
     @Serializable
-    @SerialName("6")
+    @SerialName("5")
     data class ReceiveVolumeUpdated(
         @CborLabel(1) val trackId: Int,
         @CborLabel(2) val receiveId: Int,
@@ -78,24 +78,25 @@ sealed class IemEvent {
     ) : IemEvent()
 
     @Serializable
-    @SerialName("7")
+    @SerialName("6")
     data class OutputVolumeUpdated(@CborLabel(1) val trackId: Int, @CborLabel(2) val value: Float) : IemEvent()
 
-    @SerialName("8") data object Reset : IemEvent()
+    @SerialName("7") @Serializable data object Reset : IemEvent()
 
-    @SerialName("9") data class PasscodeRequired(val passcode: CompletableDeferred<String>) : IemEvent()
+    @SerialName("8")
+    @Serializable
+    data class PasscodeRequired(@CborLabel(1) val passcode: CompletableDeferred<String>) : IemEvent()
 
-    @SerialName("10")
+    @Serializable
+    @SerialName("9")
     sealed class Error : IemEvent() {
-        @SerialName("1")
+        @SerialName("10")
         @Serializable(with = IemUnknownErrorEventSerializer::class)
-        data class Unknown(val error: Any) : Error()
+        data class Unknown(@CborLabel(1) val error: Any) : Error()
 
-        @SerialName("2")
-        data object BleProtocolMismatch : Error()
+        @SerialName("11") @Serializable data object BleProtocolMismatch : Error()
 
-        @SerialName("3")
-        data object DisconnectedPeripheral : Error()
+        @SerialName("12") @Serializable data object DisconnectedPeripheral : Error()
     }
 }
 

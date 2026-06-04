@@ -4,21 +4,37 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ethossoftworks.reaperbleiem.interactor.ServiceStatus
@@ -31,9 +47,11 @@ import com.ethossoftworks.reaperbleiem.ui.form.AppDropdown
 import com.ethossoftworks.reaperbleiem.ui.form.AppDropdownItem
 import com.ethossoftworks.reaperbleiem.ui.form.AppLoadingIndicator
 import com.ethossoftworks.reaperbleiem.ui.form.AppSlider
+import com.ethossoftworks.reaperbleiem.ui.form.AppTextField
 import com.ethossoftworks.reaperbleiem.ui.form.Knob
 import com.ethossoftworks.reaperbleiem.ui.form.NumberEntryModal
 import com.ethossoftworks.reaperbleiem.ui.theme.AppTheme
+import com.ethossoftworks.reaperbleiem.ui.theme.appModalSurface
 import com.outsidesource.oskitcompose.form.DpAxisSize
 import com.outsidesource.oskitcompose.form.KmpSliderAlignment
 import com.outsidesource.oskitcompose.form.KmpSliderTick
@@ -41,6 +59,8 @@ import com.outsidesource.oskitcompose.form.KmpSliderTickPosition
 import com.outsidesource.oskitcompose.form.KmpSliderTickStyle
 import com.outsidesource.oskitcompose.interactor.collectAsState
 import com.outsidesource.oskitcompose.lib.rememberInjectForRoute
+import com.outsidesource.oskitcompose.popup.Modal
+import com.outsidesource.oskitcompose.popup.ModalStyles
 import com.outsidesource.oskitcompose.systemui.KmpWindowInsets
 import com.outsidesource.oskitcompose.systemui.top
 import com.outsidesource.oskitkmp.text.KmpNumberFormatter
@@ -60,6 +80,7 @@ import reaper_ble_iem.shared.generated.resources.mix
 import reaper_ble_iem.shared.generated.resources.mix_project
 import reaper_ble_iem.shared.generated.resources.no_monitors
 import reaper_ble_iem.shared.generated.resources.output
+import reaper_ble_iem.shared.generated.resources.passcode
 import reaper_ble_iem.shared.generated.resources.refresh
 import reaper_ble_iem.shared.generated.resources.refreshing
 import reaper_ble_iem.shared.generated.resources.scan_for_hosts
@@ -303,6 +324,18 @@ fun IemScreen(
         onCancel = interactor::onNumberModalDismiss,
         onCommit = interactor::onNumberModalCommit,
     )
+
+    PasscodeEntryModal(
+        isVisible = state.passcodeEntry != null,
+        onCommit = {
+            state.passcodeEntry?.complete(it)
+            interactor.onPasscodeEntryDismiss()
+        },
+        onCancel = {
+            state.passcodeEntry?.cancel()
+            interactor.onPasscodeEntryDismiss()
+        },
+    )
 }
 
 val dbFormatter = KmpNumberFormatter(minimumFractionDigits = 2, maximumFractionDigits = 2)
@@ -342,5 +375,58 @@ private fun rememberTicks(faderInfo: FaderInfo): List<KmpSliderTick> {
                     ),
             ),
         )
+    }
+}
+
+@Composable
+fun PasscodeEntryModal(
+    isVisible: Boolean,
+    maxWidth: Dp = 300.dp,
+    onCancel: () -> Unit,
+    onCommit: (String) -> Unit,
+) {
+    val focusRequester = remember { FocusRequester() }
+
+    Modal(
+        modifier = Modifier.widthIn(max = maxWidth).appModalSurface().padding(16.dp),
+        isVisible = isVisible,
+        styles = ModalStyles.UserDefinedContent,
+        onDismissRequest = onCancel,
+    ) {
+        LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+        var value by remember { mutableStateOf("") }
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(text = stringResource(Res.string.passcode), fontSize = 16.sp)
+
+            Spacer(modifier = Modifier.height(8.dp))
+            AppTextField(
+                modifier =
+                    Modifier.fillMaxWidth().focusRequester(focusRequester).onKeyEvent {
+                        if ((it.key != Key.Enter && it.key != Key.NumPadEnter) || it.type != KeyEventType.KeyUp)
+                            return@onKeyEvent false
+                        onCommit(value)
+                        return@onKeyEvent true
+                    },
+                value = value,
+                onChange = { value = it },
+                keyboardActions = KeyboardActions(onDone = { onCommit(value) }),
+                singleLine = true,
+                maxLines = 1,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.End),
+            ) {
+                AppButton(label = "Cancel", onClick = onCancel)
+                AppButton(label = "Ok", onClick = { onCommit(value) })
+            }
+        }
     }
 }
