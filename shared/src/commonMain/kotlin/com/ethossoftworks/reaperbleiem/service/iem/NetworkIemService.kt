@@ -1,7 +1,7 @@
 package com.ethossoftworks.reaperbleiem.service.iem
 
 import co.touchlab.kermit.Logger
-import com.ethossoftworks.reaperbleiem.service.preferences.PreferencesService
+import com.ethossoftworks.reaperbleiem.service.preferences.PeripheralPreferencesService
 import com.outsidesource.oskitkmp.concurrency.KmpDispatchers
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
@@ -81,8 +81,10 @@ class NetworkIemService(
             launch {
                 try {
                     startWebPolling()
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (t: Throwable) {
-                    send(IemEvent.Error(t))
+                    send(IemEvent.Error.Unknown(t))
                     this@callbackFlow.cancel()
                 }
             }
@@ -94,7 +96,7 @@ class NetworkIemService(
             throw e
         } catch (t: Throwable) {
             Logger.e("NetworkIemService", t)
-            send(IemEvent.Error(t))
+            send(IemEvent.Error.Unknown(t))
             closeSocket()
             close()
         }

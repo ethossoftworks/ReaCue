@@ -61,9 +61,10 @@ class IemInteractor(private val iemService: IIemService) :
             .subscribe(context)
             .onEach { event ->
                 when (event) {
+                    is IemEvent.PasscodeRequired,
                     IemEvent.Refresh,
                     IemEvent.Reset -> {
-                        // Do Nothing. These are commands sent from the central.
+                        // Do Nothing.
                     }
 
                     IemEvent.Refreshing ->

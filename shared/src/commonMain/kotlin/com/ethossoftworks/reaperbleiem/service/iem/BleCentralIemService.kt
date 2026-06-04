@@ -11,6 +11,7 @@ import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleWriteMode
 import com.ethossoftworks.reaperbleiem.service.preferences.CentralPreferencesService
 import com.outsidesource.oskitkmp.lib.toUShort
 import com.outsidesource.oskitkmp.lib.update
+import com.outsidesource.oskitkmp.outcome.Outcome
 import com.outsidesource.oskitkmp.outcome.unwrapOrReturn
 import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.HMAC
@@ -19,8 +20,10 @@ import io.ktor.utils.io.core.toByteArray
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
@@ -69,20 +72,11 @@ class BleCentralIemService(
             return@callbackFlow
         }
 
+        peripheral.requestConnectionPriority(KmpBleConnectionPriority.High)
         peripheral.connectionStatus.onEach { if (it == KmpBleConnectionStatus.Disconnected) cancel() }.launchIn(this)
 
-        peripheral.requestConnectionPriority(KmpBleConnectionPriority.High)
-
         // Auth Handshake
-        val nonce = peripheral.read(REACUE_HANDSHAKE_CHARACTERISTIC_UUID).unwrapOrReturn {
-            cancel()
-            return@callbackFlow
-        }
-
-        val hmacKey = hmac.keyDecoder(SHA256).decodeFromByteArray(HMAC.Key.Format.RAW, "QQeUVpXz".toByteArray())
-        val signature = hmacKey.signatureGenerator().generateSignature(nonce)
-
-        peripheral.write(REACUE_HANDSHAKE_CHARACTERISTIC_UUID, signature).unwrapOrReturn {
+        handleAuth(peripheral, ::send).unwrapOrReturn {
             cancel()
             return@callbackFlow
         }
@@ -129,6 +123,51 @@ class BleCentralIemService(
                     return@launch
                 }
             }
+        }
+    }
+
+    private suspend fun handleAuth(
+        peripheral: IKmpBlePeripheral,
+        send: suspend (IemEvent) -> Unit,
+    ): Outcome<Unit, Any> {
+        return try {
+            val authChallenge =
+                peripheral.read(REACUE_HANDSHAKE_CHARACTERISTIC_UUID).unwrapOrReturn {
+                    return it
+                }
+
+            val buffer = Buffer().apply { write(authChallenge) }
+            val protocol = buffer.readInt()
+
+            if (protocol != BLE_PROTOCOL_VERSION) {
+                send(IemEvent.Error.BleProtocolMismatch)
+                return Outcome.Error(Unit)
+            }
+
+            val hostId = Uuid.fromByteArray(buffer.readByteArray(16)).toHexString()
+            val nonce = buffer.readByteArray(16)
+
+            val storedPasscode = centralPreferencesService.getPasscode(hostId)
+            val passcode = if (storedPasscode == null) {
+                val passcodeDeferred = CompletableDeferred<String>()
+                send(IemEvent.PasscodeRequired(passcodeDeferred))
+                val passcodeResult = passcodeDeferred.await()
+                centralPreferencesService.putPasscode(hostId, passcodeResult)
+                passcodeResult
+            } else {
+                storedPasscode
+            }
+
+            val hmacKey = hmac.keyDecoder(SHA256).decodeFromByteArray(HMAC.Key.Format.RAW, passcode.toByteArray())
+            val signature = hmacKey.signatureGenerator().generateSignature(nonce)
+
+            peripheral.write(REACUE_HANDSHAKE_CHARACTERISTIC_UUID, signature).unwrapOrReturn {
+                return it
+            }
+
+            Outcome.Ok(Unit)
+        } catch (e: Exception) {
+            return Outcome.Error(e)
         }
     }
 

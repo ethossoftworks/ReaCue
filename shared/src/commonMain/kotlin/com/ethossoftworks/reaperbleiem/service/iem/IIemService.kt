@@ -10,6 +10,7 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 import kotlinx.collections.immutable.PersistentMap
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
@@ -82,9 +83,20 @@ sealed class IemEvent {
 
     @SerialName("8") data object Reset : IemEvent()
 
-    @Serializable(with = IemErrorEventSerializer::class)
-    @SerialName("9")
-    data class Error(@CborLabel(1) val error: Any) : IemEvent()
+    @SerialName("9") data class PasscodeRequired(val passcode: CompletableDeferred<String>) : IemEvent()
+
+    @SerialName("10")
+    sealed class Error : IemEvent() {
+        @SerialName("1")
+        @Serializable(with = IemUnknownErrorEventSerializer::class)
+        data class Unknown(val error: Any) : Error()
+
+        @SerialName("2")
+        data object BleProtocolMismatch : Error()
+
+        @SerialName("3")
+        data object DisconnectedPeripheral : Error()
+    }
 }
 
 @Serializable
@@ -97,14 +109,14 @@ data class Track(
     val isIem = hardwareOuts.isNotEmpty() && receives.isNotEmpty()
 }
 
-object IemErrorEventSerializer : KSerializer<IemEvent.Error> {
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("IemError", PrimitiveKind.STRING)
+object IemUnknownErrorEventSerializer : KSerializer<IemEvent.Error.Unknown> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("IemError.Unknown", PrimitiveKind.STRING)
 
-    override fun deserialize(decoder: Decoder): IemEvent.Error {
-        return IemEvent.Error(decoder.decodeString())
+    override fun deserialize(decoder: Decoder): IemEvent.Error.Unknown {
+        return IemEvent.Error.Unknown(decoder.decodeString())
     }
 
-    override fun serialize(encoder: Encoder, value: IemEvent.Error) {
+    override fun serialize(encoder: Encoder, value: IemEvent.Error.Unknown) {
         encoder.encodeString(value.error.toString())
     }
 }

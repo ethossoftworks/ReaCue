@@ -145,7 +145,9 @@ class IemScreenViewInteractor(
                                 it.tracks.values.firstOrNull { track -> track.name == state.lastSelectedIemName }
                             update { state -> state.copy(selectedIemId = trackMatch?.id) }
                         }
+                        is IemEvent.PasscodeRequired -> {
 
+                        }
                         else -> {}
                     }
                 }
