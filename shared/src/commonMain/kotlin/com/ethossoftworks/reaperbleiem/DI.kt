@@ -6,6 +6,7 @@ import com.ethossoftworks.reaperbleiem.interactor.CapabilityInteractor
 import com.ethossoftworks.reaperbleiem.interactor.IemInteractor
 import com.ethossoftworks.reaperbleiem.interactor.InfoMessageInteractor
 import com.ethossoftworks.reaperbleiem.lib.KmpBuildEnvironmentOverrider
+import com.ethossoftworks.reaperbleiem.service.iem.IemContext
 import com.ethossoftworks.reaperbleiem.service.iem.NetworkIemService
 import com.ethossoftworks.reaperbleiem.service.preferences.CentralPreferencesService
 import com.ethossoftworks.reaperbleiem.service.preferences.PeripheralPreferencesService
@@ -80,7 +81,16 @@ fun commonModule() = module {
     single { IemInteractor(get()) }
 
     // View Interactors
-    factory { params -> IemScreenViewInteractor(params[0], get(), get(), get()) }
+    factory { params ->
+        val context = params[0] as IemContext
+        IemScreenViewInteractor(
+            params[0],
+            get(),
+            get(),
+            get(),
+            if (context is IemContext.Peripheral) get<PeripheralPreferencesService>() else null,
+        )
+    }
     factory { AboutViewInteractor() }
     factory { ScanScreenViewInteractor(get(), get(), get()) }
     factory { AppToolbarViewInteractor(get()) }

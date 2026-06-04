@@ -8,6 +8,7 @@ import com.ethossoftworks.reaperbleiem.service.iem.FaderInfo
 import com.ethossoftworks.reaperbleiem.service.iem.IemContext
 import com.ethossoftworks.reaperbleiem.service.iem.IemEvent
 import com.ethossoftworks.reaperbleiem.service.iem.Track
+import com.ethossoftworks.reaperbleiem.service.preferences.PeripheralPreferencesService
 import com.outsidesource.oskitkmp.capability.CapabilityStatus
 import com.outsidesource.oskitkmp.interactor.Interactor
 import kotlinx.atomicfu.atomic
@@ -26,6 +27,8 @@ data class IemScreenViewState(
     val isRefreshing: Boolean = false,
     val numberInputModalType: NumberInputModalType? = null,
     val passcodeEntry: CompletableDeferred<String>? = null,
+    val isPasscodeEntryModalVisible: Boolean = false,
+    val passcode: String = "",
 )
 
 enum class NumberInputModalType {
@@ -38,6 +41,7 @@ class IemScreenViewInteractor(
     private val iemInteractor: IemInteractor,
     private val capabilityInteractor: CapabilityInteractor,
     private val coordinator: AppCoordinator,
+    private val peripheralPreferencesService: PeripheralPreferencesService?,
 ) :
     Interactor<IemScreenViewState>(
         initialState = IemScreenViewState(),
@@ -138,6 +142,17 @@ class IemScreenViewInteractor(
 
     fun onPasscodeEntryDismiss() {
         update { state -> state.copy(passcodeEntry = null) }
+    }
+
+    fun onViewPasscodeClick() {
+        interactorScope.launch {
+            val passcode = peripheralPreferencesService?.settings?.value?.hostPasscode
+            update { state -> state.copy(isPasscodeEntryModalVisible = true, passcode = passcode ?: "") }
+        }
+    }
+
+    fun onViewPasscodeModalDismiss() {
+        update { state -> state.copy(isPasscodeEntryModalVisible = false) }
     }
 
     private fun start() {

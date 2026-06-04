@@ -33,6 +33,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -88,6 +89,7 @@ import reaper_ble_iem.shared.generated.resources.select_monitor
 import reaper_ble_iem.shared.generated.resources.set_all_0db
 import reaper_ble_iem.shared.generated.resources.set_all_n
 import reaper_ble_iem.shared.generated.resources.untitled
+import reaper_ble_iem.shared.generated.resources.view_passcode
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -117,6 +119,13 @@ fun IemScreen(
                         stringResource(Res.string.mix)
                     },
                 additionalMenuItems = { close ->
+                    if (context is IemContext.Peripheral) {
+                        AppDropdownItem(
+                            text = stringResource(Res.string.view_passcode),
+                            onClick = interactor::onViewPasscodeClick,
+                        )
+                    }
+
                     if (state.serviceStatus != ServiceStatus.Connected || state.selectedIemId == null) return@AppToolbar
                     AppDropdownItem(
                         text = stringResource(Res.string.refresh),
@@ -336,6 +345,12 @@ fun IemScreen(
             interactor.onPasscodeEntryDismiss()
         },
     )
+
+    ViewPasscodeModal(
+        isVisible = state.isPasscodeEntryModalVisible,
+        onDismiss = interactor::onViewPasscodeModalDismiss,
+        passcode = state.passcode,
+    )
 }
 
 val dbFormatter = KmpNumberFormatter(minimumFractionDigits = 2, maximumFractionDigits = 2)
@@ -426,6 +441,42 @@ fun PasscodeEntryModal(
             ) {
                 AppButton(label = "Cancel", onClick = onCancel)
                 AppButton(label = "Ok", onClick = { onCommit(value) })
+            }
+        }
+    }
+}
+
+@Composable
+fun ViewPasscodeModal(
+    isVisible: Boolean,
+    passcode: String,
+    maxWidth: Dp = 300.dp,
+    onDismiss: () -> Unit,
+) {
+    Modal(
+        modifier = Modifier.widthIn(max = maxWidth).appModalSurface().padding(16.dp),
+        isVisible = isVisible,
+        styles = ModalStyles.UserDefinedContent,
+        onDismissRequest = onDismiss,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(text = stringResource(Res.string.passcode), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                modifier = Modifier.padding(vertical = 24.dp),
+                text = passcode,
+                fontSize = 20.sp,
+                letterSpacing = 2.sp,
+                fontWeight = FontWeight.Light,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.End),
+            ) {
+                AppButton(label = "Ok", onClick = onDismiss)
             }
         }
     }
