@@ -61,8 +61,8 @@ class BlePeripheralIemService(
     private val crypto = CryptographyProvider.Default
     private val hmac = crypto.get(HMAC)
     private val secureRandom = CryptographyRandom.Default
-    private val whitelistedCentrals = atomic<Set<KmpBleCentralId>>(emptySet())
-    private val centralNonces = atomic<Map<KmpBleCentralId, ByteArray>>(emptyMap())
+    private val authorizedCentrals = atomic<Set<KmpBleCentralId>>(emptySet())
+    private val authNonces = atomic<Map<KmpBleCentralId, ByteArray>>(emptyMap())
 
     private var hostName: String = "ReaCue"
     private var hostPasscode: String = ""
@@ -130,7 +130,7 @@ class BlePeripheralIemService(
                         is KmpBlePeripheralEvent.CentralSubscribed ->
                             peripheralManager.requestConnectionPriority(KmpBleConnectionPriority.High, event.centralId)
                         is KmpBlePeripheralEvent.CentralUnsubscribed ->
-                            whitelistedCentrals.update { it - event.centralId }
+                            authorizedCentrals.update { it - event.centralId }
                         is KmpBlePeripheralEvent.ReadRequest ->
                             when (event.characteristic) {
                                 REACUE_HANDSHAKE_CHARACTERISTIC_UUID -> onHandshakeReadRequest(event)
@@ -159,6 +159,9 @@ class BlePeripheralIemService(
                 .launchIn(this)
 
         awaitClose {
+            authorizedCentrals.update { emptySet() }
+            authNonces.update { emptyMap() }
+
             bleChannelJob.cancel()
             advertiseJob.cancel()
             networkJob.cancel()
@@ -183,7 +186,7 @@ class BlePeripheralIemService(
                 }
                 .readByteArray()
 
-        centralNonces.update { it.update { this[event.centralId] = nonce } }
+        authNonces.update { it.update { this[event.centralId] = nonce } }
 
         peripheralManager.respondToRequest(
             central = event.centralId,
@@ -194,15 +197,15 @@ class BlePeripheralIemService(
     }
 
     private suspend fun onHandshakeWriteRequest(event: KmpBlePeripheralEvent.WriteRequest) {
-        val nonce = centralNonces.value[event.centralId] ?: byteArrayOf()
+        val nonce = authNonces.value[event.centralId] ?: byteArrayOf()
         val keyBytes = peripheralPreferencesService.settings.value.hostPasscode.toByteArray()
         val hmacKey = hmac.keyDecoder(SHA256).decodeFromByteArray(HMAC.Key.Format.RAW, keyBytes)
         val signatureVerifier = hmacKey.signatureVerifier()
         val isValid = signatureVerifier.tryVerifySignature(nonce, event.data)
 
         if (isValid) {
-            whitelistedCentrals.update { it + event.centralId }
-            centralNonces.update { it - event.centralId }
+            authorizedCentrals.update { it + event.centralId }
+            authNonces.update { it - event.centralId }
         }
 
         peripheralManager.respondToRequest(
@@ -222,7 +225,7 @@ class BlePeripheralIemService(
         send: suspend (IemEvent) -> Unit,
     ) {
         try {
-            if (!whitelistedCentrals.value.contains(request.centralId)) return
+            if (!authorizedCentrals.value.contains(request.centralId)) return
 
             val event = cbor.decodeFromByteArray(IemEvent.serializer(), request.data)
             Logger.i { "Received command - $event" }
@@ -294,7 +297,7 @@ class BlePeripheralIemService(
         Logger.i { "Sending notification to ${centrals.size} centrals - $event" }
 
         for (central in centrals) {
-            if (!whitelistedCentrals.value.contains(central)) continue
+            if (!authorizedCentrals.value.contains(central)) continue
 
             val packetSize = peripheralManager.maximumUpdateValueLengthForCentral(central) - headerSize
             val packetCount = ceil(payload.size.toDouble() / packetSize.toDouble()).toUInt()
