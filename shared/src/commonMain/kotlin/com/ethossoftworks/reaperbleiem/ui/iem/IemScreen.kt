@@ -350,7 +350,7 @@ fun IemScreen(
     )
 
     ViewPasscodeModal(
-        isVisible = state.isPasscodeEntryModalVisible,
+        isVisible = state.isViewPasscodeModalVisible,
         onDismiss = interactor::onViewPasscodeModalDismiss,
         passcode = state.passcode,
     )
@@ -434,6 +434,7 @@ fun PasscodeEntryModal(
                 value = value,
                 onChange = { value = it },
                 keyboardActions = KeyboardActions(onDone = { onCommit(value) }),
+                fontFamily = FontFamily.Monospace,
                 singleLine = true,
                 maxLines = 1,
             )

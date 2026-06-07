@@ -14,6 +14,9 @@ import com.outsidesource.oskitkmp.interactor.Interactor
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
 data class IemScreenViewState(
@@ -27,7 +30,7 @@ data class IemScreenViewState(
     val isRefreshing: Boolean = false,
     val numberInputModalType: NumberInputModalType? = null,
     val passcodeEntry: CompletableDeferred<String>? = null,
-    val isPasscodeEntryModalVisible: Boolean = false,
+    val isViewPasscodeModalVisible: Boolean = false,
     val passcode: String = "",
 )
 
@@ -147,19 +150,20 @@ class IemScreenViewInteractor(
     fun onViewPasscodeClick() {
         interactorScope.launch {
             val passcode = peripheralPreferencesService?.settings?.value?.hostPasscode
-            update { state -> state.copy(isPasscodeEntryModalVisible = true, passcode = passcode ?: "") }
+            update { state -> state.copy(isViewPasscodeModalVisible = true, passcode = passcode ?: "") }
         }
     }
 
     fun onViewPasscodeModalDismiss() {
-        update { state -> state.copy(isPasscodeEntryModalVisible = false) }
+        update { state -> state.copy(isViewPasscodeModalVisible = false) }
     }
 
     private fun start() {
         subscriptionJob.value?.cancel()
-        interactorScope
-            .launch {
-                iemInteractor.subscribe(iemContext).collect {
+        subscriptionJob.value =
+            iemInteractor
+                .subscribe(iemContext)
+                .onEach {
                     when (it) {
                         is IemEvent.Refreshed -> {
                             val trackMatch =
@@ -170,7 +174,9 @@ class IemScreenViewInteractor(
                         else -> {}
                     }
                 }
-            }
-            .let { subscriptionJob.value = it }
+                .onCompletion {
+                    update { state -> state.copy(passcodeEntry = null) }
+                }
+                .launchIn(interactorScope)
     }
 }
