@@ -119,46 +119,49 @@ fun IemScreen(
                         stringResource(Res.string.mix)
                     },
                 additionalMenuItems = { close ->
+                    if (state.serviceStatus == ServiceStatus.Connected && state.selectedIemId != null) {
+                        AppDropdownItem(
+                            text = stringResource(Res.string.refresh),
+                            onClick = {
+                                close()
+                                interactor.onRefreshClick()
+                            },
+                        )
+                        AppDropdownItem(
+                            text = stringResource(Res.string.set_all_0db),
+                            onClick = {
+                                close()
+                                interactor.onSetAllTo0Click()
+                            },
+                        )
+                        AppDropdownItem(
+                            text = stringResource(Res.string.set_all_n),
+                            onClick = {
+                                close()
+                                interactor.onSetAllToNClick()
+                            },
+                        )
+                        AppDropdownItem(
+                            text = stringResource(Res.string.adjust_all_n),
+                            onClick = {
+                                close()
+                                interactor.onAdjustAllByNClick()
+                            },
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                            color = colors.strokePrimary,
+                        )
+                    }
                     if (context is IemContext.Peripheral) {
                         AppDropdownItem(
                             text = stringResource(Res.string.view_passcode),
-                            onClick = interactor::onViewPasscodeClick,
+                            onClick = {
+                                close()
+                                interactor.onViewPasscodeClick()
+                            },
                         )
                     }
-
-                    if (state.serviceStatus != ServiceStatus.Connected || state.selectedIemId == null) return@AppToolbar
-                    AppDropdownItem(
-                        text = stringResource(Res.string.refresh),
-                        onClick = {
-                            close()
-                            interactor.onRefreshClick()
-                        },
-                    )
-                    AppDropdownItem(
-                        text = stringResource(Res.string.set_all_0db),
-                        onClick = {
-                            close()
-                            interactor.onSetAllTo0Click()
-                        },
-                    )
-                    AppDropdownItem(
-                        text = stringResource(Res.string.set_all_n),
-                        onClick = {
-                            close()
-                            interactor.onSetAllToNClick()
-                        },
-                    )
-                    AppDropdownItem(
-                        text = stringResource(Res.string.adjust_all_n),
-                        onClick = {
-                            close()
-                            interactor.onAdjustAllByNClick()
-                        },
-                    )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                        color = colors.strokePrimary,
-                    )
                 },
             )
         },

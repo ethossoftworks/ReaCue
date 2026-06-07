@@ -36,6 +36,7 @@ import com.outsidesource.oskitcompose.scrollbars.KmpVerticalScrollbar
 import com.outsidesource.oskitcompose.scrollbars.rememberKmpScrollbarAdapter
 import org.jetbrains.compose.resources.stringResource
 import reaper_ble_iem.shared.generated.resources.Res
+import reaper_ble_iem.shared.generated.resources.apply
 import reaper_ble_iem.shared.generated.resources.are_you_sure
 import reaper_ble_iem.shared.generated.resources.cancel
 import reaper_ble_iem.shared.generated.resources.host_id
@@ -44,7 +45,6 @@ import reaper_ble_iem.shared.generated.resources.reaper_osc_device_port
 import reaper_ble_iem.shared.generated.resources.reaper_osc_listen_port
 import reaper_ble_iem.shared.generated.resources.reaper_web_port
 import reaper_ble_iem.shared.generated.resources.reset_to_default
-import reaper_ble_iem.shared.generated.resources.save
 import reaper_ble_iem.shared.generated.resources.saving
 import reaper_ble_iem.shared.generated.resources.settings
 
@@ -117,8 +117,8 @@ fun PeripheralSettingsScreen(interactor: PeripheralSettingsScreenViewInteractor 
 
             AppButton(
                 modifier = Modifier.align(Alignment.End),
-                label = stringResource(if (state.isSaving) Res.string.saving else Res.string.save),
-                onClick = interactor::onSaveClick,
+                label = stringResource(if (state.isSaving) Res.string.saving else Res.string.apply),
+                onClick = interactor::onApplyClick,
                 enabled = !state.isSaving,
             )
         }

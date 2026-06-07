@@ -49,7 +49,7 @@ class PeripheralSettingsScreenViewInteractor(
         interactorScope.coroutineContext.cancelChildren()
     }
 
-    fun onSaveClick() {
+    fun onApplyClick() {
         interactorScope.launch {
             update { state -> state.copy(isSaving = true) }
             var hasError = false
