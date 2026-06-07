@@ -78,13 +78,8 @@ class BleCentralIemService(
         peripheral.requestConnectionPriority(KmpBleConnectionPriority.High)
         peripheral.connectionStatus.onEach { if (it == KmpBleConnectionStatus.Disconnected) cancel() }.launchIn(this)
 
-        // Auth Handshake
-        handleAuth(peripheral, ::send).unwrapOrReturn {
-            cancel()
-            return@callbackFlow
-        }
-
-        // Subscribe to notifications
+        // Subscribe to notifications. Subscribe to notifications before auth so that BLE connection is kept open
+        // while the user types in the passcode
         val job =
             peripheral
                 .notifications(REACUE_EVENT_CHARACTERISTIC_UUID)
@@ -114,6 +109,12 @@ class BleCentralIemService(
                     }
                 }
                 .launchIn(this)
+
+        // Auth Handshake
+        handleAuth(peripheral, ::send).unwrapOrReturn {
+            cancel()
+            return@callbackFlow
+        }
 
         // Wait for collector to be ready to send refresh command
         delay(16.milliseconds)
