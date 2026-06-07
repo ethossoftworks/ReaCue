@@ -20,85 +20,100 @@ data class LicenseData(
 )
 
 /**
- * Generates CSV, JSON, TXT, and Markdown files of open source dependencies with their respective license URLs
+ * Generates CSV, JSON, TXT, and Markdown files of open source dependencies with their respective license URLs.
  *
- * Add `tasks.register<OssDisclaimerGenerator>("generateOssDisclaimer")` to root build.gradle.kts
+ * Register per-module (e.g. inside `subprojects { }`) so each module resolves its OWN configurations — cross-project
+ * configuration resolution is not allowed by Gradle. Each app module's report already includes its transitive deps
+ * (e.g. `:androidApp` covers `:shared`).
+ *
+ * `tasks.register<OssDisclaimerGenerator>("generateOssDisclaimer")`
  */
 abstract class OssDisclaimerGenerator : DefaultTask() {
     @get:OutputDirectory
     abstract val outputDirectory: org.gradle.api.file.DirectoryProperty
 
+    @get:org.gradle.api.tasks.Internal
+    var resolvedDeps: List<LicenseData> = emptyList()
+
     init {
         outputDirectory.convention(project.layout.buildDirectory.dir("reports/open-source-licenses"))
+        resolvedDeps = resolveFromConfigurations()
+    }
+
+    private fun resolveFromConfigurations(): List<LicenseData> {
+        val artifactExtRegex = Regex("-(jvm|android|js|wasm-js|wasm-wasi|iosarm64|iosx64|iossimulatorarm64|macosarm64|macosx64|linuxx64|linuxarm64|mingwx64|watchosarm64|watchossimulatorarm64|tvosarm64|tvossimulatorarm64|native)$")
+        val deduplicatedModuleKeys = mutableSetOf<String>()
+
+        val targetConfigs = project.configurations
+            .filter {
+                it.isCanBeResolved && (
+                    it.name.endsWith("RuntimeClasspath") ||
+                        it.name.endsWith("CompileKlibraries") ||
+                        it.name == "metadataCompileClasspath"
+                    )
+            }
+            .map { it.name }
+
+        return buildSet {
+            targetConfigs.forEach { configName ->
+                val config = project.configurations.findByName(configName) ?: return@forEach
+                if (!config.isCanBeResolved) return@forEach
+
+                val componentIds = config.incoming.resolutionResult.allComponents
+                    .map { it.id }
+                    .filterIsInstance<ModuleComponentIdentifier>()
+
+                val resolutionResult = project.dependencies.createArtifactResolutionQuery()
+                    .forComponents(componentIds)
+                    .withArtifacts(MavenModule::class.java, MavenPomArtifact::class.java)
+                    .execute()
+
+                resolutionResult.resolvedComponents.forEach { component ->
+                    val id = component.id as ModuleComponentIdentifier
+                    val sanitizedName = id.module.replace(artifactExtRegex, "")
+
+                    if (deduplicatedModuleKeys.contains("${id.group}:$sanitizedName")) return@forEach
+                    deduplicatedModuleKeys.add("${id.group}:$sanitizedName")
+
+                    val pomFile = component.getArtifacts(MavenPomArtifact::class.java)
+                        .filterIsInstance<ResolvedArtifactResult>()
+                        .firstOrNull()?.file
+
+                    val xml = try { XmlParser(false, false).parse(pomFile) } catch (e: Exception) { null }
+                    val poms = listOf(xml, *resolveParentPomXmls(xml))
+
+                    val projectUrl = poms.firstNotNullOfOrNull {
+                        (it?.get("url") as? NodeList)?.firstOrNull().let { (it as? Node)?.text() }
+                    }
+                    val license = poms.firstNotNullOfOrNull {
+                        val licenses = it?.get("licenses") as? NodeList
+                        val firstLicense = (licenses?.getAt("license"))?.firstOrNull() as? Node
+                            ?: return@firstNotNullOfOrNull null
+                        val name = (firstLicense["name"] as? NodeList)?.firstOrNull()
+                            ?.let { (it as? Node)?.text() } ?: return@firstNotNullOfOrNull null
+                        val licenseUrl = (firstLicense["url"] as? NodeList)?.firstOrNull()
+                            ?.let { (it as? Node)?.text() } ?: return@firstNotNullOfOrNull null
+                        Pair(name, licenseUrl)
+                    }
+
+                    val data = LicenseData(
+                        projectName = "${id.group}:$sanitizedName",
+                        version = id.version,
+                        projectUrl = projectUrl ?: "N/A",
+                        licenseName = license?.first ?: "N/A",
+                        licenseUrl = license?.second ?: "N/A"
+                    )
+                    add(data)
+                }
+            }
+        }.sortedBy { it.projectName }
     }
 
     @TaskAction
     fun generate() {
         val outputName = "open-source-licenses"
         val outputDir = outputDirectory.get().asFile.apply { mkdirs() }
-        val artifactExtRegex = Regex("-(jvm|android|js|wasm-js|wasm-wasi|iosarm64|iosx64|iossimulatorarm64|macosarm64|macosx64|linuxx64|linuxarm64|mingwx64|watchosarm64|watchossimulatorarm64|tvosarm64|tvossimulatorarm64|native)$")
-
-        // 1. Gather dependency information
-        val deduplicatedModuleKeys = mutableSetOf<String>()
-        val allDeps = buildSet {
-            project.subprojects.forEach { subproject ->
-                val targetConfigs = subproject.configurations
-                    .filter { it.isCanBeResolved && (it.name.endsWith("RuntimeClasspath") || it.name == "metadataCompileClasspath") }
-                    .map { it.name }
-
-                targetConfigs.forEach { configName ->
-                    val config = subproject.configurations.findByName(configName) ?: return@forEach
-                    if (!config.isCanBeResolved) return@forEach
-
-                    val componentIds = config.incoming.resolutionResult.allComponents
-                        .map { it.id }
-                        .filterIsInstance<ModuleComponentIdentifier>()
-
-                    val resolutionResult = project.dependencies.createArtifactResolutionQuery()
-                        .forComponents(componentIds)
-                        .withArtifacts(MavenModule::class.java, MavenPomArtifact::class.java)
-                        .execute()
-
-                    resolutionResult.resolvedComponents.forEach { component ->
-                        val id = component.id as ModuleComponentIdentifier
-                        val sanitizedName = id.module.replace(artifactExtRegex, "")
-
-                        if (deduplicatedModuleKeys.contains("${id.group}:$sanitizedName")) return@forEach
-                        deduplicatedModuleKeys.add("${id.group}:$sanitizedName")
-
-                        val pomFile = component.getArtifacts(MavenPomArtifact::class.java)
-                            .filterIsInstance<ResolvedArtifactResult>()
-                            .firstOrNull()?.file
-
-                        val xml = try { XmlParser(false, false).parse(pomFile) } catch (e: Exception) { null }
-                        val poms = listOf(xml, *resolveParentPomXmls(xml))
-
-                        val projectUrl = poms.firstNotNullOfOrNull {
-                            (it?.get("url") as? NodeList)?.firstOrNull().let { (it as? Node)?.text() }
-                        }
-                        val license = poms.firstNotNullOfOrNull {
-                            val licenses = it?.get("licenses") as? NodeList
-                            val firstLicense = (licenses?.getAt("license"))?.firstOrNull() as? Node
-                                ?: return@firstNotNullOfOrNull null
-                            val name = (firstLicense["name"] as? NodeList)?.firstOrNull()
-                                ?.let { (it as? Node)?.text() } ?: return@firstNotNullOfOrNull null
-                            val licenseUrl = (firstLicense["url"] as? NodeList)?.firstOrNull()
-                                ?.let { (it as? Node)?.text() } ?: return@firstNotNullOfOrNull null
-                            Pair(name, licenseUrl)
-                        }
-
-                        val data = LicenseData(
-                            projectName = "${id.group}:$sanitizedName",
-                            version = id.version,
-                            projectUrl = projectUrl ?: "N/A",
-                            licenseName = license?.first ?: "N/A",
-                            licenseUrl = license?.second ?: "N/A"
-                        )
-                        add(data)
-                    }
-                }
-            }
-        }.sortedBy { it.projectName }
+        val allDeps = resolvedDeps
 
         File(outputDir, "$outputName.csv").bufferedWriter().use { out ->
             out.append("Project,Project URL,Version,License,License URL\n")

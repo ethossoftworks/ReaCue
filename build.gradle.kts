@@ -46,6 +46,6 @@ subprojects {
             }
         }
     }
-}
 
-tasks.register<OssDisclaimerGenerator>("generateOssDisclaimer")
+    tasks.register<OssDisclaimerGenerator>("generateOssDisclaimer")
+}
