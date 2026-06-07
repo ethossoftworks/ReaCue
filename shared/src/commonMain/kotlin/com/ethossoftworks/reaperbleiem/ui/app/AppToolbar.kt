@@ -23,11 +23,11 @@ import com.outsidesource.oskitcompose.systemui.top
 import com.outsidesource.oskitkmp.lib.Platform
 import com.outsidesource.oskitkmp.lib.current
 import org.jetbrains.compose.resources.stringResource
-import reaper_ble_iem.shared.generated.resources.Res
-import reaper_ble_iem.shared.generated.resources.about
-import reaper_ble_iem.shared.generated.resources.arrow_back
-import reaper_ble_iem.shared.generated.resources.menu
-import reaper_ble_iem.shared.generated.resources.settings
+import reacue.shared.generated.resources.Res
+import reacue.shared.generated.resources.about
+import reacue.shared.generated.resources.arrow_back
+import reacue.shared.generated.resources.menu
+import reacue.shared.generated.resources.settings
 
 @Composable
 fun AppToolbar(

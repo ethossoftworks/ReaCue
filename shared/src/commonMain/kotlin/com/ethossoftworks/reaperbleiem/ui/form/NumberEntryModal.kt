@@ -44,9 +44,9 @@ import com.outsidesource.oskitcompose.popup.Modal
 import com.outsidesource.oskitcompose.popup.ModalStyles
 import com.outsidesource.oskitkmp.text.parseFloatOrNull
 import org.jetbrains.compose.resources.painterResource
-import reaper_ble_iem.shared.generated.resources.Res
-import reaper_ble_iem.shared.generated.resources.add
-import reaper_ble_iem.shared.generated.resources.remove
+import reacue.shared.generated.resources.Res
+import reacue.shared.generated.resources.add
+import reacue.shared.generated.resources.remove
 
 @Composable
 fun NumberEntryModal(

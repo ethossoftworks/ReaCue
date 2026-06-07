@@ -54,8 +54,8 @@ import com.ethossoftworks.reaperbleiem.ui.theme.AppThemeProvider
 import com.outsidesource.oskitcompose.modifier.kmpOuterShadow
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
-import reaper_ble_iem.shared.generated.resources.Res
-import reaper_ble_iem.shared.generated.resources.close
+import reacue.shared.generated.resources.Res
+import reacue.shared.generated.resources.close
 
 @Composable
 fun AppTextField(

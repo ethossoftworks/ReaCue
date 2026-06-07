@@ -35,18 +35,18 @@ import com.outsidesource.oskitcompose.scrollbars.KmpScrollbarStyle
 import com.outsidesource.oskitcompose.scrollbars.KmpVerticalScrollbar
 import com.outsidesource.oskitcompose.scrollbars.rememberKmpScrollbarAdapter
 import org.jetbrains.compose.resources.stringResource
-import reaper_ble_iem.shared.generated.resources.Res
-import reaper_ble_iem.shared.generated.resources.apply
-import reaper_ble_iem.shared.generated.resources.are_you_sure
-import reaper_ble_iem.shared.generated.resources.cancel
-import reaper_ble_iem.shared.generated.resources.host_id
-import reaper_ble_iem.shared.generated.resources.host_passcode
-import reaper_ble_iem.shared.generated.resources.reaper_osc_device_port
-import reaper_ble_iem.shared.generated.resources.reaper_osc_listen_port
-import reaper_ble_iem.shared.generated.resources.reaper_web_port
-import reaper_ble_iem.shared.generated.resources.reset_to_default
-import reaper_ble_iem.shared.generated.resources.saving
-import reaper_ble_iem.shared.generated.resources.settings
+import reacue.shared.generated.resources.Res
+import reacue.shared.generated.resources.apply
+import reacue.shared.generated.resources.are_you_sure
+import reacue.shared.generated.resources.cancel
+import reacue.shared.generated.resources.host_id
+import reacue.shared.generated.resources.host_passcode
+import reacue.shared.generated.resources.reaper_osc_device_port
+import reacue.shared.generated.resources.reaper_osc_listen_port
+import reacue.shared.generated.resources.reaper_web_port
+import reacue.shared.generated.resources.reset_to_default
+import reacue.shared.generated.resources.saving
+import reacue.shared.generated.resources.settings
 
 @Composable
 fun PeripheralSettingsScreen(interactor: PeripheralSettingsScreenViewInteractor = rememberInject()) {

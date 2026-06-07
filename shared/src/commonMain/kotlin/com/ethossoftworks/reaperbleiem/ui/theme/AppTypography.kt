@@ -5,18 +5,18 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import org.jetbrains.compose.resources.Font
-import reaper_ble_iem.shared.generated.resources.Inter_18pt_Bold
-import reaper_ble_iem.shared.generated.resources.Inter_18pt_ExtraLight
-import reaper_ble_iem.shared.generated.resources.Inter_18pt_Light
-import reaper_ble_iem.shared.generated.resources.Inter_18pt_Medium
-import reaper_ble_iem.shared.generated.resources.Inter_18pt_Regular
-import reaper_ble_iem.shared.generated.resources.Inter_18pt_SemiBold
-import reaper_ble_iem.shared.generated.resources.Inter_18pt_Thin
-import reaper_ble_iem.shared.generated.resources.Res
-import reaper_ble_iem.shared.generated.resources.SourceSans3_Bold
-import reaper_ble_iem.shared.generated.resources.SourceSans3_Medium
-import reaper_ble_iem.shared.generated.resources.SourceSans3_Regular
-import reaper_ble_iem.shared.generated.resources.SourceSans3_SemiBold
+import reacue.shared.generated.resources.Inter_18pt_Bold
+import reacue.shared.generated.resources.Inter_18pt_ExtraLight
+import reacue.shared.generated.resources.Inter_18pt_Light
+import reacue.shared.generated.resources.Inter_18pt_Medium
+import reacue.shared.generated.resources.Inter_18pt_Regular
+import reacue.shared.generated.resources.Inter_18pt_SemiBold
+import reacue.shared.generated.resources.Inter_18pt_Thin
+import reacue.shared.generated.resources.Res
+import reacue.shared.generated.resources.SourceSans3_Bold
+import reacue.shared.generated.resources.SourceSans3_Medium
+import reacue.shared.generated.resources.SourceSans3_Regular
+import reacue.shared.generated.resources.SourceSans3_SemiBold
 
 @Immutable
 interface IAppTypography {

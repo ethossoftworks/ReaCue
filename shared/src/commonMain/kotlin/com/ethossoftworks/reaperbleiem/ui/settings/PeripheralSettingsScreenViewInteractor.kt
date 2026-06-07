@@ -14,9 +14,9 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
-import reaper_ble_iem.shared.generated.resources.Res
-import reaper_ble_iem.shared.generated.resources.settings_error
-import reaper_ble_iem.shared.generated.resources.settings_saved
+import reacue.shared.generated.resources.Res
+import reacue.shared.generated.resources.settings_error
+import reacue.shared.generated.resources.settings_saved
 import kotlin.uuid.ExperimentalUuidApi
 
 data class PeripheralSettingsState(
