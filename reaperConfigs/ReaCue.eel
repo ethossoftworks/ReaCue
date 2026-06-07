@@ -135,9 +135,9 @@ function reacue() local(i)
       i += 1;
     );
 
+    atexit("shutdown_server();");
     reacue_fader_info();
     reacue_loop();
 );
 
-atexit("shutdown_server();");
 reacue();
