@@ -10,6 +10,7 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 import kotlinx.collections.immutable.PersistentMap
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
@@ -61,7 +62,7 @@ sealed class IemEvent {
     data class TrackNameUpdated(@CborLabel(1) val trackId: Int, @CborLabel(2) val name: String) : IemEvent()
 
     @Serializable
-    @SerialName("5")
+    @SerialName("4")
     data class ReceivePanUpdated(
         @CborLabel(1) val trackId: Int,
         @CborLabel(2) val receiveId: Int,
@@ -69,7 +70,7 @@ sealed class IemEvent {
     ) : IemEvent()
 
     @Serializable
-    @SerialName("6")
+    @SerialName("5")
     data class ReceiveVolumeUpdated(
         @CborLabel(1) val trackId: Int,
         @CborLabel(2) val receiveId: Int,
@@ -77,14 +78,26 @@ sealed class IemEvent {
     ) : IemEvent()
 
     @Serializable
-    @SerialName("7")
+    @SerialName("6")
     data class OutputVolumeUpdated(@CborLabel(1) val trackId: Int, @CborLabel(2) val value: Float) : IemEvent()
 
-    @SerialName("8") data object Reset : IemEvent()
+    @SerialName("7") @Serializable data object Reset : IemEvent()
 
-    @Serializable(with = IemErrorEventSerializer::class)
+    @SerialName("8")
+    @Serializable
+    data class PasscodeRequired(@CborLabel(1) val passcode: CompletableDeferred<String>) : IemEvent()
+
+    @Serializable
     @SerialName("9")
-    data class Error(@CborLabel(1) val error: Any) : IemEvent()
+    sealed class Error : IemEvent() {
+        @SerialName("10")
+        @Serializable(with = IemUnknownErrorEventSerializer::class)
+        data class Unknown(@CborLabel(1) val error: Any) : Error()
+
+        @SerialName("11") @Serializable data object BleProtocolMismatch : Error()
+
+        @SerialName("12") @Serializable data object DisconnectedPeripheral : Error()
+    }
 }
 
 @Serializable
@@ -97,14 +110,14 @@ data class Track(
     val isIem = hardwareOuts.isNotEmpty() && receives.isNotEmpty()
 }
 
-object IemErrorEventSerializer : KSerializer<IemEvent.Error> {
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("IemError", PrimitiveKind.STRING)
+object IemUnknownErrorEventSerializer : KSerializer<IemEvent.Error.Unknown> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("IemError.Unknown", PrimitiveKind.STRING)
 
-    override fun deserialize(decoder: Decoder): IemEvent.Error {
-        return IemEvent.Error(decoder.decodeString())
+    override fun deserialize(decoder: Decoder): IemEvent.Error.Unknown {
+        return IemEvent.Error.Unknown(decoder.decodeString())
     }
 
-    override fun serialize(encoder: Encoder, value: IemEvent.Error) {
+    override fun serialize(encoder: Encoder, value: IemEvent.Error.Unknown) {
         encoder.encodeString(value.error.toString())
     }
 }

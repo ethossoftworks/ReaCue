@@ -16,7 +16,6 @@ class AppToolbarViewInteractor(val coordinator: AppCoordinator) :
         initialState =
             run {
                 val coordinatorObserver = Coordinator.createObserver(coordinator)
-                println(coordinatorObserver.routeFlow.value)
 
                 AppToolbarViewState(
                     hasBackStack = coordinatorObserver.hasBackStack(),

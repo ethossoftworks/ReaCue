@@ -38,4 +38,6 @@
     <string name="reset_to_default">Reset to Defaults</string>
     <string name="are_you_sure">Are you sure?</string>
     <string name="cancel">Cancel</string>
+    <string name="passcode">Passcode</string>
+    <string name="view_passcode">View Passcode</string>
 </resources>

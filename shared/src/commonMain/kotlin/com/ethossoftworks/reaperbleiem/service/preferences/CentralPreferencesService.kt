@@ -9,124 +9,28 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-data class PeripheralSettings(
-    val hostName: String = "ReaCue" + randomNumbers(2),
-    val hostPasscode: String = randomCharacters(12),
-    val reaperWebPort: Int = 8080,
-    val reaperOscDevicePort: Int = 9000,
-    val reaperOscListenPort: Int = 8000,
-)
-
-class PeripheralPreferencesService(private val kvStore: IKmpKvStore) {
+class CentralPreferencesService(private val kvStore: IKmpKvStore) {
     private val node = CompletableDeferred<IKmpKvStoreNode>()
-    private val loaded = CompletableDeferred<Unit>()
-    private val _settings = MutableStateFlow(PeripheralSettings())
-
-    val settings: StateFlow<PeripheralSettings> = _settings.asStateFlow()
-
-    private val KeyHostName = "host_name"
-    private val KeyHostPasscode = "host_passcode"
-    private val KeyReaperWebPort = "reaper_web_port"
-    private val KeyReaperOscDevicePort = "reaper_osc_device_port"
-    private val KeyReaperOscListenPort = "reaper_osc_listen_port"
 
     init {
         CoroutineScope(Dispatchers.IO).launch {
-            val nodeResult =
-                kvStore.openNode("ReaCue").unwrapOrReturn {
-                    Logger.i { "Could not open KvStore" }
-                    return@launch
-                }
-
-
-            val default = PeripheralSettings()
-            if (!nodeResult.contains(KeyHostName)) nodeResult.putString(KeyHostName, default.hostName)
-            if (!nodeResult.contains(KeyHostPasscode)) nodeResult.putString(KeyHostPasscode, default.hostPasscode)
-
-            _settings.value =
-                PeripheralSettings(
-                    hostName = nodeResult.getString(KeyHostName) ?: default.hostName,
-                    hostPasscode = nodeResult.getString(KeyHostPasscode) ?: default.hostPasscode,
-                    reaperWebPort = nodeResult.getInt(KeyReaperWebPort) ?: default.reaperWebPort,
-                    reaperOscDevicePort = nodeResult.getInt(KeyReaperOscDevicePort) ?: default.reaperOscDevicePort,
-                    reaperOscListenPort = nodeResult.getInt(KeyReaperOscListenPort) ?: default.reaperOscListenPort,
-                )
-
+            val nodeResult = kvStore.openNode("ReaCue").unwrapOrReturn {
+                Logger.i { "Could not open KvStore" }
+                return@launch
+            }
             node.complete(nodeResult)
-            loaded.complete(Unit)
         }
     }
 
-    suspend fun awaitSettings(): PeripheralSettings {
-        loaded.await()
-        return settings.value
+    suspend fun putPasscode(peripheralId: String, passcode: String): Outcome<Unit, Any> {
+        return node.await().putString(passcodeKey(peripheralId), passcode)
     }
 
-    suspend fun resetToDefaults(): Outcome<Unit, Any> {
-        val settings = PeripheralSettings()
-        setHostId(settings.hostName).unwrapOrReturn {
-            return it
-        }
-        setHostPasscode(settings.hostPasscode).unwrapOrReturn {
-            return it
-        }
-        setReaperWebPort(settings.reaperWebPort).unwrapOrReturn {
-            return it
-        }
-        setReaperOscDevicePort(settings.reaperOscDevicePort).unwrapOrReturn {
-            return it
-        }
-        setReaperOscListenPort(settings.reaperOscListenPort).unwrapOrReturn {
-            return it
-        }
-        _settings.value = settings
-
-        return Outcome.Ok(Unit)
+    suspend fun getPasscode(peripheralId: String): String? {
+        return node.await().getString(passcodeKey(peripheralId))
     }
 
-    suspend fun setHostId(value: String): Outcome<Unit, Any> {
-        val result = node.await().putString(KeyHostName, value)
-        _settings.update { it.copy(hostName = value) }
-        return result
-    }
-
-    suspend fun setHostPasscode(value: String): Outcome<Unit, Any> {
-        val result = node.await().putString(KeyHostPasscode, value)
-        _settings.update { it.copy(hostPasscode = value) }
-        return result
-    }
-
-    suspend fun setReaperWebPort(value: Int): Outcome<Unit, Any> {
-        val result = node.await().putInt(KeyReaperWebPort, value)
-        _settings.update { it.copy(reaperWebPort = value) }
-        return result
-    }
-
-    suspend fun setReaperOscDevicePort(value: Int): Outcome<Unit, Any> {
-        val result = node.await().putInt(KeyReaperOscDevicePort, value)
-        _settings.update { it.copy(reaperOscDevicePort = value) }
-        return result
-    }
-
-    suspend fun setReaperOscListenPort(value: Int): Outcome<Unit, Any> {
-        val result = node.await().putInt(KeyReaperOscListenPort, value)
-        _settings.update { it.copy(reaperOscListenPort = value) }
-        return result
-    }
-}
-
-private fun randomCharacters(length: Int): String {
-    val charPool = ('A'..'Z') + ('a'..'z') + ('0'..'9')
-    return CharArray(length) { charPool.random() }.concatToString()
-}
-
-private fun randomNumbers(length: Int): String {
-    val charPool = ('0'..'9')
-    return CharArray(length) { charPool.random() }.concatToString()
+    private fun passcodeKey(peripheralId: String): String = "passcode-$peripheralId"
 }

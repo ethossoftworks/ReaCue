@@ -7,6 +7,8 @@ import com.outsidesource.oskitkmp.outcome.Outcome
 import com.outsidesource.oskitkmp.outcome.unwrapOrReturn
 import com.outsidesource.oskitkmp.storage.IKmpKvStore
 import com.outsidesource.oskitkmp.storage.IKmpKvStoreNode
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -16,13 +18,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
 data class PeripheralSettings(
     val hostId: Uuid = Uuid.random(),
     val hostName: String = "ReaCue" + randomNumbers(2),
-    val hostPasscode: String = randomCharacters(12),
+    val hostPasscode: String = randomCharacters(12).chunked(4).joinToString("-"),
     val reaperWebPort: Int = 8080,
     val reaperOscDevicePort: Int = 9000,
     val reaperOscListenPort: Int = 8000,
@@ -49,7 +49,6 @@ class PeripheralPreferencesService(private val kvStore: IKmpKvStore) {
                     Logger.i { "Could not open KvStore" }
                     return@launch
                 }
-
 
             val default = PeripheralSettings()
             if (!nodeResult.contains(KeyHostId)) nodeResult.putBytes(KeyHostId, default.hostId.toByteArray())
@@ -130,7 +129,7 @@ class PeripheralPreferencesService(private val kvStore: IKmpKvStore) {
 }
 
 private fun randomCharacters(length: Int): String {
-    val charPool = ('A'..'Z') + ('a'..'z') + ('0'..'9')
+    val charPool = ('a'..'z') + ('0'..'9')
     return CharArray(length) { charPool.random() }.concatToString()
 }
 

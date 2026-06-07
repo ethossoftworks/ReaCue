@@ -8,9 +8,11 @@ import com.ethossoftworks.reaperbleiem.service.iem.FaderInfo
 import com.ethossoftworks.reaperbleiem.service.iem.IemContext
 import com.ethossoftworks.reaperbleiem.service.iem.IemEvent
 import com.ethossoftworks.reaperbleiem.service.iem.Track
+import com.ethossoftworks.reaperbleiem.service.preferences.PeripheralPreferencesService
 import com.outsidesource.oskitkmp.capability.CapabilityStatus
 import com.outsidesource.oskitkmp.interactor.Interactor
 import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
@@ -24,6 +26,9 @@ data class IemScreenViewState(
     val serviceStatus: ServiceStatus = ServiceStatus.Disconnected,
     val isRefreshing: Boolean = false,
     val numberInputModalType: NumberInputModalType? = null,
+    val passcodeEntry: CompletableDeferred<String>? = null,
+    val isPasscodeEntryModalVisible: Boolean = false,
+    val passcode: String = "",
 )
 
 enum class NumberInputModalType {
@@ -36,6 +41,7 @@ class IemScreenViewInteractor(
     private val iemInteractor: IemInteractor,
     private val capabilityInteractor: CapabilityInteractor,
     private val coordinator: AppCoordinator,
+    private val peripheralPreferencesService: PeripheralPreferencesService?,
 ) :
     Interactor<IemScreenViewState>(
         initialState = IemScreenViewState(),
@@ -134,6 +140,21 @@ class IemScreenViewInteractor(
         iemInteractor.setReceivePan(trackId, receiveId, value)
     }
 
+    fun onPasscodeEntryDismiss() {
+        update { state -> state.copy(passcodeEntry = null) }
+    }
+
+    fun onViewPasscodeClick() {
+        interactorScope.launch {
+            val passcode = peripheralPreferencesService?.settings?.value?.hostPasscode
+            update { state -> state.copy(isPasscodeEntryModalVisible = true, passcode = passcode ?: "") }
+        }
+    }
+
+    fun onViewPasscodeModalDismiss() {
+        update { state -> state.copy(isPasscodeEntryModalVisible = false) }
+    }
+
     private fun start() {
         subscriptionJob.value?.cancel()
         interactorScope
@@ -145,7 +166,7 @@ class IemScreenViewInteractor(
                                 it.tracks.values.firstOrNull { track -> track.name == state.lastSelectedIemName }
                             update { state -> state.copy(selectedIemId = trackMatch?.id) }
                         }
-
+                        is IemEvent.PasscodeRequired -> update { state -> state.copy(passcodeEntry = it.passcode) }
                         else -> {}
                     }
                 }
