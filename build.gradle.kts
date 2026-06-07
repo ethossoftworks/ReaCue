@@ -18,10 +18,22 @@ subprojects {
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
         compilerOptions {
             if (project.findProperty("composeCompilerReports") == "true") {
-                freeCompilerArgs.add("-P plugin:androidx.compose.compiler.plugins.kotlin:reportsDestination=${projectDir.resolve("/build").absolutePath}/compose_compiler")
+                freeCompilerArgs.add(
+                    "-P plugin:androidx.compose.compiler.plugins.kotlin:reportsDestination=${
+                        projectDir.resolve(
+                            "/build"
+                        ).absolutePath
+                    }/compose_compiler"
+                )
             }
             if (project.findProperty("composeCompilerMetrics") == "true") {
-                freeCompilerArgs.add("-P plugin:androidx.compose.compiler.plugins.kotlin:metricsDestination=${projectDir.resolve("/build").absolutePath}/compose_compiler")
+                freeCompilerArgs.add(
+                    "-P plugin:androidx.compose.compiler.plugins.kotlin:metricsDestination=${
+                        projectDir.resolve(
+                            "/build"
+                        ).absolutePath
+                    }/compose_compiler"
+                )
             }
         }
     }
