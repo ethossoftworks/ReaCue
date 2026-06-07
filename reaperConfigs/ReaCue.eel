@@ -1,0 +1,87 @@
+// ReaCue
+
+TCP_PORT = 9001;
+MAX_CLIENTS = 10;
+
+function reacue_fader_info() local(curve, min_db, max_db)
+(
+  curve  = -1.0;
+  min_db = -72.0;
+  max_db = 12.0;
+
+  // get_config_var_string returns true on success; match writes parsed float, else default kept
+  get_config_var_string("slidershex", #v) ? match("%f", #v, curve);
+  get_config_var_string("sliderminv", #v) ? match("%f", #v, min_db);
+  get_config_var_string("slidermaxv", #v) ? match("%f", #v, max_db);
+
+  sprintf(#fi, "%f;%f;%f", curve, min_db, max_db);
+  SetExtState("ReaCue", "FaderInfo", #fi, 0);
+);
+
+function send_tcp_event(payload)
+(
+  i = 0;
+  loop(MAX_CLIENTS,
+    client_handle = 0[i];
+
+    // If the slot contains a valid active client handle
+    client_handle > 0 ? (
+      bytes_sent = tcp_send(client_handle, payload);
+
+      // If bytes_sent is <= 0, that specific client disconnected
+      bytes_sent <= 0 ? (
+        tcp_close(client_handle);
+        0[i] = 0; // Clear the slot so it can be reused
+      );
+    );
+    i += 1;
+  );
+);
+
+function handle_tcp_connection() (
+  connection = tcp_listen(TCP_PORT);
+  connection > 0 ? (
+    slot = -1;
+    i = 0;
+    while (i < MAX_CLIENTS && slot == -1) (
+      0[i] == 0 ? slot = i;
+      i += 1;
+    );
+
+    slot != -1 ? (
+      0[slot] = connection;
+    ) : (
+      tcp_close(connection);
+    )
+  );
+);
+
+function reacue_loop()
+(
+  handle_tcp_connection();
+
+  EnumProjects(-1, #project_fn);
+  strcmp(#project_fn, #last_project) ? (
+    strcpy(#last_project, #project_fn);
+
+    sprintf(#payload, "%s\n", #project_fn);
+    send_tcp_event(#payload);
+  );
+
+  runloop("reacue_loop();");
+);
+
+function reacue()
+(
+    reacue_fader_info();
+    reacue_loop();
+);
+
+i = 0;
+loop(MAX_CLIENTS,
+  0[i] = 0;
+  i += 1;
+);
+
+
+reacue();

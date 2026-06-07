@@ -29,40 +29,13 @@ REAPER <—HTTP/OSC—> macOS Host <—BLE—> Android/iOS Client
 
 ## REAPER Setup
 
-ReaCue requires three things configured in REAPER: 
-1. A web interface 
-2. An OSC control server
-3. A ReaScript Lua script for project name tracking.
+ReaCue requires a ReaScript to be run
 
-### 1. Enable the Web Interface
-
-1. Open REAPER and go to **Options > Preferences > Control/OSC/web**
-2. Click **Add**
-3. Select **Web browser interface**
-4. Set the port to **8080**
-5. Click **OK**
-
-### 2. Add the OSC Control Surface
-
-1. Copy `reaperConfigs/ReaCue.ReaperOSC` to your REAPER resource path's `OSC` directory
-   - Find your resource path via **Options > Show REAPER resource path...**
-   - Place the file in the `OSC` subfolder (create it if it doesn't exist)
-2. Go to **Options > Preferences > Control/OSC/web**
-3. Click **Add**
-4. Select **OSC (Open Sound Control)**
-5. Set **Mode** to **Configure device IP+local port**
-6. Set **Device IP** to **127.0.0.1** 
-7. Set **Device port** to **9000**
-8. Set **Local listen port** to **8000**
-9. Under **Pattern config**, select **ReaCue**
-10. Click **OK**
-
-### 3. Install the Lua Script
-
-1. Copy `reaperConfigs/ReaCue.lua` to your REAPER resource path's `Scripts` directory
-2. Create or edit `__startup.lua` in the `Scripts` directory and add the following line:
+1. Copy `reaperConfigs/ReaCue.eel` to your REAPER resource path's `Scripts` directory
+2. Create or edit `__startup.eel` in the `Scripts` directory and add the following lines:
    ```lua
-   dofile(reaper.GetResourcePath() .. "/Scripts/ReaCue.lua")
+   @import ReaCue.eel
+   reacue();
    ```
 3. Restart REAPER
 

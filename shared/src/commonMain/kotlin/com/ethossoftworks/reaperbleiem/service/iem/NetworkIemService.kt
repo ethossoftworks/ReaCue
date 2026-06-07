@@ -13,9 +13,13 @@ import io.ktor.network.sockets.BoundDatagramSocket
 import io.ktor.network.sockets.Datagram
 import io.ktor.network.sockets.InetSocketAddress
 import io.ktor.network.sockets.aSocket
+import io.ktor.network.sockets.openReadChannel
 import io.ktor.utils.io.CancellationException
 import io.ktor.utils.io.core.buildPacket
 import io.ktor.utils.io.core.discard
+import io.ktor.utils.io.readLine
+import io.ktor.utils.io.readUTF8Line
+import io.ktor.utils.io.reader
 import kotlin.math.absoluteValue
 import kotlin.math.log10
 import kotlin.time.Duration.Companion.milliseconds
@@ -65,6 +69,13 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
 
             val socketListeningStarted = CompletableDeferred<Unit>()
             val eventsListeningStarted = CompletableDeferred<Unit>()
+
+            val test = aSocket(selectorManager).tcp().connect(oscIp, 9001)
+            val reader = test.openReadChannel()
+            while (!reader.isClosedForRead) {
+                val test = reader.readLine()
+                println(test)
+            }
 
             oscSocket.update { aSocket(selectorManager).udp().bind(oscIp, oscNotificationPort) }
 
