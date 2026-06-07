@@ -44,6 +44,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
@@ -71,12 +72,12 @@ fun AppTextField(
     maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
     modifier: Modifier = Modifier,
     fieldModifier: Modifier = Modifier,
+    fontFamily: FontFamily = AppTheme.typography.defaultFontFamily,
 ) {
-    val defaultFontFamily = AppTheme.typography.defaultFontFamily
     val theme = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val textStyle = remember { TextStyle(fontFamily = defaultFontFamily, color = theme.textPrimary) }
+    val textStyle = remember { TextStyle(fontFamily = fontFamily, color = theme.textPrimary) }
     val focusManager = LocalFocusManager.current
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -128,7 +129,7 @@ fun AppTextField(
                                 shape = shape,
                             )
                             .clip(shape)
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {

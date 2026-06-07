@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
 data class PeripheralSettings(
     val hostId: Uuid = Uuid.random(),
     val hostName: String = "ReaCue" + randomNumbers(2),
-    val hostPasscode: String = randomCharacters(12),
+    val hostPasscode: String = randomCharacters(12).chunked(4).joinToString("-"),
     val reaperWebPort: Int = 8080,
     val reaperOscDevicePort: Int = 9000,
     val reaperOscListenPort: Int = 8000,
@@ -129,7 +129,7 @@ class PeripheralPreferencesService(private val kvStore: IKmpKvStore) {
 }
 
 private fun randomCharacters(length: Int): String {
-    val charPool = ('A'..'Z') + ('a'..'z') + ('0'..'9')
+    val charPool = ('a'..'z') + ('0'..'9')
     return CharArray(length) { charPool.random() }.concatToString()
 }
 

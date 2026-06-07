@@ -15,6 +15,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -93,6 +94,7 @@ fun PeripheralSettingsScreen(interactor: PeripheralSettingsScreenViewInteractor 
                 value = state.hostPasscode,
                 placeholder = state.originalPeripheralSettings.hostPasscode,
                 onChange = interactor::onHostPasscodeChange,
+                fontFamily = FontFamily.Monospace,
             )
             AppTextField(
                 label = stringResource(Res.string.reaper_web_port),

@@ -33,6 +33,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -66,9 +67,6 @@ import com.outsidesource.oskitcompose.systemui.KmpWindowInsets
 import com.outsidesource.oskitcompose.systemui.top
 import com.outsidesource.oskitkmp.text.KmpNumberFormatter
 import com.outsidesource.oskitkmp.text.parseFloatOrNull
-import kotlin.collections.forEach
-import kotlin.math.absoluteValue
-import kotlin.math.roundToInt
 import org.jetbrains.compose.resources.stringResource
 import org.koin.core.parameter.parametersOf
 import reaper_ble_iem.shared.generated.resources.Res
@@ -90,6 +88,8 @@ import reaper_ble_iem.shared.generated.resources.set_all_0db
 import reaper_ble_iem.shared.generated.resources.set_all_n
 import reaper_ble_iem.shared.generated.resources.untitled
 import reaper_ble_iem.shared.generated.resources.view_passcode
+import kotlin.math.absoluteValue
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -470,6 +470,7 @@ fun ViewPasscodeModal(
                 text = passcode,
                 fontSize = 20.sp,
                 letterSpacing = 2.sp,
+                fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Light,
             )
             Row(
