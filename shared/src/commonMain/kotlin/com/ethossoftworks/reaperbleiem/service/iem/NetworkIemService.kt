@@ -70,11 +70,13 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
             val socketListeningStarted = CompletableDeferred<Unit>()
             val eventsListeningStarted = CompletableDeferred<Unit>()
 
-            val test = aSocket(selectorManager).tcp().connect(oscIp, 9001)
-            val reader = test.openReadChannel()
-            while (!reader.isClosedForRead) {
-                val test = reader.readLine()
-                println(test)
+            aSocket(selectorManager).tcp().connect(oscIp, 9001).use { socket ->
+                println("Connected")
+                val reader = socket.openReadChannel()
+                while (isActive) {
+                    val test = reader.readLine() ?: break
+                    println(test)
+                }
             }
 
             oscSocket.update { aSocket(selectorManager).udp().bind(oscIp, oscNotificationPort) }

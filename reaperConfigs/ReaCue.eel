@@ -3,6 +3,9 @@
 TCP_PORT = 9001;
 MAX_CLIENTS = 10;
 
+CACHE_START = 20000;
+RECV_STRIDE = 128;
+
 function reacue_fader_info() local(curve, min_db, max_db)
 (
   curve  = -1.0;
@@ -18,27 +21,25 @@ function reacue_fader_info() local(curve, min_db, max_db)
   SetExtState("ReaCue", "FaderInfo", #fi, 0);
 );
 
-function send_tcp_event(payload)
+function send_tcp_event(payload) local(client_handle, bytes_sent)
 (
   i = 0;
   loop(MAX_CLIENTS,
     client_handle = 0[i];
 
-    // If the slot contains a valid active client handle
     client_handle > 0 ? (
       bytes_sent = tcp_send(client_handle, payload);
 
-      // If bytes_sent is <= 0, that specific client disconnected
       bytes_sent <= 0 ? (
         tcp_close(client_handle);
-        0[i] = 0; // Clear the slot so it can be reused
+        0[i] = 0; // Clear the client slot
       );
     );
     i += 1;
   );
 );
 
-function handle_tcp_connection() (
+function handle_tcp_connection() local(connection, slot) (
   connection = tcp_listen(TCP_PORT);
   connection > 0 ? (
     slot = -1;
@@ -56,9 +57,50 @@ function handle_tcp_connection() (
   );
 );
 
+function watch_receive_volumes() local(num_tracks, t_idx, track, num_recvs, r_idx, current_vol, cache_slot, src_track)
+(
+  num_tracks = CountTracks(0);
+  t_idx = 0;
+
+  loop(num_tracks,
+    track = GetTrack(0, t_idx);
+
+    // CRITICAL FIX: Pass -1 to look at track RECEIVES
+    num_recvs = GetTrackNumSends(track, -1);
+    r_idx = 0;
+
+    loop(num_recvs,
+      // CRITICAL FIX: Pass -1 here as well
+      current_vol = GetTrackSendInfo_Value(track, -1, r_idx, "D_VOL");
+
+      cache_slot = CACHE_START + (t_idx * RECV_STRIDE) + r_idx;
+
+      current_vol != 0[cache_slot] ? (
+        0[cache_slot] = current_vol;
+
+        // CRITICAL FIX: Pass -1 to get the source track pointer feeding this receive
+        src_track = GetTrackSendInfo_Value(track, -1, r_idx, "P_SRCTRACK");
+        GetTrackGUID(#src_guid, src_track);
+        GetTrackGUID(#target_guid, track);
+
+        sprintf(#payload, "RV|%s|%s|%f\n", #src_guid, #target_guid, current_vol);
+        send_tcp_event(#payload);
+      );
+
+      r_idx += 1;
+    );
+    t_idx += 1;
+  );
+);
+
+function get_project_data() (
+  0
+);
+
 function reacue_loop()
 (
   handle_tcp_connection();
+  watch_receive_volumes();
 
   EnumProjects(-1, #project_fn);
   strcmp(#project_fn, #last_project) ? (
@@ -71,17 +113,31 @@ function reacue_loop()
   runloop("reacue_loop();");
 );
 
-function reacue()
+
+function shutdown_server() local(i, client_handle)
 (
+  i = 0;
+  loop(MAX_CLIENTS,
+    client_handle = 0[i];
+    client_handle > 0 ? (
+      tcp_close(client_handle);
+      0[i] = 0;
+    );
+    i += 1;
+  );
+);
+
+function reacue() local(i)
+(
+    i = 0;
+    loop(MAX_CLIENTS,
+      0[i] = 0;
+      i += 1;
+    );
+
     reacue_fader_info();
     reacue_loop();
 );
 
-i = 0;
-loop(MAX_CLIENTS,
-  0[i] = 0;
-  i += 1;
-);
-
-
+atexit("shutdown_server();");
 reacue();
