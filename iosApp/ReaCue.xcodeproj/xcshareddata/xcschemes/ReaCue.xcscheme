@@ -16,7 +16,7 @@
                BlueprintIdentifier = "7555FF7A242A565900829871"
                BuildableName = "ReaCue.app"
                BlueprintName = "ReaCue"
-               ReferencedContainer = "container:Reaper BLE IEM.xcodeproj">
+               ReferencedContainer = "container:ReaCue.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -45,7 +45,7 @@
             BlueprintIdentifier = "7555FF7A242A565900829871"
             BuildableName = "ReaCue.app"
             BlueprintName = "ReaCue"
-            ReferencedContainer = "container:Reaper BLE IEM.xcodeproj">
+            ReferencedContainer = "container:ReaCue.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>

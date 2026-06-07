@@ -107,7 +107,7 @@ Or open the project in Android Studio and run the `androidApp` configuration.
 
 ### iOS Client
 
-1. Open `iosApp/Reaper BLE IEM.xcodeproj` in Xcode
+1. Open `iosApp/ReaCue.xcodeproj` in Xcode
 2. Select a development team under **Signing & Capabilities**
 3. Build and run on a device (BLE is not available in the simulator)
 
