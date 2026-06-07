@@ -1,11 +1,5 @@
 // ReaCue
 
-TCP_PORT = 9001;
-MAX_CLIENTS = 10;
-
-CACHE_START = 20000;
-RECV_STRIDE = 128;
-
 function reacue_fader_info() local(curve, min_db, max_db)
 (
   curve  = -1.0;
@@ -129,6 +123,12 @@ function shutdown_server() local(i, client_handle)
 
 function reacue() local(i)
 (
+    TCP_PORT = 9001;
+    MAX_CLIENTS = 10;
+
+    CACHE_START = 20000;
+    RECV_STRIDE = 128;
+
     i = 0;
     loop(MAX_CLIENTS,
       0[i] = 0;
