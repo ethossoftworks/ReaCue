@@ -1,4 +1,4 @@
-rootProject.name = "Reaper-BLE-IEM"
+rootProject.name = "ReaCue"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {
