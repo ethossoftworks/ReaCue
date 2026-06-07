@@ -67,9 +67,9 @@ import com.outsidesource.oskitcompose.popup.ModalStyles
 import com.outsidesource.oskitkmp.text.KmpNumberFormatter
 import kotlin.math.roundToInt
 import org.jetbrains.compose.resources.painterResource
-import reaper_ble_iem.shared.generated.resources.Res
-import reaper_ble_iem.shared.generated.resources.add
-import reaper_ble_iem.shared.generated.resources.remove
+import reacue.shared.generated.resources.Res
+import reacue.shared.generated.resources.add
+import reacue.shared.generated.resources.remove
 
 @Composable
 fun AppSlider(

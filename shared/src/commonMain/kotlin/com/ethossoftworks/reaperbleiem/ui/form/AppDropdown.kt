@@ -33,8 +33,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ethossoftworks.reaperbleiem.ui.theme.AppTheme
 import com.ethossoftworks.reaperbleiem.ui.theme.AppThemeProvider
-import reaper_ble_iem.shared.generated.resources.Res
-import reaper_ble_iem.shared.generated.resources.arrow_down
+import reacue.shared.generated.resources.Res
+import reacue.shared.generated.resources.arrow_down
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

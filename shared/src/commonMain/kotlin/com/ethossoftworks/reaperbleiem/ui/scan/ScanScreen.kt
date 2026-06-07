@@ -41,14 +41,14 @@ import com.outsidesource.oskitkmp.capability.CapabilityStatus
 import com.outsidesource.oskitkmp.capability.NoPermissionReason
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
-import reaper_ble_iem.shared.generated.resources.Res
-import reaper_ble_iem.shared.generated.resources.ble_disabled_message
-import reaper_ble_iem.shared.generated.resources.ble_permission_denied_message
-import reaper_ble_iem.shared.generated.resources.ble_permission_request_message
-import reaper_ble_iem.shared.generated.resources.bluetooth
-import reaper_ble_iem.shared.generated.resources.discovered_hosts
-import reaper_ble_iem.shared.generated.resources.no_hosts_found
-import reaper_ble_iem.shared.generated.resources.scanning
+import reacue.shared.generated.resources.Res
+import reacue.shared.generated.resources.ble_disabled_message
+import reacue.shared.generated.resources.ble_permission_denied_message
+import reacue.shared.generated.resources.ble_permission_request_message
+import reacue.shared.generated.resources.bluetooth
+import reacue.shared.generated.resources.discovered_hosts
+import reacue.shared.generated.resources.no_hosts_found
+import reacue.shared.generated.resources.scanning
 
 @Composable
 fun ScanScreen(interactor: ScanScreenViewInteractor = rememberInjectForRoute()) {
