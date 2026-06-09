@@ -1,24 +1,20 @@
 // ReaCue
 
-function reacue_fader_info() local(curve, min_db, max_db)
-(
-  curve  = -1.0;
-  min_db = -72.0;
-  max_db = 12.0;
-
-  // get_config_var_string returns true on success; match writes parsed float, else default kept
-  get_config_var_string("slidershex", #v) ? match("%f", #v, curve);
-  get_config_var_string("sliderminv", #v) ? match("%f", #v, min_db);
-  get_config_var_string("slidermaxv", #v) ? match("%f", #v, max_db);
-
-  sprintf(#fi, "%f;%f;%f", curve, min_db, max_db);
-  SetExtState("ReaCue", "FaderInfo", #fi, 0);
+function linear_to_normalized(vol) local(db, slider_val) (
+  db = vol <= 0.00001 ? -150 : 20 * (log(vol) / log(10));
+  slider_val = DB2SLIDER(db);
+  slider_val / 1000;
 );
 
-function send_tcp_event(payload) local(client_handle, bytes_sent)
-(
+function normalized_to_linear(norm_val) local(slider_val, db) (
+  slider_val = norm_val * 1000;
+  db = SLIDER2DB(slider_val);
+  db <= -140 ? 0.0 : exp(db * (log(10) / 20));
+);
+
+function send_tcp_event(payload) local(client_handle, bytes_sent) (
   i = 0;
-  loop(MAX_CLIENTS,
+  loop(TCP_MAX_CLIENTS,
     client_handle = 0[i];
 
     client_handle > 0 ? (
@@ -38,7 +34,7 @@ function handle_tcp_connection() local(connection, slot) (
   connection > 0 ? (
     slot = -1;
     i = 0;
-    while (i < MAX_CLIENTS && slot == -1) (
+    while (i < TCP_MAX_CLIENTS && slot == -1) (
       0[i] == 0 ? slot = i;
       i += 1;
     );
@@ -51,65 +47,215 @@ function handle_tcp_connection() local(connection, slot) (
   );
 );
 
-function watch_receive_volumes() local(num_tracks, t_idx, track, num_recvs, r_idx, current_vol, cache_slot, src_track)
-(
-  num_tracks = CountTracks(0);
-  t_idx = 0;
-
-  loop(num_tracks,
-    track = GetTrack(0, t_idx);
-
-    // CRITICAL FIX: Pass -1 to look at track RECEIVES
-    num_recvs = GetTrackNumSends(track, -1);
-    r_idx = 0;
-
-    loop(num_recvs,
-      // CRITICAL FIX: Pass -1 here as well
-      current_vol = GetTrackSendInfo_Value(track, -1, r_idx, "D_VOL");
-
-      cache_slot = CACHE_START + (t_idx * RECV_STRIDE) + r_idx;
-
-      current_vol != 0[cache_slot] ? (
-        0[cache_slot] = current_vol;
-
-        // CRITICAL FIX: Pass -1 to get the source track pointer feeding this receive
-        src_track = GetTrackSendInfo_Value(track, -1, r_idx, "P_SRCTRACK");
-        GetTrackGUID(#src_guid, src_track);
-        GetTrackGUID(#target_guid, track);
-
-        sprintf(#payload, "RV|%s|%s|%f\n", #src_guid, #target_guid, current_vol);
-        send_tcp_event(#payload);
-      );
-
-      r_idx += 1;
-    );
-    t_idx += 1;
-  );
-);
-
-function get_project_data() (
+function handle_tcp_receive() (
   0
 );
 
-function reacue_loop()
-(
-  handle_tcp_connection();
-  watch_receive_volumes();
+function has_project_structure_changed() local(has_changed, i, track, hw_out_count, receive_count, track_slot) (
+  has_changed = 0;
+  project_fn = EnumProjects(-1);
+  GetProjectPath(#project_path);
+  strcmp(0[10], #project_path) != 0 ? has_changed = 1;
 
-  EnumProjects(-1, #project_fn);
-  strcmp(#project_fn, #last_project) ? (
-    strcpy(#last_project, #project_fn);
+  get_config_var_string("slidershex", #v) ? match("%f", #v, fader_curve);
+  has_changed == 0 && fader_curve != 0[11] ? has_changed = 1;
 
-    sprintf(#payload, "%s\n", #project_fn);
-    send_tcp_event(#payload);
+  get_config_var_string("sliderminv", #v) ? match("%f", #v, fader_min_db);
+  has_changed == 0 && fader_min_db != 0[12] ? has_changed = 1;
+
+  get_config_var_string("slidermaxv", #v) ? match("%f", #v, fader_max_db);
+  has_changed == 0 && fader_max_db != 0[13] ? has_changed = 1;
+
+  track_count = GetNumTracks();
+  has_changed == 0 && track_count != 0[14] ? has_changed = 1;
+
+  has_changed == 0 ? (
+    i = 0;
+    loop(track_count,
+      track = GetTrack(project_fn, i);
+      track_slot = MEM_TRACK + (MEM_TRACK_STRIDE * i);
+
+      GetTrackGUID(#guid, track);
+      has_changed == 0 && strcmp(#guid, 0[track_slot + 0]) != 0 ? has_changed = 1;
+
+      // Receives
+      receive_count = GetTrackNumSends(track, -1);
+      has_changed == 0 && receive_count != 0[track_slot + 3] ? has_changed = 1;
+
+      // Hardware outputs
+      hw_out_count = GetTrackNumSends(track, 1);
+      has_changed == 0 && hw_out_count != 0[track_slot + 4] ? has_changed = 1;
+
+      i += 1;
+    );
   );
+
+  has_changed;
+);
+
+function handle_project_structure_change() local(i, track, receive_count, hw_out_count, track_slot, guid_slot, vol, pan, mute, j, send_slot) (
+  0[10] = #project_path;
+  0[11] = fader_curve;
+  0[12] = fader_min_db;
+  0[13] = fader_max_db;
+  0[14] = track_count;
+
+  i = 0;
+  loop(track_count,
+    track = GetTrack(project_fn, i);
+    track_slot = MEM_TRACK + (MEM_TRACK_STRIDE * i);
+
+    // Due to how EEL2 strings work, we have to initialize the string slot to point to a different location
+    0[track_slot + 0] = MEM_STRING + (MEM_STRING_STRIDE * i);
+    GetTrackGUID(0[track_slot + 0], track);
+
+    0[track_slot + 1] = i;
+
+    0[track_slot + 2] = MEM_STRING + (MEM_STRING_STRIDE * i) + 1;
+    GetTrackName(track, 0[track_slot + 2]);
+
+    // Receives
+    receive_count = GetTrackNumSends(track, -1);
+    0[track_slot + 3] = receive_count;
+
+    // Hardware outputs
+    hw_out_count = GetTrackNumSends(track, 1);
+    0[track_slot + 4] = hw_out_count;
+
+    vol = 0;
+    pan = 0;
+    mute = 0;
+    GetTrackUIVolPan(track, vol, pan);
+    GetTrackUIMute(track, mute);
+    0[track_slot + 5] = linear_to_normalized(vol);
+    0[track_slot + 6] = (pan + 1) / 2;
+    0[track_slot + 7] = mute;
+
+    j = 0;
+    loop(receive_count + hw_out_count,
+      send_slot = MEM_SEND + (MEM_SEND_TRACK_STRIDE * i) + (MEM_SEND_STRIDE * j);
+
+      j < receive_count ? (
+        0[send_slot + 0] = -1;
+        GetTrackReceiveUIVolPan(track, j, vol, pan);
+        GetTrackReceiveUIMute(track, j, mute);
+      ) : (
+        0[send_slot + 0] = 1;
+        GetTrackSendUIVolPan(track, j - receive_count, vol, pan);
+        GetTrackSendUIMute(track, j - receive_count, mute);
+      );
+
+      0[send_slot + 1] = j;
+      0[send_slot + 2] = 0[track_slot + 0];
+      0[send_slot + 3] = linear_to_normalized(vol);
+      0[send_slot + 4] = (pan + 1) / 2;
+      0[send_slot + 5] = mute;
+
+      j += 1;
+    );
+
+    i += 1;
+  );
+);
+
+function handle_delta_change() local(i, track, receive_count, hw_out_count, track_slot, name_slot) (
+  i = 0;
+  loop(track_count,
+    track = GetTrack(project_fn, i);
+    track_slot = MEM_TRACK + (MEM_TRACK_STRIDE * i);
+
+    GetTrackName(track, #track_name);
+    strcmp(0[track_slot + 2], #track_name) != 0 ? (
+      ShowConsoleMsg("Track name changed \n");
+      strcpy(0[track_slot + 2], #track_name);
+    );
+
+    receive_count = 0[track_slot + 3];
+    hw_out_count = 0[track_slot + 4];
+
+    vol = 0;
+    pan = 0;
+    mute = 0;
+    GetTrackUIVolPan(track, vol, pan);
+    GetTrackUIMute(track, mute);
+
+    vol = linear_to_normalized(vol);
+    vol != 0[track_slot + 5] ? (
+      ShowConsoleMsg("Volume changed\n");
+      0[track_slot + 5] = vol;
+    );
+
+    pan = (pan + 1) / 2;
+    pan != 0[track_slot + 6] ? (
+      ShowConsoleMsg("Pan changed\n");
+      0[track_slot + 6] = pan;
+    );
+
+    mute != 0[track_slot + 7] ? (
+      ShowConsoleMsg("Mute changed\n");
+      0[track_slot + 7] = mute;
+    );
+
+    j = 0;
+    loop(receive_count + hw_out_count,
+      send_slot = MEM_SEND + (MEM_SEND_TRACK_STRIDE * i) + (MEM_SEND_STRIDE * j);
+
+      j < receive_count ? (
+        GetTrackReceiveUIVolPan(track, j, vol, pan);
+        GetTrackReceiveUIMute(track, j, mute);
+      ) : (
+        GetTrackSendUIVolPan(track, j - receive_count, vol, pan);
+        GetTrackSendUIMute(track, j - receive_count, mute);
+      );
+
+      vol = linear_to_normalized(vol);
+      vol != 0[send_slot + 3] ? (
+        ShowConsoleMsg("Send Volume changed\n");
+        0[send_slot + 3] = vol;
+      );
+
+      pan = (pan + 1) / 2;
+      pan != 0[send_slot + 4] ? (
+        ShowConsoleMsg("Send Pan changed\n");
+        0[send_slot + 4] = pan;
+      );
+
+
+      mute != 0[send_slot + 5] ? (
+        ShowConsoleMsg("Send Mute changed\n");
+        0[send_slot + 5] = mute;
+      );
+
+      j += 1;
+    );
+
+    i += 1;
+  );
+);
+
+
+function reacue_loop() (
+  start = 0;
+  time_precise(start);
+  handle_tcp_connection();
+  handle_tcp_receive();
+
+  has_project_structure_changed() ? (
+    ShowConsoleMsg("Structure Changed\n");
+    handle_project_structure_change();
+  ) : (
+    handle_delta_change();
+  );
+
+  end = 0;
+  time_precise(end);
+  sprintf(#elapsed, "Time elapsed: %f\n", end - start);
+  ShowConsoleMsg(#elapsed);
 
   runloop("reacue_loop();");
 );
 
-
-function shutdown_server() local(i, client_handle)
-(
+function shutdown_server() local(i, client_handle) (
   i = 0;
   loop(MAX_CLIENTS,
     client_handle = 0[i];
@@ -121,22 +267,57 @@ function shutdown_server() local(i, client_handle)
   );
 );
 
-function reacue() local(i)
-(
+function reacue() (
     TCP_PORT = 9001;
-    MAX_CLIENTS = 10;
+    TCP_MAX_CLIENTS = 10;
 
-    CACHE_START = 20000;
-    RECV_STRIDE = 128;
+    /*
+     * Memory arena for project details:
+     * 0-9 - TCP Clients
+     * 10 - Project Name
+     * 11 - Fader Curve
+     * 12 - Fader Max dB
+     * 13 - Fader Min dB
+     * 14 - Track Count
+     */
+    MEM_PROJECT = 0;
 
-    i = 0;
-    loop(MAX_CLIENTS,
-      0[i] = 0;
-      i += 1;
-    );
+    /*
+     * Memory arena for Track info:
+     * 0 - GUID
+     * 1 - Index
+     * 2 - Name
+     * 3 - Receive Count
+     * 4 - Hardware Out Count
+     * 5 - Volume
+     * 6 - Pan
+     * 7 - Mute
+     */
+    MEM_TRACK = 10000;
+    MEM_TRACK_STRIDE = 16;
+
+    /*
+     * Memory arena for send info:
+     * 0 - Type (-1 receive, 1 hw out). Sends are ignored at the moment.
+     * 1 - Index
+     * 2 - Source Track GUID
+     * 3 - Volume
+     * 4 - Pan
+     * 5 - Mute
+     */
+    MEM_SEND = 20000;
+    MEM_SEND_STRIDE = 16;
+    MEM_SEND_TRACK_STRIDE = 2000;
+
+    /*
+     * Memory arena for strings:
+     * 0 - GUID
+     * 1 - Name
+     */
+    MEM_STRING = 30000;
+    MEM_STRING_STRIDE = 10;
 
     atexit("shutdown_server();");
-    reacue_fader_info();
     reacue_loop();
 );
 
