@@ -121,7 +121,7 @@ function has_project_structure_changed() local(has_changed, i, track, hw_out_cou
  * 42-45 - float - Pan
  * 46 - byte - Mute
  */
-function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j, base_track_size, base_project_size, base_send_size, name_len, send_slot, receive_count, hw_out_count) (
+function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j, base_track_size, base_project_info_size, base_send_size, name_len, send_slot, receive_count, hw_out_count) (
   base_project_info_size = 21;
   base_track_size = 53;
   base_send_size = 47;
@@ -132,7 +132,7 @@ function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j
   loop(track_count,
     track_slot = MEM_TRACK + (MEM_TRACK_STRIDE * i);
 
-    payload_size += base_track_size = strlen(0[track_slot + 2]);
+    payload_size += base_track_size + strlen(0[track_slot + 2]);
     receive_count = 0[track_slot + 3];
     hw_out_count = 0[track_slot + 4];
     payload_size += ((receive_count + hw_out_count) * base_send_size);
@@ -140,6 +140,7 @@ function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j
     i+=1;
   );
 
+  #buffer = "";
   str_setchar(#buffer, 0, 0, 'cu');
   str_setchar(#buffer, 1, payload_size, 'Iu');
   str_setchar(#buffer, 5, fader_curve, 'F');
@@ -153,6 +154,7 @@ function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j
 
   i = 0;
   loop(track_count,
+    #buffer = "";
     offset = 0;
     track_slot = MEM_TRACK + (MEM_TRACK_STRIDE * i);
     receive_count = 0[track_slot + 3];
@@ -264,7 +266,7 @@ function handle_project_structure_change() local(i, track, receive_count, hw_out
       );
 
       0[send_slot + 1] = j;
-      0[send_slot + 2] = GetTrackGUID(0[track_slot + 0], src_track);
+      GetTrackGUID(0[send_slot + 2], src_track);
 
       0[send_slot + 3] = linear_to_normalized(vol);
       0[send_slot + 4] = (pan + 1) / 2;
@@ -378,7 +380,7 @@ function reacue_loop() (
 
 function shutdown_server() local(i, client_handle) (
   i = 0;
-  loop(MAX_CLIENTS,
+  loop(TCP_MAX_CLIENTS,
     client_handle = 0[i];
     client_handle > 0 ? (
       tcp_close(client_handle);
@@ -398,8 +400,8 @@ function reacue() (
      * 10 - Project Name
      * 11 - Project Path
      * 12 - Fader Curve
-     * 13 - Fader Max dB
-     * 14 - Fader Min dB
+     * 13 - Fader Min dB
+     * 14 - Fader Max dB
      * 15 - Track Count
      */
     MEM_PROJECT = 0;
