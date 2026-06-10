@@ -228,12 +228,12 @@ function handle_project_structure_change() local(i, track, receive_count, hw_out
     track_slot = MEM_TRACK + (MEM_TRACK_STRIDE * i);
 
     // Due to how EEL2 strings work, we have to initialize the string slot to point to a different location
-    0[track_slot + 0] = MEM_STRING + (MEM_STRING_STRIDE * i);
+    0[track_slot + 0] = MEM_TRACK_STRINGS + (MEM_TRACK_STRINGS_STRIDE * i);
     GetTrackGUID(0[track_slot + 0], track);
 
     0[track_slot + 1] = i;
 
-    0[track_slot + 2] = MEM_STRING + (MEM_STRING_STRIDE * i) + 1;
+    0[track_slot + 2] = MEM_TRACK_STRINGS + (MEM_TRACK_STRINGS_STRIDE * i) + 1;
     GetTrackName(track, 0[track_slot + 2]);
 
     // Receives
@@ -270,6 +270,7 @@ function handle_project_structure_change() local(i, track, receive_count, hw_out
       );
 
       0[send_slot + 1] = j;
+      0[send_slot + 2] = MEM_SEND_STRINGS + (MEM_SEND_STRINGS_TRACK_STRIDE * i) + j;
       GetTrackGUID(0[send_slot + 2], src_track);
       0[send_slot + 3] = linear_to_normalized(vol);
       0[send_slot + 4] = (pan + 1) / 2;
@@ -441,8 +442,16 @@ function reacue() (
      * 0 - GUID
      * 1 - Name
      */
-    MEM_STRING = 30000;
-    MEM_STRING_STRIDE = 10;
+    MEM_TRACK_STRINGS = 10000;
+    MEM_TRACK_STRINGS_STRIDE = 10;
+
+    /*
+     * Memory arena for send source GUID strings.
+     * One string slot per send, indexed by (track i, send j).
+     * Stride caps sends per track (200).
+     */
+    MEM_SEND_STRINGS = 20000;
+    MEM_SEND_STRINGS_TRACK_STRIDE = 200;
 
     atexit("shutdown_server();");
     reacue_loop();
