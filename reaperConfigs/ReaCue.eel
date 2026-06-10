@@ -145,7 +145,7 @@ function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j
     i+=1;
   );
 
-  #buffer = "";
+  #buffer = ""; // Reset buffer due to str_insert shifting any trailing content (causing the buffer length to grow)
   str_setchar(#buffer, 0, 0, 'cu');
   str_setchar(#buffer, 1, 0, 'cu');
   str_setchar(#buffer, 2, payload_size, 'Iu');
@@ -160,7 +160,7 @@ function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j
 
   i = 0;
   loop(track_count,
-    #buffer = "";
+    #buffer = ""; // Reset buffer due to str_insert shifting any trailing content (causing the buffer length to grow)
     offset = 0;
     track_slot = MEM_TRACK + (MEM_TRACK_STRIDE * i);
     receive_count = 0[track_slot + 3];
