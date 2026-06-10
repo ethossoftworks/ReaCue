@@ -13,6 +13,9 @@ function normalized_to_linear(norm_val) local(slider_val, db) (
 );
 
 function send_tcp_message(payload, len) local(client_handle, bytes_sent) (
+  sprintf(#message, "Sending message - %i bytes\n", len);
+  ShowConsoleMsg(#message);
+
   i = 0;
   loop(TCP_MAX_CLIENTS,
     client_handle = 0[i];
@@ -97,13 +100,14 @@ function has_project_structure_changed() local(has_changed, i, track, hw_out_cou
 /*
  * Project Info
  * 0 - byte - Schema Version
- * 1-4 - int - Payload Size
- * 5-8 - float - Fader Curve
- * 9-12 - float - Fader Min dB
- * 13-16 - float - Fader Max dB
- * 17-18 - short - Track Count
- * 19-20 - short - Project Path Size
- * 21-N - string - Project path
+ * 1 - byte - Message Type
+ * 2-5 - int - Payload Size
+ * 6-9 - float - Fader Curve
+ * 10-13 - float - Fader Min dB
+ * 14-17 - float - Fader Max dB
+ * 17-19 - short - Track Count
+ * 20-21 - short - Project Name Size
+ * 22-N - string - Project Name
  *
  * Track Info (Track info repeats with its corresponding send info. Track index can be inferred by position in bytes)
  * 0-37 - string - GUID
@@ -121,8 +125,9 @@ function has_project_structure_changed() local(has_changed, i, track, hw_out_cou
  * 42-45 - float - Pan
  * 46 - byte - Mute
  */
-function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j, base_track_size, base_project_info_size, base_send_size, name_len, send_slot, receive_count, hw_out_count) (
-  base_project_info_size = 21;
+function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j, base_track_size, base_project_info_size, base_send_size, name_len, send_slot, receive_count, hw_out_count, header_size) (
+  header_size = 6;
+  base_project_info_size = 16;
   base_track_size = 53;
   base_send_size = 47;
 
@@ -140,21 +145,20 @@ function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j
     i+=1;
   );
 
-  #buffer = "";
   str_setchar(#buffer, 0, 0, 'cu');
-  str_setchar(#buffer, 1, payload_size, 'Iu');
-  str_setchar(#buffer, 5, fader_curve, 'F');
-  str_setchar(#buffer, 9, fader_min_db, 'F');
-  str_setchar(#buffer, 13, fader_max_db, 'F');
-  str_setchar(#buffer, 17, track_count, 'Su');
-  str_setchar(#buffer, 19, strlen(#project_name), 'Su');
-  str_insert(#buffer, #project_name, 21);
+  str_setchar(#buffer, 1, 0, 'cu');
+  str_setchar(#buffer, 2, payload_size, 'Iu');
+  str_setchar(#buffer, 6, fader_curve, 'F');
+  str_setchar(#buffer, 10, fader_min_db, 'F');
+  str_setchar(#buffer, 14, fader_max_db, 'F');
+  str_setchar(#buffer, 18, track_count, 'Su');
+  str_setchar(#buffer, 20, strlen(#project_name), 'Su');
+  str_insert(#buffer, #project_name, 22);
 
-  send_tcp_message(#buffer, base_project_info_size + strlen(#project_name));
+  send_tcp_message(#buffer, header_size + base_project_info_size + strlen(#project_name));
 
   i = 0;
   loop(track_count,
-    #buffer = "";
     offset = 0;
     track_slot = MEM_TRACK + (MEM_TRACK_STRIDE * i);
     receive_count = 0[track_slot + 3];
@@ -267,7 +271,6 @@ function handle_project_structure_change() local(i, track, receive_count, hw_out
 
       0[send_slot + 1] = j;
       GetTrackGUID(0[send_slot + 2], src_track);
-
       0[send_slot + 3] = linear_to_normalized(vol);
       0[send_slot + 4] = (pan + 1) / 2;
       0[send_slot + 5] = mute;

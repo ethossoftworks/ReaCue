@@ -3,6 +3,7 @@ package com.ethossoftworks.reaperbleiem.service.iem
 import co.touchlab.kermit.Logger
 import com.ethossoftworks.reaperbleiem.service.preferences.PeripheralPreferencesService
 import com.outsidesource.oskitkmp.concurrency.KmpDispatchers
+import com.outsidesource.oskitkmp.io.toKmpIoSource
 import io.ktor.network.selector.SelectorManager
 import io.ktor.network.sockets.Socket
 import io.ktor.network.sockets.aSocket
@@ -10,8 +11,12 @@ import io.ktor.network.sockets.openReadChannel
 import io.ktor.network.sockets.openWriteChannel
 import io.ktor.utils.io.ByteWriteChannel
 import io.ktor.utils.io.CancellationException
-import io.ktor.utils.io.readAvailable
+import io.ktor.utils.io.read
+import io.ktor.utils.io.readByte
 import io.ktor.utils.io.readByteArray
+import io.ktor.utils.io.readFloat
+import io.ktor.utils.io.readInt
+import io.ktor.utils.io.readShort
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
 import kotlinx.coroutines.channels.awaitClose
@@ -19,6 +24,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+
+val SupportedSchemaVersion = 0
 
 class NetworkIemService(private val peripheralPreferencesService: PeripheralPreferencesService) : IIemService {
 
@@ -39,11 +46,62 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
 
             launch {
                 val reader = socket.openReadChannel()
-                val buffer = ByteArray(256)
+                val buffer = ByteArray(65536)
                 while (isActive && socket.isActive) {
-                    val read = reader.readAvailable(buffer)
-                    if (read > 0) {
-                        println(buffer.copyOfRange(0, read).decodeToString())
+                    val schemaVersion = reader.readByte()
+                    if (schemaVersion > SupportedSchemaVersion) {
+                        Logger.e { "NetworkIemService - Received unsupported schema version $schemaVersion" }
+                        close()
+                        return@launch
+                    }
+
+                    val messageType = reader.readByte()
+                    val payloadLength = reader.readInt()
+                    val message = reader.readByteArray(payloadLength).toKmpIoSource()
+
+                    val curve = message.readFloat()
+                    val minDb = message.readFloat()
+                    val maxDb = message.readFloat()
+                    val trackCount = message.readShort()
+                    val nameSize = message.readShort()
+                    val projectName = message.readUtf8(nameSize.toInt())
+                    println("Curve: $curve")
+                    println("Min dB: $minDb")
+                    println("Max dB: $maxDb")
+                    println("Track Count: $trackCount")
+                    println("Project Name: $projectName")
+
+                    for (i in 0 until trackCount) {
+                        val guid = message.readUtf8(38)
+                        val index = i
+                        val receiveCount = message.readShort()
+                        val hwOutCount = message.readShort()
+                        val volume = message.readFloat()
+                        val pan = message.readFloat()
+                        val mute = message.readByte()
+                        val trackNameLength = message.readShort()
+                        val trackName = message.readUtf8(trackNameLength.toInt())
+                        println("Track name: $trackName")
+                        println("Guid: $guid")
+                        println("Index: $index")
+                        println("Receive count: $receiveCount")
+                        println("Hw out: $hwOutCount")
+                        println("Volume: $volume")
+                        println("Pan: $pan")
+                        println("Mute: $mute")
+
+                        for (j in 0 until receiveCount + hwOutCount) {
+                            val guid = message.readUtf8(38)
+                            val index = if (j < receiveCount) j else j - receiveCount
+                            val volume = message.readFloat()
+                            val pan = message.readFloat()
+                            val mute = message.readByte()
+                            println("Src Guid: $guid")
+                            println("Index: $index")
+                            println("Volume: $volume")
+                            println("Pan: $pan")
+                            println("Mute: $mute")
+                        }
                     }
                 }
             }
