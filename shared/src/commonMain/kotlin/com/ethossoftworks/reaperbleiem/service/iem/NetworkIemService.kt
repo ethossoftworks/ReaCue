@@ -11,14 +11,15 @@ import io.ktor.network.sockets.openReadChannel
 import io.ktor.network.sockets.openWriteChannel
 import io.ktor.utils.io.ByteWriteChannel
 import io.ktor.utils.io.CancellationException
-import io.ktor.utils.io.read
 import io.ktor.utils.io.readByte
 import io.ktor.utils.io.readByteArray
 import io.ktor.utils.io.readFloat
 import io.ktor.utils.io.readInt
 import io.ktor.utils.io.readShort
+import kotlin.experimental.and
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
+import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -65,15 +66,12 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
                     val trackCount = message.readShort()
                     val nameSize = message.readShort()
                     val projectName = message.readUtf8(nameSize.toInt())
-                    println("Curve: $curve")
-                    println("Min dB: $minDb")
-                    println("Max dB: $maxDb")
-                    println("Track Count: $trackCount")
-                    println("Project Name: $projectName")
+
+                    val tracks = persistentMapOf<Int, Track>().builder()
+                    val receives = persistentMapOf<Int, Mix>().builder()
+                    val hardwareOuts = persistentMapOf<Int, Mix>().builder()
 
                     for (i in 0 until trackCount) {
-                        val guid = message.readUtf8(38)
-                        val index = i
                         val receiveCount = message.readShort()
                         val hwOutCount = message.readShort()
                         val volume = message.readFloat()
@@ -81,28 +79,62 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
                         val mute = message.readByte()
                         val trackNameLength = message.readShort()
                         val trackName = message.readUtf8(trackNameLength.toInt())
-                        println("Track name: $trackName")
-                        println("Guid: $guid")
-                        println("Index: $index")
-                        println("Receive count: $receiveCount")
-                        println("Hw out: $hwOutCount")
-                        println("Volume: $volume")
-                        println("Pan: $pan")
-                        println("Mute: $mute")
 
-                        for (j in 0 until receiveCount + hwOutCount) {
-                            val guid = message.readUtf8(38)
-                            val index = if (j < receiveCount) j else j - receiveCount
+                        for (j in 0 until receiveCount) {
+                            val sourceTrack = message.readShort()
                             val volume = message.readFloat()
                             val pan = message.readFloat()
                             val mute = message.readByte()
-                            println("Src Guid: $guid")
-                            println("Index: $index")
-                            println("Volume: $volume")
-                            println("Pan: $pan")
-                            println("Mute: $mute")
+
+                            receives[j] =
+                                Mix(
+                                    id = j,
+                                    trackId = sourceTrack.toInt(),
+                                    volume = volume,
+                                    pan = pan,
+                                    isMuted = mute and 0xFF.toByte() > 0x00,
+                                )
                         }
+
+                        for (j in 0 until hwOutCount) {
+                            val sourceTrack = message.readShort()
+                            val volume = message.readFloat()
+                            val pan = message.readFloat()
+                            val mute = message.readByte()
+
+                            hardwareOuts[j] =
+                                Mix(
+                                    id = j,
+                                    trackId = sourceTrack.toInt(),
+                                    volume = volume,
+                                    pan = pan,
+                                    isMuted = mute and 0xFF.toByte() > 0x00,
+                                )
+                        }
+
+                        tracks[i] =
+                            Track(
+                                id = i,
+                                name = trackName,
+                                receives = receives.build(),
+                                hardwareOuts = hardwareOuts.build(),
+                            )
                     }
+
+                    val event =
+                        IemEvent.Refreshed(
+                            projectName = projectName,
+                            faderInfo =
+                                FaderInfo(
+                                    curve = curve,
+                                    minDb = minDb,
+                                    maxDb = maxDb,
+                                ),
+                            tracks = tracks.build(),
+                        )
+
+                    println(event)
+                    send(event)
                 }
             }
 
@@ -119,8 +151,7 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
         awaitClose { closeSocket() }
     }
 
-    override suspend fun refresh() {
-    }
+    override suspend fun refresh() {}
 
     override suspend fun setOutputVolume(trackId: Int, value: Float) {}
 

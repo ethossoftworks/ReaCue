@@ -98,38 +98,39 @@ function has_project_structure_changed() local(has_changed, i, track, hw_out_cou
 );
 
 /*
- * Project Info
+ * Header
  * 0 - byte - Schema Version
  * 1 - byte - Message Type
- * 2-5 - int - Payload Size
- * 6-9 - float - Fader Curve
- * 10-13 - float - Fader Min dB
- * 14-17 - float - Fader Max dB
- * 17-19 - short - Track Count
- * 20-21 - short - Project Name Size
- * 22-N - string - Project Name
+ *
+ * Project Info
+ * 0-4 - int - Payload Size
+ * 5-8 - float - Fader Curve
+ * 9-12 - float - Fader Min dB
+ * 13-16 - float - Fader Max dB
+ * 17-18 - short - Track Count
+ * 19-20 - short - Project Name Size
+ * 20-N - string - Project Name
  *
  * Track Info (Track info repeats with its corresponding send info. Track index can be inferred by position in bytes)
- * 0-37 - string - GUID
- * 38-39 - short - Receive Count
- * 40-41 - short - Hardware Output Count
- * 42-45 - float - Volume
- * 46-49 - float - Pan
- * 50 - byte - Mute
- * 51-52 - short - Name length
- * 53-N - string - Name
+ * 0-1 - short - Receive Count
+ * 2-3 - short - Hardware Output Count
+ * 4-7 - float - Volume
+ * 8-11 - float - Pan
+ * 12 - byte - Mute
+ * 13-14 - short - Name length
+ * 15-N - string - Name
  *
  * Send Info (receives are listed first, then hardware outs. Actual sends are ignored for now. Indexes can be inferred by position in bytes).
- * 0-37 - string - Source GUID
- * 38-41 - float - Volume
- * 42-45 - float - Pan
- * 46 - byte - Mute
+ * 0-1 - short - Src Track
+ * 2-5 - float - Volume
+ * 6-9 - float - Pan
+ * 9 - byte - Mute
  */
-function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j, base_track_size, base_project_info_size, base_send_size, name_len, send_slot, receive_count, hw_out_count, header_size) (
+function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j, base_track_size, base_project_info_size, base_send_size, name_len, send_slot, receive_count, hw_out_count, header_size, project_name_length) (
   header_size = 6;
   base_project_info_size = 16;
-  base_track_size = 53;
-  base_send_size = 47;
+  base_track_size = 15;
+  base_send_size = 11;
 
   payload_size = base_project_info_size + strlen(#project_name);
 
@@ -145,29 +146,42 @@ function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j
     i+=1;
   );
 
-  #buffer = ""; // Reset buffer due to str_insert shifting any trailing content (causing the buffer length to grow)
-  str_setchar(#buffer, 0, 0, 'cu');
-  str_setchar(#buffer, 1, 0, 'cu');
-  str_setchar(#buffer, 2, payload_size, 'Iu');
-  str_setchar(#buffer, 6, fader_curve, 'F');
-  str_setchar(#buffer, 10, fader_min_db, 'F');
-  str_setchar(#buffer, 14, fader_max_db, 'F');
-  str_setchar(#buffer, 18, track_count, 'Su');
-  str_setchar(#buffer, 20, strlen(#project_name), 'Su');
-  str_insert(#buffer, #project_name, 22);
+  #buffer = "";
+  offset = 0;
 
-  send_tcp_message(#buffer, header_size + base_project_info_size + strlen(#project_name));
+  str_setchar(#buffer, offset, TCP_SCHEMA_VERSION, 'cu');
+  offset += 1;
+
+  str_setchar(#buffer, offset, COMMAND_TYPE_REFRESHED, 'cu');
+  offset += 1;
+
+  str_setchar(#buffer, offset, payload_size, 'Iu');
+  offset += 4;
+
+  str_setchar(#buffer, offset, fader_curve, 'F');
+  offset += 4;
+
+  str_setchar(#buffer, offset, fader_min_db, 'F');
+  offset += 4;
+
+  str_setchar(#buffer, offset, fader_max_db, 'F');
+  offset += 4;
+
+  str_setchar(#buffer, offset, track_count, 'Su');
+  offset += 2;
+
+  project_name_length = strlen(#project_name);
+  str_setchar(#buffer, offset, project_name_length, 'Su');
+  offset += 2;
+
+  str_insert(#buffer, #project_name, offset);
+  offset += project_name_length;
 
   i = 0;
   loop(track_count,
-    #buffer = ""; // Reset buffer due to str_insert shifting any trailing content (causing the buffer length to grow)
-    offset = 0;
     track_slot = MEM_TRACK + (MEM_TRACK_STRIDE * i);
     receive_count = 0[track_slot + 3];
     hw_out_count = 0[track_slot + 4];
-
-    str_insert(#buffer, 0[track_slot + 0], offset);
-    offset += 38;
 
     str_setchar(#buffer, offset, 0[track_slot + 3], 'Su');
     offset += 2;
@@ -195,8 +209,8 @@ function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j
     loop(receive_count + hw_out_count,
       send_slot = MEM_SEND + (MEM_SEND_TRACK_STRIDE * i) + (MEM_SEND_STRIDE * j);
 
-      str_insert(#buffer, 0[send_slot + 2], offset);
-      offset += 38;
+      str_setchar(#buffer, offset, 0[send_slot + 1], 'Su');
+      offset += 2;
 
       str_setchar(#buffer, offset, 0[send_slot + 3], 'F');
       offset += 4;
@@ -210,10 +224,10 @@ function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j
       j += 1;
     );
 
-    send_tcp_message(#buffer, offset);
-
     i+=1;
   );
+
+  send_tcp_message(#buffer, offset);
 );
 
 function handle_project_structure_change() local(i, track, receive_count, hw_out_count, track_slot, guid_slot, vol, pan, mute, j, send_slot, src_track) (
@@ -454,6 +468,9 @@ function reacue() (
      */
     MEM_SEND_STRINGS = 20000;
     MEM_SEND_STRINGS_TRACK_STRIDE = 200;
+
+    TCP_SCHEMA_VERSION = 0;
+    COMMAND_TYPE_REFRESHED = 0;
 
     atexit("shutdown_server();");
     reacue_loop();
