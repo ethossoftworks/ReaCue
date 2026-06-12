@@ -610,7 +610,7 @@ function handle_tcp_message(client_index, message, message_type, payload_size) l
   );
 );
 
-function handle_tcp_receive() local(i, client_handle, bytes, accum, payload_size, draining) (
+function handle_tcp_receive() local(i, client_handle, bytes, accum, payload_size, draining, guard, msg_size) (
   i = 0;
   loop(TCP_MAX_CLIENTS,
     client_handle = 0[MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + i];
@@ -621,11 +621,14 @@ function handle_tcp_receive() local(i, client_handle, bytes, accum, payload_size
         close_tcp_client(i);
       ) : bytes > 0 ? (
         accum = MEM_BASE + MEM_BASE_OFFSET_TCP_RECV_BUFFER + i;
+        str_setlen(#recv_buffer, bytes);
         strcat(accum, #recv_buffer);
 
         draining = 1;
-        while (draining) (
+        guard = 0;
+        while (draining && guard < 100) ( // iteration cap: a stuck buffer must not freeze REAPER
           draining = 0;
+          guard += 1;
           strlen(accum) >= TCP_HEADER_SIZE ? (
             str_getchar(accum, TCP_HEADER_SCHEMA_VERSION_OFFSET, 'cu') != TCP_SCHEMA_VERSION ? (
               DEBUG > 0 ? ShowConsoleMsg("Schema version mismatch - closing client\n");
@@ -638,7 +641,20 @@ function handle_tcp_receive() local(i, client_handle, bytes, accum, payload_size
                 close_tcp_client(i);
               ) : strlen(accum) >= TCP_HEADER_SIZE + payload_size ? (
                 handle_tcp_message(i, accum, str_getchar(accum, TCP_HEADER_MESSAGE_TYPE_OFFSET, 'cu'), payload_size);
-                str_delsub(accum, 0, TCP_HEADER_SIZE + payload_size);
+
+                // Consume the processed message by rebuilding the buffer from the tail
+                // (str_delsub proved unreliable here)
+                msg_size = TCP_HEADER_SIZE + payload_size;
+                strlen(accum) > msg_size ? (
+                  strcpy_from(#remaining, accum, msg_size);
+                  strcpy(accum, #remaining);
+                ) : (
+                  strcpy(accum, "");
+                );
+                DEBUG > 0 ? (
+                  sprintf(#debug, "Consumed %i bytes, %i remain\n", msg_size, strlen(accum));
+                  ShowConsoleMsg(#debug);
+                );
                 draining = 1;
               );
             );
