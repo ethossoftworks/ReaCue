@@ -12,46 +12,42 @@ function normalized_to_linear(norm_val) local(slider_val, db) (
   db <= -140 ? 0.0 : exp(db * (log(10) / 20));
 );
 
-function send_tcp_message(payload, len) local(client_handle, bytes_sent) (
-  sprintf(#message, "Sending message - %i bytes\n", len);
-  ShowConsoleMsg(#message);
+/*
+ * Sends a payload with the specified length to tcp connections. Sends to all connections by default.
+ * To override what clients are sent to, modify the slots under MEM_BASE_OFFSET_TCP_SEND_LIST to point
+ * to MEM_BASE_OFFSET_TCP_CLIENTS slot.
+ */
+function send_tcp_message(payload, len) local(client_handle, bytes_sent, i, slot, broadcast) (
+  DEBUG > 0 ? (
+    sprintf(#debug, "Sending message - %i bytes\n", len);
+    ShowConsoleMsg(#debug);
+  );
+
+  broadcast = 0[MEM_BASE + MEM_BASE_OFFSET_TCP_SEND_LIST] == 0;
 
   i = 0;
   loop(TCP_MAX_CLIENTS,
-    client_handle = 0[MEM_PROJECT_OFFSET_TCP_CLIENTS + i];
+    broadcast ? (
+      slot = MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + i;
+    ) : 0[MEM_BASE + MEM_BASE_OFFSET_TCP_SEND_LIST + i] > 0 ? (
+      slot = 0[MEM_BASE + MEM_BASE_OFFSET_TCP_SEND_LIST + i];
+      0[MEM_BASE + MEM_BASE_OFFSET_TCP_SEND_LIST + i] = 0;
+    );
 
-    client_handle > 0 ? (
-      bytes_sent = tcp_send(client_handle, payload, len);
-
-      bytes_sent <= 0 ? (
-        tcp_close(client_handle);
-        0[MEM_PROJECT_OFFSET_TCP_CLIENTS + i] = 0; // Clear the client slot
+    slot != 0 ? (
+      client_handle = 0[slot];
+      client_handle > 0 ? (
+        bytes_sent = tcp_send(client_handle, payload, len);
+        bytes_sent <= 0 ? (
+          tcp_close(client_handle);
+          0[slot] = 0;
+        );
       );
     );
+
+
     i += 1;
   );
-);
-
-function handle_tcp_connection() local(connection, slot) (
-  connection = tcp_listen(TCP_PORT);
-  connection > 0 ? (
-    slot = -1;
-    i = 0;
-    while (i < TCP_MAX_CLIENTS && slot == -1) (
-      0[MEM_PROJECT_OFFSET_TCP_CLIENTS + i] == 0 ? slot = i;
-      i += 1;
-    );
-
-    slot != -1 ? (
-      0[MEM_PROJECT_OFFSET_TCP_CLIENTS + slot] = connection;
-    ) : (
-      tcp_close(connection);
-    )
-  );
-);
-
-function handle_tcp_receive() (
-  0
 );
 
 function has_project_structure_changed() local(has_changed, i, track, hw_out_count, receive_count, track_slot) (
@@ -126,7 +122,7 @@ function has_project_structure_changed() local(has_changed, i, track, hw_out_cou
  * float - Pan
  * byte - Mute
  */
-function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j, base_track_size, base_project_info_size, base_send_size, name_len, send_slot, receive_count, hw_out_count, header_size, project_name_length) (
+function send_tcp_message_refreshed() local(payload_size, offset, i, j, base_track_size, base_project_info_size, base_send_size, name_len, send_slot, receive_count, hw_out_count, header_size, project_name_length) (
   header_size = 6;
   base_project_info_size = 16;
   base_track_size = 15;
@@ -246,6 +242,11 @@ function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j
  * float - Value
  */
 function send_tcp_message_send_changed(message_type, track_index, src_index, value, value_type) local(offset, value_size) (
+  DEBUG > 0 ? (
+    sprintf(#debug, "Send Changed - Message Type: %i\n", message_type);
+    ShowConsoleMsg(#debug);
+  );
+
   #buffer = "";
   offset = 0;
 
@@ -289,6 +290,11 @@ function send_tcp_message_send_changed(message_type, track_index, src_index, val
  * string - Track name
  */
 function send_tcp_message_track_name_changed(track_index, value) local(offset, name_len) (
+  DEBUG > 0 ? (
+    sprintf(#debug, "Track Name Changed - Track: %i\n", track_index);
+    ShowConsoleMsg(#debug);
+  );
+
   #buffer = "";
   offset = 0;
   name_len = strlen(value);
@@ -314,6 +320,10 @@ function send_tcp_message_track_name_changed(track_index, value) local(offset, n
 );
 
 function handle_project_structure_change() local(i, track, receive_count, hw_out_count, track_slot, guid_slot, vol, pan, mute, j, send_slot, src_track) (
+  DEBUG > 0 ? (
+    ShowConsoleMsg("Project structure changed\n");
+  );
+
   0[MEM_PROJECT + MEM_PROJECT_OFFSET_PATH] = #project_path;
   0[MEM_PROJECT + MEM_PROJECT_OFFSET_NAME] = #project_name;
   0[MEM_PROJECT + MEM_PROJECT_OFFSET_FADER_CURVE] = fader_curve;
@@ -474,24 +484,52 @@ function handle_delta_change() local(i, track, receive_count, hw_out_count, trac
   );
 );
 
+function handle_tcp_connection() local(connection, slot) (
+  connection = tcp_listen(TCP_PORT);
+  connection > 0 ? (
+    slot = -1;
+    i = 0;
+    while (i < TCP_MAX_CLIENTS && slot == -1) (
+      0[MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + i] == 0 ? slot = i;
+      i += 1;
+    );
+
+    slot != -1 ? (
+      DEBUG > 0 ? (
+        sprintf(#debug, "TCP client connected\n", len);
+        ShowConsoleMsg(#debug);
+      );
+
+      0[MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + slot] = connection;
+
+      0[MEM_BASE + MEM_BASE_OFFSET_TCP_SEND_LIST + slot] = MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + slot;
+      send_tcp_message_refreshed();
+    ) : (
+      DEBUG > 0 ? (
+        sprintf(#debug, "TCP client closed\n", len);
+        ShowConsoleMsg(#debug);
+      );
+      tcp_close(connection);
+    )
+  );
+);
+
+function handle_tcp_receive() (
+  0
+);
 
 function reacue_loop() (
   start = 0;
-  time_precise(start);
   handle_tcp_connection();
   handle_tcp_receive();
 
   has_project_structure_changed() ? (
-    ShowConsoleMsg("Structure Changed\n");
     handle_project_structure_change();
   ) : (
     handle_delta_change();
   );
 
   end = 0;
-  time_precise(end);
-  sprintf(#elapsed, "Time elapsed: %f\n", end - start);
-  //ShowConsoleMsg(#elapsed);
 
   runloop("reacue_loop();");
 );
@@ -509,20 +547,24 @@ function shutdown_server() local(i, client_handle) (
 );
 
 function reacue() (
+    DEBUG = 0;
     TCP_PORT = 9001;
     TCP_MAX_CLIENTS = 10;
 
     /*
      * Memory arena for project details:
      */
-    MEM_PROJECT = 0;
-    MEM_PROJECT_OFFSET_TCP_CLIENTS = 0;
-    MEM_PROJECT_OFFSET_NAME = 10;
-    MEM_PROJECT_OFFSET_PATH = 11;
-    MEM_PROJECT_OFFSET_FADER_CURVE = 12;
-    MEM_PROJECT_OFFSET_FADER_MIN_DB = 13;
-    MEM_PROJECT_OFFSET_FADER_MAX_DB = 14;
-    MEM_PROJECT_OFFSET_TRACK_COUNT = 15;
+    MEM_BASE = 0;
+    MEM_BASE_OFFSET_TCP_CLIENTS = 10;
+    MEM_BASE_OFFSET_TCP_SEND_LIST = 20;
+
+    MEM_PROJECT = 5000;
+    MEM_PROJECT_OFFSET_NAME = 0;
+    MEM_PROJECT_OFFSET_PATH = 1;
+    MEM_PROJECT_OFFSET_FADER_CURVE = 2;
+    MEM_PROJECT_OFFSET_FADER_MIN_DB = 3;
+    MEM_PROJECT_OFFSET_FADER_MAX_DB = 4;
+    MEM_PROJECT_OFFSET_TRACK_COUNT = 5;
 
     /*
      * Memory arena for Track info:
