@@ -174,9 +174,7 @@ class IemScreenViewInteractor(
                         else -> {}
                     }
                 }
-                .onCompletion {
-                    update { state -> state.copy(passcodeEntry = null) }
-                }
+                .onCompletion { update { state -> state.copy(passcodeEntry = null) } }
                 .launchIn(interactorScope)
     }
 }

@@ -272,10 +272,7 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
         localRequests.update { it.update { remove(requestId) } }
 
         peripheralManager.respondToRequest(
-            request =
-                request.apply {
-                    setValue(value.toNSData())
-                },
+            request = request.apply { setValue(value.toNSData()) },
             withResult =
                 when (result) {
                     KmpBlePeripheralGattResult.Failure -> CBATTErrorUnlikelyError

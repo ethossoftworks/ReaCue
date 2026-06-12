@@ -67,6 +67,8 @@ import com.outsidesource.oskitcompose.systemui.KmpWindowInsets
 import com.outsidesource.oskitcompose.systemui.top
 import com.outsidesource.oskitkmp.text.KmpNumberFormatter
 import com.outsidesource.oskitkmp.text.parseFloatOrNull
+import kotlin.math.absoluteValue
+import kotlin.math.roundToInt
 import org.jetbrains.compose.resources.stringResource
 import org.koin.core.parameter.parametersOf
 import reacue.shared.generated.resources.Res
@@ -88,8 +90,6 @@ import reacue.shared.generated.resources.set_all_0db
 import reacue.shared.generated.resources.set_all_n
 import reacue.shared.generated.resources.untitled
 import reacue.shared.generated.resources.view_passcode
-import kotlin.math.absoluteValue
-import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -397,12 +397,7 @@ private fun rememberTicks(faderInfo: FaderInfo): List<KmpSliderTick> {
 }
 
 @Composable
-fun PasscodeEntryModal(
-    isVisible: Boolean,
-    maxWidth: Dp = 300.dp,
-    onCancel: () -> Unit,
-    onCommit: (String) -> Unit,
-) {
+fun PasscodeEntryModal(isVisible: Boolean, maxWidth: Dp = 300.dp, onCancel: () -> Unit, onCommit: (String) -> Unit) {
     val focusRequester = remember { FocusRequester() }
 
     Modal(
@@ -451,12 +446,7 @@ fun PasscodeEntryModal(
 }
 
 @Composable
-fun ViewPasscodeModal(
-    isVisible: Boolean,
-    passcode: String,
-    maxWidth: Dp = 300.dp,
-    onDismiss: () -> Unit,
-) {
+fun ViewPasscodeModal(isVisible: Boolean, passcode: String, maxWidth: Dp = 300.dp, onDismiss: () -> Unit) {
     Modal(
         modifier = Modifier.widthIn(max = maxWidth).appModalSurface().padding(16.dp),
         isVisible = isVisible,

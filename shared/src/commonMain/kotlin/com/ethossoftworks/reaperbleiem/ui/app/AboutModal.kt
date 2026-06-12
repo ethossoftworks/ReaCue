@@ -24,6 +24,7 @@ import com.outsidesource.oskitcompose.interactor.collectAsState
 import com.outsidesource.oskitcompose.lib.rememberInject
 import com.outsidesource.oskitcompose.popup.Modal
 import com.outsidesource.oskitcompose.popup.ModalStyles
+import kotlin.time.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.jetbrains.compose.resources.painterResource
@@ -31,7 +32,6 @@ import org.jetbrains.compose.resources.stringResource
 import reacue.shared.generated.resources.Res
 import reacue.shared.generated.resources.app_icon
 import reacue.shared.generated.resources.app_name
-import kotlin.time.Clock
 
 @Composable
 fun AboutModal(isVisible: Boolean, onDismissRequest: () -> Unit, interactor: AboutViewInteractor = rememberInject()) {

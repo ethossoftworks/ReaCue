@@ -144,20 +144,13 @@ fun PeripheralSettingsScreen(interactor: PeripheralSettingsScreenViewInteractor 
         onDismissRequest = interactor::onResetToDefaultCancel,
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
-            Text(
-                text = stringResource(Res.string.reset_to_default),
-                fontWeight = FontWeight.Light,
-                fontSize = 20.sp,
-            )
+            Text(text = stringResource(Res.string.reset_to_default), fontWeight = FontWeight.Light, fontSize = 20.sp)
             Text(text = stringResource(Res.string.are_you_sure))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.End),
             ) {
-                AppButton(
-                    label = stringResource(Res.string.cancel),
-                    onClick = interactor::onResetToDefaultCancel,
-                )
+                AppButton(label = stringResource(Res.string.cancel), onClick = interactor::onResetToDefaultCancel)
                 AppButton(
                     buttonType = AppButtonType.Destructive,
                     label = stringResource(Res.string.reset_to_default),
