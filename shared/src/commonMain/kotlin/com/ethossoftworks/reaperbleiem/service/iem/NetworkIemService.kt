@@ -12,9 +12,14 @@ import io.ktor.network.sockets.openReadChannel
 import io.ktor.network.sockets.openWriteChannel
 import io.ktor.utils.io.ByteWriteChannel
 import io.ktor.utils.io.CancellationException
+import io.ktor.utils.io.readAvailable
 import io.ktor.utils.io.readByte
 import io.ktor.utils.io.readByteArray
 import io.ktor.utils.io.readInt
+import io.ktor.utils.io.writeByte
+import io.ktor.utils.io.writeFloat
+import io.ktor.utils.io.writeInt
+import io.ktor.utils.io.writeShort
 import kotlin.experimental.and
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
@@ -45,6 +50,7 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
             tcpSocket.update { socket }
 
             launch {
+                val unknownBuffer = ByteArray(16384)
                 val reader = socket.openReadChannel()
                 while (isActive && socket.isActive) {
                     val schemaVersion = reader.readByte()
@@ -61,13 +67,16 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
                     val event = when (messageType) {
                         TcpMessageType.StructureChanged.value -> parseRefreshedMessage(payload)
                         TcpMessageType.TrackNameChanged.value -> parseTrackNameChangedMessage(payload, payloadSize)
+                        TcpMessageType.TrackVolChanged.value -> parseTrackVolChangedMessage(payload)
+                        TcpMessageType.TrackPanChanged.value -> parseTrackPanChangedMessage(payload)
+                        TcpMessageType.TrackMuteChanged.value -> parseTrackMuteChangedMessage(payload)
                         TcpMessageType.ReceiveVolChanged.value -> parseReceiveVolChangedMessage(payload)
                         TcpMessageType.ReceivePanChanged.value -> parseReceivePanChangedMessage(payload)
-                        TcpMessageType.ReceiveMuteChanged.value -> {}
+                        TcpMessageType.ReceiveMuteChanged.value -> parseReceiveMuteChangedMessage(payload)
                         TcpMessageType.HwOutVolChanged.value -> parseHwOutVolChangedMessage(payload)
-                        TcpMessageType.HwOutPanChanged.value -> {}
-                        TcpMessageType.HwOutMuteChanged.value -> {}
-                        else -> continue
+                        TcpMessageType.HwOutPanChanged.value -> parseHwOutPanChangedMessage(payload)
+                        TcpMessageType.HwOutMuteChanged.value -> parseHwOutMuteChangedMessage(payload)
+                        else -> reader.readAvailable(unknownBuffer) // Attempt to drain unknown message
                     }
 
                     if (event is IemEvent) {
@@ -164,11 +173,22 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
         return IemEvent.TrackNameUpdated(trackId = trackId, name = value)
     }
 
-    private suspend fun parseHwOutVolChangedMessage(payload: IKmpIoSource): IemEvent {
+    private suspend fun parseTrackVolChangedMessage(payload: IKmpIoSource): IemEvent {
         val trackId = payload.readShort().toInt()
-        val hwOutId = payload.readShort().toInt()
         val value = payload.readFloat()
-        return IemEvent.HardwareOutputVolumeUpdated(trackId = trackId, hardwareOutId = hwOutId, value = value)
+        return IemEvent.TrackVolumeUpdated(trackId = trackId, value = value)
+    }
+
+    private suspend fun parseTrackPanChangedMessage(payload: IKmpIoSource): IemEvent {
+        val trackId = payload.readShort().toInt()
+        val value = payload.readFloat()
+        return IemEvent.TrackPanUpdated(trackId = trackId, value = value)
+    }
+
+    private suspend fun parseTrackMuteChangedMessage(payload: IKmpIoSource): IemEvent {
+        val trackId = payload.readShort().toInt()
+        val value = payload.readByte() > 0x00
+        return IemEvent.TrackMuteUpdated(trackId = trackId, value = value)
     }
 
     private suspend fun parseReceiveVolChangedMessage(payload: IKmpIoSource): IemEvent {
@@ -185,9 +205,56 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
         return IemEvent.ReceivePanUpdated(trackId = trackId, receiveId = receiveId, value = value)
     }
 
-    override suspend fun refresh() {}
+    private suspend fun parseReceiveMuteChangedMessage(payload: IKmpIoSource): IemEvent {
+        val trackId = payload.readShort().toInt()
+        val receiveId = payload.readShort().toInt()
+        val value = payload.readByte() > 0x00
+        return IemEvent.ReceiveMuteUpdated(trackId = trackId, receiveId = receiveId, value = value)
+    }
 
-    override suspend fun setReceiveVolume(trackId: Int, receiveId: Int, value: Float) {}
+    private suspend fun parseHwOutVolChangedMessage(payload: IKmpIoSource): IemEvent {
+        val trackId = payload.readShort().toInt()
+        val hwOutId = payload.readShort().toInt()
+        val value = payload.readFloat()
+        return IemEvent.HardwareOutputVolumeUpdated(trackId = trackId, hardwareOutId = hwOutId, value = value)
+    }
+
+    private suspend fun parseHwOutPanChangedMessage(payload: IKmpIoSource): IemEvent {
+        val trackId = payload.readShort().toInt()
+        val hwOutId = payload.readShort().toInt()
+        val value = payload.readFloat()
+        return IemEvent.HardwareOutputPanUpdated(trackId = trackId, hardwareOutId = hwOutId, value = value)
+    }
+
+    private suspend fun parseHwOutMuteChangedMessage(payload: IKmpIoSource): IemEvent {
+        val trackId = payload.readShort().toInt()
+        val hwOutId = payload.readShort().toInt()
+        val value = payload.readByte() > 0x00
+        return IemEvent.HardwareOutputMuteUpdated(trackId = trackId, hardwareOutId = hwOutId, value = value)
+    }
+
+    override suspend fun refresh() {
+        writeChannel.value?.apply {
+            writeByte(SupportedSchemaVersion)
+            writeByte(TcpMessageType.Refresh.value)
+            writeInt(0)
+        }
+    }
+
+    override suspend fun setReceiveVolume(trackId: Int, receiveId: Int, value: Float) {
+        try {
+            writeChannel.value?.apply {
+                writeByte(SupportedSchemaVersion)
+                writeByte(TcpMessageType.ReceiveVolChanged.value)
+                writeInt(8)
+                writeShort(trackId.toShort())
+                writeShort(receiveId.toShort())
+                writeFloat(value)
+            }
+        } catch (e: Exception) {
+            Logger.e { "NetworkIemService - $e" }
+        }
+    }
 
     override suspend fun setReceivePan(trackId: Int, receiveId: Int, value: Float) {}
 
