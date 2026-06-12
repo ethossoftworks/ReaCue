@@ -18,7 +18,7 @@ function close_tcp_client(slot) local(client_handle) (
     DEBUG > 0 ? (
       ShowConsoleMsg("Closing TCP client\n");
     );
-
+  
     tcp_close(client_handle);
     0[slot] = 0;
   );
@@ -34,9 +34,9 @@ function send_tcp_message(payload, len) local(client_handle, bytes_sent, i, slot
     sprintf(#debug, "Sending message - %i bytes\n", len);
     ShowConsoleMsg(#debug);
   );
-
+  
   broadcast = 0[MEM_BASE + MEM_BASE_OFFSET_TCP_SEND_LIST] == 0;
-
+  
   i = 0;
   loop(TCP_MAX_CLIENTS,
     broadcast ? (
@@ -45,7 +45,7 @@ function send_tcp_message(payload, len) local(client_handle, bytes_sent, i, slot
       slot = 0[MEM_BASE + MEM_BASE_OFFSET_TCP_SEND_LIST + i];
       0[MEM_BASE + MEM_BASE_OFFSET_TCP_SEND_LIST + i] = 0;
     );
-
+    
     slot != 0 ? (
       client_handle = 0[slot];
       client_handle > 0 ? (
@@ -55,7 +55,8 @@ function send_tcp_message(payload, len) local(client_handle, bytes_sent, i, slot
         );
       );
     );
-
+    
+    
     i += 1;
   );
 );
@@ -159,7 +160,7 @@ function send_tcp_message_refreshed() local(payload_size, offset, i, j, base_tra
   str_setchar(#buffer, offset, TCP_SCHEMA_VERSION, 'cu');
   offset += 1;
 
-  str_setchar(#buffer, offset, MESSAGE_TYPE_REFRESHED, 'cu');
+  str_setchar(#buffer, offset, MESSAGE_TYPE_STRUCTURE_CHANGED, 'cu');
   offset += 1;
 
   str_setchar(#buffer, offset, payload_size, 'Iu');
@@ -248,23 +249,24 @@ function send_tcp_message_refreshed() local(payload_size, offset, i, j, base_tra
  *
  * Payload
  * short - Track Index
- * short - Hardware Out Index
- * float - Value
+ * short - Source Track Index
+ * float|byte - Value (depends on the message_type)
  */
-function send_tcp_message_send_changed(message_type, track_index, src_index, value, value_type) local(offset, value_size) (
+function send_tcp_message_send_changed(message_type, track_index, src_index, value, value_type) local(offset, value_size, payload_size) (
   DEBUG > 0 ? (
     sprintf(#debug, "Send Changed - Message Type: %i\n", message_type);
     ShowConsoleMsg(#debug);
   );
-
-  #buffer = "";
-  offset = 0;
 
   value_type == 'F' ? (
     value_size = 4;
   ) ? value_type == 'cu' ? (
     value_size = 1;
   );
+
+  #buffer = "";
+  offset = 0;
+  payload_size = 4 + value_size;
 
   // Header
   str_setchar(#buffer, offset, TCP_SCHEMA_VERSION, 'cu');
@@ -273,7 +275,7 @@ function send_tcp_message_send_changed(message_type, track_index, src_index, val
   str_setchar(#buffer, offset, message_type, 'cu');
   offset += 1;
 
-  str_setchar(#buffer, offset, 4 + value_size, 'Iu');
+  str_setchar(#buffer, offset, payload_size, 'Iu');
   offset += 4;
 
   // Payload
@@ -297,9 +299,55 @@ function send_tcp_message_send_changed(message_type, track_index, src_index, val
  *
  * Payload
  * short - Track Index
+ * float|byte - Value (depends on the message_type)
+ */
+function send_tcp_message_track_changed(message_type, track_index, value, value_type) local(offset, value_size, payload_size) (
+  DEBUG > 0 ? (
+    sprintf(#debug, "Track Changed - Message Type: %i\n", message_type);
+    ShowConsoleMsg(#debug);
+  );
+
+  value_type == 'F' ? (
+    value_size = 4;
+  ) ? value_type == 'cu' ? (
+    value_size = 1;
+  );
+
+  #buffer = "";
+  offset = 0;
+  payload_size = 2 + value_size;
+
+  // Header
+  str_setchar(#buffer, offset, TCP_SCHEMA_VERSION, 'cu');
+  offset += 1;
+
+  str_setchar(#buffer, offset, message_type, 'cu');
+  offset += 1;
+
+  str_setchar(#buffer, offset, payload_size, 'Iu');
+  offset += 4;
+
+  // Payload
+  str_setchar(#buffer, offset, track_index, 'Su');
+  offset += 2;
+
+  str_setchar(#buffer, offset, value, value_type);
+  offset += value_size;
+
+  send_tcp_message(#buffer, offset);
+);
+
+/*
+ * Header
+ * byte - Schema Version
+ * byte - Message Type
+ * int - Payload Size
+ *
+ * Payload
+ * short - Track Index
  * string - Track name
  */
-function send_tcp_message_track_name_changed(track_index, value) local(offset, name_len) (
+function send_tcp_message_track_name_changed(track_index, value) local(offset, name_len, payload_size) (
   DEBUG > 0 ? (
     sprintf(#debug, "Track Name Changed - Track: %i\n", track_index);
     ShowConsoleMsg(#debug);
@@ -308,6 +356,8 @@ function send_tcp_message_track_name_changed(track_index, value) local(offset, n
   #buffer = "";
   offset = 0;
   name_len = strlen(value);
+  payload_size = 2 + name_len;
+
 
   // Header
   str_setchar(#buffer, offset, TCP_SCHEMA_VERSION, 'cu');
@@ -316,7 +366,7 @@ function send_tcp_message_track_name_changed(track_index, value) local(offset, n
   str_setchar(#buffer, offset, MESSAGE_TYPE_TRACK_NAME_CHANGED, 'cu');
   offset += 1;
 
-  str_setchar(#buffer, offset, 2 + name_len, 'Iu');
+  str_setchar(#buffer, offset, payload_size, 'Iu');
   offset += 4;
 
   // Payload
@@ -422,18 +472,18 @@ function handle_delta_change() local(i, track, receive_count, hw_out_count, trac
     vol = linear_to_normalized(vol);
     vol != 0[track_slot + MEM_TRACK_OFFSET_VOL] ? (
       0[track_slot + MEM_TRACK_OFFSET_VOL] = vol;
-      // TODO: Implement this
+      send_tcp_message_track_changed(MESSAGE_TYPE_TRACK_VOL_CHANGED, i, vol, 'F');
     );
 
     pan = (pan + 1) / 2;
     pan != 0[track_slot + MEM_TRACK_OFFSET_PAN] ? (
       0[track_slot + MEM_TRACK_OFFSET_PAN] = pan;
-      // TODO: Implement this
+      send_tcp_message_track_changed(MESSAGE_TYPE_TRACK_PAN_CHANGED, i, pan, 'F');
     );
 
     mute != 0[track_slot + MEM_TRACK_OFFSET_MUTE] ? (
       0[track_slot + MEM_TRACK_OFFSET_MUTE] = mute;
-      // TODO: Implement this
+      send_tcp_message_track_changed(MESSAGE_TYPE_TRACK_MUTe_CHANGED, i, mute, 'cu');
     );
 
     j = 0;
@@ -564,6 +614,8 @@ function shutdown_server() local(i, client_handle) (
     close_tcp_client(MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + i);
     i += 1;
   );
+
+  tcp_listen_end(TCP_PORT);
 );
 
 function reacue() (
@@ -622,14 +674,19 @@ function reacue() (
     MEM_TRACK_STRINGS_STRIDE = 10;
 
     TCP_SCHEMA_VERSION = 0;
-    MESSAGE_TYPE_REFRESHED = 0;
+
+    MESSAGE_TYPE_STRUCTURE_CHANGED = 0;
     MESSAGE_TYPE_TRACK_NAME_CHANGED = 1;
-    MESSAGE_TYPE_RECEIVE_VOL_CHANGED = 2;
-    MESSAGE_TYPE_RECEIVE_PAN_CHANGED = 3;
-    MESSAGE_TYPE_RECEIVE_MUTE_CHANGED = 4;
-    MESSAGE_TYPE_HWOUT_VOL_CHANGED = 5;
-    MESSAGE_TYPE_HWOUT_PAN_CHANGED = 6;
-    MESSAGE_TYPE_HWOUT_MUTE_CHANGED = 7;
+    MESSAGE_TYPE_TRACK_VOL_CHANGED = 2;
+    MESSAGE_TYPE_TRACK_PAN_CHANGED = 3;
+    MESSAGE_TYPE_TRACK_MUTE_CHANGED = 4;
+    MESSAGE_TYPE_RECEIVE_VOL_CHANGED = 5;
+    MESSAGE_TYPE_RECEIVE_PAN_CHANGED = 6;
+    MESSAGE_TYPE_RECEIVE_MUTE_CHANGED = 7;
+    MESSAGE_TYPE_HWOUT_VOL_CHANGED = 8;
+    MESSAGE_TYPE_HWOUT_PAN_CHANGED = 9;
+    MESSAGE_TYPE_HWOUT_MUTE_CHANGED = 10;
+    MESSAGE_TYPE_REFRESH = 11;
 
     atexit("shutdown_server();");
     reacue_loop();
