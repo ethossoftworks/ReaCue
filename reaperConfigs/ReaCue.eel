@@ -609,6 +609,11 @@ function reacue_loop() (
 );
 
 function shutdown_server() local(i, client_handle) (
+  DEBUG > 0 ? (
+    sprintf(#debug, "Shutting down server\n", len);
+    ShowConsoleMsg(#debug);
+  );
+
   i = 0;
   loop(TCP_MAX_CLIENTS,
     close_tcp_client(MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + i);
