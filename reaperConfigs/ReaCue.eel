@@ -20,7 +20,8 @@ function close_tcp_client(slot) local(client_handle) (
     );
   
     tcp_close(client_handle);
-    0[slot] = 0;
+    0[MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + slot] = 0;
+    0[MEM_BASE + MEM_BASE_OFFSET_TCP_RECV_BUFFER + slot] = 0;
   );
 );
 
@@ -36,7 +37,7 @@ function send_tcp_message(payload, len) local(client_handle, bytes_sent, i, slot
   );
 
   broadcast = 0[MEM_BASE + MEM_BASE_OFFSET_TCP_SEND_LIST] == 0;
-  
+
   i = 0;
   loop(TCP_MAX_CLIENTS,
     broadcast ? (
@@ -561,6 +562,7 @@ function handle_tcp_connection() local(connection, slot) (
       );
 
       0[MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + slot] = connection;
+      strcpy(MEM_BASE + MEM_BASE_OFFSET_TCP_RECV_BUFFER + slot, ""); // Clear receive buffer
 
       0[MEM_BASE + MEM_BASE_OFFSET_TCP_SEND_LIST + 0] = MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + slot;
       send_tcp_message_refreshed();
@@ -579,18 +581,54 @@ function handle_tcp_connection() local(connection, slot) (
   );
 );
 
-function handle_tcp_receive() local(i, client_handle, bytes) (
+function handle_tcp_message(client_index, accum, message_type, payload_size) (
+  DEBUG > 0 ? (
+    sprintf(#debug, "Received message - Type: %i, Payload: %i bytes\n", message_type, payload_size);
+    ShowConsoleMsg(#debug);
+  );
+
+  str_getchar(accum, 0, 'cu') != TCP_SCHEMA_VERSION ? (
+    DEBUG > 0 ? ShowConsoleMsg("Schema version mismatch - dropping message\n");
+  ) : message_type == MESSAGE_TYPE_REFRESH ? (
+    tcp_send_list_add(MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + client_index);
+    send_tcp_message_refreshed();
+  ) : (
+    DEBUG > 0 ? (
+      sprintf(#debug, "Unknown message type: %i\n", message_type);
+      ShowConsoleMsg(#debug);
+    );
+  );
+);
+
+function handle_tcp_receive() local(i, client_handle, bytes, accum, payload_size, draining) (
   i = 0;
   loop(TCP_MAX_CLIENTS,
     client_handle = 0[MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + i];
     client_handle > 0 ? (
-      bytes = tcp_recv(client_handle, #recv_buffer, RECV_BUFFER_SIZE);
+      bytes = tcp_recv(client_handle, #recv_buffer, TCP_RECV_BUFFER_SIZE);
 
       bytes < 0 ? (
         close_tcp_client(MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + i);
       ) : bytes > 0 ? (
-        // TODO: handle incoming bytes in #recv_buffer
-        0
+        accum = MEM_BASE + MEM_BASE_OFFSET_TCP_RECV_BUFFER + i;
+        strcat(accum, #recv_buffer);
+
+        draining = 1;
+        while (draining) (
+          draining = 0;
+          strlen(accum) >= TCP_HEADER_SIZE ? (
+            payload_size = str_getchar(accum, TCP_HEADER_PAYLOAD_SIZE_OFFSET, 'Iu');
+
+            payload_size > TCP_MAX_PAYLOAD_SIZE ? (
+              DEBUG > 0 ? ShowConsoleMsg("Invalid payload size - closing client\n");
+              close_tcp_client(MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + i);
+            ) : strlen(accum) >= TCP_HEADER_SIZE + payload_size ? (
+              handle_tcp_message(i, accum, str_getchar(accum, 1, 'cu'), payload_size);
+              str_delsub(accum, 0, TCP_HEADER_SIZE + payload_size);
+              draining = 1;
+            );
+          );
+        );
       );
     );
     i += 1;
@@ -630,8 +668,23 @@ function shutdown_server() local(i, client_handle) (
 
 function reacue() (
     DEBUG = 1;
+
+    /*
+     * TCP Settings
+     */
     TCP_PORT = 9001;
     TCP_MAX_CLIENTS = 10;
+    TCP_MAX_PAYLOAD_SIZE = 65536;
+    TCP_RECV_BUFFER_SIZE = 4096;
+    TCP_SCHEMA_VERSION = 0;
+
+    /*
+     * TCP Header
+     */
+    TCP_HEADER_SIZE = 6;
+    TCP_HEADER_VERSION_OFFSET = 0;
+    TCP_HEADER_MESSAGE_TYPE_OFFSET = 1;
+    TCP_HEADER_PAYLOAD_SIZE_OFFSET = 3;
 
     /*
      * Memory arena for TCP:
@@ -639,6 +692,7 @@ function reacue() (
     MEM_BASE = 0;
     MEM_BASE_OFFSET_TCP_CLIENTS = 10;
     MEM_BASE_OFFSET_TCP_SEND_LIST = 20;
+    MEM_BASE_OFFSET_TCP_RECV_BUFFER = 11000;
 
     /*
      * Memory arena for project details:
@@ -683,8 +737,9 @@ function reacue() (
     MEM_TRACK_STRINGS = 10000;
     MEM_TRACK_STRINGS_STRIDE = 10;
 
-    TCP_SCHEMA_VERSION = 0;
-
+    /*
+     * TCP Message Types
+     */
     MESSAGE_TYPE_STRUCTURE_CHANGED = 0;
     MESSAGE_TYPE_TRACK_NAME_CHANGED = 1;
     MESSAGE_TYPE_TRACK_VOL_CHANGED = 2;
