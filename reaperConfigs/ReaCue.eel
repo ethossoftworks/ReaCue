@@ -600,7 +600,8 @@ function handle_tcp_message(client_index, message, message_type, payload_size) l
     volume = str_getchar(message, offset, 'F');
     sprintf(#debug, "Volume: %f\n", volume);
     ShowConsoleMsg(#debug);
-    0[MEM_SEND + (MEM_SEND_TRACK_STRIDE * track_index) + (MEM_SEND_STRIDE * src_index) + MEM_SEND_OFFSET_VOL] = normalized_to_linear(volume);
+    0[MEM_SEND + (MEM_SEND_TRACK_STRIDE * track_index) + (MEM_SEND_STRIDE * send_index) + MEM_SEND_OFFSET_VOL] = volume;
+    SetTrackSendInfo_Value(GetTrack(project_fn, track_index), -1, send_index, "D_VOL", normalized_to_linear(volume));
   ) : (
     DEBUG > 0 ? (
       sprintf(#debug, "Unknown message type: %i\n", message_type);
@@ -721,9 +722,9 @@ function reacue() (
      * Memory arena for TCP:
      */
     MEM_BASE = 0;
+    MEM_BASE_OFFSET_TCP_RECV_BUFFER = 0;
     MEM_BASE_OFFSET_TCP_CLIENTS = 10;
     MEM_BASE_OFFSET_TCP_SEND_LIST = 20;
-    MEM_BASE_OFFSET_TCP_RECV_BUFFER = 11000;
 
     /*
      * Memory arena for project details:
