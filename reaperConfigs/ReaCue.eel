@@ -598,8 +598,6 @@ function handle_tcp_message(client_index, message, message_type, payload_size) l
     send_index = str_getchar(message, offset, 'Su');
     offset += 2;
     volume = str_getchar(message, offset, 'F');
-    sprintf(#debug, "Volume: %f\n", volume);
-    ShowConsoleMsg(#debug);
     0[MEM_SEND + (MEM_SEND_TRACK_STRIDE * track_index) + (MEM_SEND_STRIDE * send_index) + MEM_SEND_OFFSET_VOL] = volume;
     SetTrackSendInfo_Value(GetTrack(project_fn, track_index), -1, send_index, "D_VOL", normalized_to_linear(volume));
   ) : (
