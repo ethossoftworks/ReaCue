@@ -153,7 +153,7 @@ function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j
   str_setchar(#buffer, offset, TCP_SCHEMA_VERSION, 'cu');
   offset += 1;
 
-  str_setchar(#buffer, offset, COMMAND_TYPE_REFRESHED, 'cu');
+  str_setchar(#buffer, offset, MESSAGE_TYPE_REFRESHED, 'cu');
   offset += 1;
 
   str_setchar(#buffer, offset, payload_size, 'Iu');
@@ -201,11 +201,11 @@ function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j
     str_setchar(#buffer, offset, 0[track_slot + MEM_TRACK_OFFSET_MUTE], 'cu');
     offset += 1;
 
-    name_len = strlen(0[track_slot + 2]);
+    name_len = strlen(0[track_slot + MEM_TRACK_OFFSET_NAME]);
     str_setchar(#buffer, offset, name_len, 'Su');
     offset += 2;
 
-    str_insert(#buffer, 0[track_slot + 2], offset);
+    str_insert(#buffer, 0[track_slot + MEM_TRACK_OFFSET_NAME], offset);
     offset += name_len;
 
     // Receives/hardware sends
@@ -229,6 +229,48 @@ function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j
     );
 
     i+=1;
+  );
+
+  send_tcp_message(#buffer, offset);
+);
+
+/*
+ * Header
+ * byte - Schema Version
+ * byte - Message Type
+ * int - Payload Size
+ *
+ * Payload
+ * short - Track Index
+ * short - Hardware Out Index
+ * float - Value
+ */
+function send_tcp_message_send_changed(message_type, track_index, hwout_index, value, value_type) local() (
+  #buffer = "";
+  offset = 0;
+
+  // Header
+  str_setchar(#buffer, offset, TCP_SCHEMA_VERSION, 'cu');
+  offset += 1;
+
+  str_setchar(#buffer, offset, message_type, 'cu');
+  offset += 1;
+
+  str_setchar(#buffer, offset, 8, 'Iu');
+  offset += 4;
+
+  // Payload
+  str_setchar(#buffer, offset, track_index, 'Su');
+  offset += 2;
+
+  str_setchar(#buffer, offset, hwout_index, 'Su');
+  offset += 2;
+
+  str_setchar(#buffer, offset, value, value_type);
+  value_type == 'F' ? (
+    offset += 4;
+  ) ? value_type == 'cu' ? (
+    offset += 1;
   );
 
   send_tcp_message(#buffer, offset);
@@ -322,19 +364,19 @@ function handle_delta_change() local(i, track, receive_count, hw_out_count, trac
 
     vol = linear_to_normalized(vol);
     vol != 0[track_slot + MEM_TRACK_OFFSET_VOL] ? (
-      ShowConsoleMsg("Volume changed\n");
       0[track_slot + MEM_TRACK_OFFSET_VOL] = vol;
+      // TODO: Implement this
     );
 
     pan = (pan + 1) / 2;
     pan != 0[track_slot + MEM_TRACK_OFFSET_PAN] ? (
-      ShowConsoleMsg("Pan changed\n");
       0[track_slot + MEM_TRACK_OFFSET_PAN] = pan;
+      // TODO: Implement this
     );
 
     mute != 0[track_slot + MEM_TRACK_OFFSET_MUTE] ? (
-      ShowConsoleMsg("Mute changed\n");
       0[track_slot + MEM_TRACK_OFFSET_MUTE] = mute;
+      // TODO: Implement this
     );
 
     j = 0;
@@ -346,19 +388,19 @@ function handle_delta_change() local(i, track, receive_count, hw_out_count, trac
 
       vol = linear_to_normalized(vol);
       vol != 0[send_slot + MEM_SEND_OFFSET_VOL] ? (
-        ShowConsoleMsg("Send Volume changed\n");
         0[send_slot + MEM_SEND_OFFSET_VOL] = vol;
+        send_tcp_message_send_changed(MESSAGE_TYPE_RECEIVE_VOL_CHANGED, i, j, vol, 'F');
       );
 
       pan = (pan + 1) / 2;
       pan != 0[send_slot + MEM_SEND_OFFSET_PAN] ? (
-        ShowConsoleMsg("Send Pan changed\n");
         0[send_slot + MEM_SEND_OFFSET_PAN] = pan;
+        send_tcp_message_send_changed(MESSAGE_TYPE_RECEIVE_PAN_CHANGED, i, j, mute, 'F');
       );
 
       mute != 0[send_slot + MEM_SEND_OFFSET_MUTE] ? (
-        ShowConsoleMsg("Send Mute changed\n");
         0[send_slot + MEM_SEND_OFFSET_MUTE] = mute;
+        send_tcp_message_send_changed(MESSAGE_TYPE_RECEIVE_MUTE_CHANGED, i, j, mute, 'cu');
       );
 
       j += 1;
@@ -373,19 +415,19 @@ function handle_delta_change() local(i, track, receive_count, hw_out_count, trac
 
       vol = linear_to_normalized(vol);
       vol != 0[send_slot + MEM_SEND_OFFSET_VOL] ? (
-        ShowConsoleMsg("Hardware Output Volume changed\n");
         0[send_slot + MEM_SEND_OFFSET_VOL] = vol;
+        send_tcp_message_send_changed(MESSAGE_TYPE_HWOUT_VOL_CHANGED, i, j, vol, 'F');
       );
 
       pan = (pan + 1) / 2;
       pan != 0[send_slot + MEM_SEND_OFFSET_PAN] ? (
-        ShowConsoleMsg("Hardware Output Pan changed\n");
         0[send_slot + MEM_SEND_OFFSET_PAN] = pan;
+        send_tcp_message_send_changed(MESSAGE_TYPE_HWOUT_PAN_CHANGED, i, j, pan, 'F');
       );
 
       mute != 0[send_slot + MEM_SEND_OFFSET_MUTE] ? (
-        ShowConsoleMsg("Hardware Output Mute changed\n");
         0[send_slot + MEM_SEND_OFFSET_MUTE] = mute;
+        send_tcp_message_send_changed(MESSAGE_TYPE_HWOUT_MUTE_CHANGED, i, j, mute, 'cu');
       );
 
       j += 1;
@@ -478,7 +520,14 @@ function reacue() (
     MEM_TRACK_STRINGS_STRIDE = 10;
 
     TCP_SCHEMA_VERSION = 0;
-    COMMAND_TYPE_REFRESHED = 0;
+    MESSAGE_TYPE_REFRESHED = 0;
+    MESSAGE_TYPE_TRACK_NAME_CHANGED = 1;
+    MESSAGE_TYPE_RECEIVE_VOL_CHANGED = 2;
+    MESSAGE_TYPE_RECEIVE_PAN_CHANGED = 3;
+    MESSAGE_TYPE_RECEIVE_MUTE_CHANGED = 4;
+    MESSAGE_TYPE_HWOUT_VOL_CHANGED = 5;
+    MESSAGE_TYPE_HWOUT_PAN_CHANGED = 6;
+    MESSAGE_TYPE_HWOUT_MUTE_CHANGED = 7;
 
     atexit("shutdown_server();");
     reacue_loop();
