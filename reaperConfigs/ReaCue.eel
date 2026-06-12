@@ -581,15 +581,26 @@ function handle_tcp_connection() local(connection, slot) (
   );
 );
 
-function handle_tcp_message(client_index, accum, message_type, payload_size) (
+function handle_tcp_message(client_index, message, message_type, payload_size) local(volume, offset, send_slot, send_index, track_index) (
   DEBUG > 0 ? (
     sprintf(#debug, "Received message - Type: %i, Payload: %i bytes\n", message_type, payload_size);
     ShowConsoleMsg(#debug);
   );
 
+  offset = TCP_HEADER_SIZE;
+
   message_type == MESSAGE_TYPE_REFRESH ? (
     0[MEM_BASE + MEM_BASE_OFFSET_TCP_SEND_LIST + 0] = 0[MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + client_index];
     send_tcp_message_refreshed();
+ ) : message_type == MESSAGE_TYPE_RECEIVE_VOL_CHANGED ? (
+    track_index = str_getchar(message, offset, 'Su');
+    offset += 2;
+    send_index = str_getchar(message, offset, 'Su');
+    offset += 2;
+    volume = str_getchar(message, offset, 'F');
+    sprintf(#debug, "Volume: %f\n", volume);
+    ShowConsoleMsg(#debug);
+    0[MEM_SEND + (MEM_SEND_TRACK_STRIDE * track_index) + (MEM_SEND_STRIDE * src_index) + MEM_SEND_OFFSET_VOL] = normalized_to_linear(volume);
   ) : (
     DEBUG > 0 ? (
       sprintf(#debug, "Unknown message type: %i\n", message_type);
@@ -615,7 +626,7 @@ function handle_tcp_receive() local(i, client_handle, bytes, accum, payload_size
         while (draining) (
           draining = 0;
           strlen(accum) >= TCP_HEADER_SIZE ? (
-            str_getchar(accum, 0, 'cu') != TCP_SCHEMA_VERSION ? (
+            str_getchar(accum, TCP_HEADER_SCHEMA_VERSION_OFFSET, 'cu') != TCP_SCHEMA_VERSION ? (
               DEBUG > 0 ? ShowConsoleMsg("Schema version mismatch - closing client\n");
               close_tcp_client(i);
             ) : (
@@ -625,7 +636,7 @@ function handle_tcp_receive() local(i, client_handle, bytes, accum, payload_size
                 DEBUG > 0 ? ShowConsoleMsg("Invalid payload size - closing client\n");
                 close_tcp_client(i);
               ) : strlen(accum) >= TCP_HEADER_SIZE + payload_size ? (
-                handle_tcp_message(i, accum, str_getchar(accum, 1, 'cu'), payload_size);
+                handle_tcp_message(i, accum, str_getchar(accum, TCP_HEADER_MESSAGE_TYPE_OFFSET, 'cu'), payload_size);
                 str_delsub(accum, 0, TCP_HEADER_SIZE + payload_size);
                 draining = 1;
               );
@@ -691,6 +702,22 @@ function reacue() (
     TCP_HEADER_PAYLOAD_OFFSET = 6;
 
     /*
+     * TCP Message Types
+     */
+    MESSAGE_TYPE_STRUCTURE_CHANGED = 0;
+    MESSAGE_TYPE_TRACK_NAME_CHANGED = 1;
+    MESSAGE_TYPE_TRACK_VOL_CHANGED = 2;
+    MESSAGE_TYPE_TRACK_PAN_CHANGED = 3;
+    MESSAGE_TYPE_TRACK_MUTE_CHANGED = 4;
+    MESSAGE_TYPE_RECEIVE_VOL_CHANGED = 5;
+    MESSAGE_TYPE_RECEIVE_PAN_CHANGED = 6;
+    MESSAGE_TYPE_RECEIVE_MUTE_CHANGED = 7;
+    MESSAGE_TYPE_HWOUT_VOL_CHANGED = 8;
+    MESSAGE_TYPE_HWOUT_PAN_CHANGED = 9;
+    MESSAGE_TYPE_HWOUT_MUTE_CHANGED = 10;
+    MESSAGE_TYPE_REFRESH = 11;
+
+    /*
      * Memory arena for TCP:
      */
     MEM_BASE = 0;
@@ -740,22 +767,6 @@ function reacue() (
      */
     MEM_TRACK_STRINGS = 10000;
     MEM_TRACK_STRINGS_STRIDE = 10;
-
-    /*
-     * TCP Message Types
-     */
-    MESSAGE_TYPE_STRUCTURE_CHANGED = 0;
-    MESSAGE_TYPE_TRACK_NAME_CHANGED = 1;
-    MESSAGE_TYPE_TRACK_VOL_CHANGED = 2;
-    MESSAGE_TYPE_TRACK_PAN_CHANGED = 3;
-    MESSAGE_TYPE_TRACK_MUTE_CHANGED = 4;
-    MESSAGE_TYPE_RECEIVE_VOL_CHANGED = 5;
-    MESSAGE_TYPE_RECEIVE_PAN_CHANGED = 6;
-    MESSAGE_TYPE_RECEIVE_MUTE_CHANGED = 7;
-    MESSAGE_TYPE_HWOUT_VOL_CHANGED = 8;
-    MESSAGE_TYPE_HWOUT_PAN_CHANGED = 9;
-    MESSAGE_TYPE_HWOUT_MUTE_CHANGED = 10;
-    MESSAGE_TYPE_REFRESH = 11;
 
     atexit("shutdown_server();");
     reacue_loop();
