@@ -245,9 +245,15 @@ function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j
  * short - Hardware Out Index
  * float - Value
  */
-function send_tcp_message_send_changed(message_type, track_index, hwout_index, value, value_type) local() (
+function send_tcp_message_send_changed(message_type, track_index, src_index, value, value_type) local(offset, value_size) (
   #buffer = "";
   offset = 0;
+
+  value_type == 'F' ? (
+    value_size = 4;
+  ) ? value_type == 'cu' ? (
+    value_size = 1;
+  );
 
   // Header
   str_setchar(#buffer, offset, TCP_SCHEMA_VERSION, 'cu');
@@ -256,22 +262,18 @@ function send_tcp_message_send_changed(message_type, track_index, hwout_index, v
   str_setchar(#buffer, offset, message_type, 'cu');
   offset += 1;
 
-  str_setchar(#buffer, offset, 8, 'Iu');
+  str_setchar(#buffer, offset, 4 + value_size, 'Iu');
   offset += 4;
 
   // Payload
   str_setchar(#buffer, offset, track_index, 'Su');
   offset += 2;
 
-  str_setchar(#buffer, offset, hwout_index, 'Su');
+  str_setchar(#buffer, offset, src_index, 'Su');
   offset += 2;
 
   str_setchar(#buffer, offset, value, value_type);
-  value_type == 'F' ? (
-    offset += 4;
-  ) ? value_type == 'cu' ? (
-    offset += 1;
-  );
+  offset += value_size;
 
   send_tcp_message(#buffer, offset);
 );
@@ -395,7 +397,7 @@ function handle_delta_change() local(i, track, receive_count, hw_out_count, trac
       pan = (pan + 1) / 2;
       pan != 0[send_slot + MEM_SEND_OFFSET_PAN] ? (
         0[send_slot + MEM_SEND_OFFSET_PAN] = pan;
-        send_tcp_message_send_changed(MESSAGE_TYPE_RECEIVE_PAN_CHANGED, i, j, mute, 'F');
+        send_tcp_message_send_changed(MESSAGE_TYPE_RECEIVE_PAN_CHANGED, i, j, pan, 'F');
       );
 
       mute != 0[send_slot + MEM_SEND_OFFSET_MUTE] ? (
