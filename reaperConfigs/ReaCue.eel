@@ -278,6 +278,41 @@ function send_tcp_message_send_changed(message_type, track_index, src_index, val
   send_tcp_message(#buffer, offset);
 );
 
+/*
+ * Header
+ * byte - Schema Version
+ * byte - Message Type
+ * int - Payload Size
+ *
+ * Payload
+ * short - Track Index
+ * string - Track name
+ */
+function send_tcp_message_track_name_changed(track_index, value) local(offset, name_len) (
+  #buffer = "";
+  offset = 0;
+  name_len = strlen(value);
+
+  // Header
+  str_setchar(#buffer, offset, TCP_SCHEMA_VERSION, 'cu');
+  offset += 1;
+
+  str_setchar(#buffer, offset, message_type, 'cu');
+  offset += 1;
+
+  str_setchar(#buffer, offset, 2 + name_len, 'Iu');
+  offset += 4;
+
+  // Payload
+  str_setchar(#buffer, offset, track_index, 'Su');
+  offset += 2;
+
+  str_setchar(#buffer, offset, name, 'Su');
+  offset += name_len;
+
+  send_tcp_message(#buffer, offset);
+);
+
 function handle_project_structure_change() local(i, track, receive_count, hw_out_count, track_slot, guid_slot, vol, pan, mute, j, send_slot, src_track) (
   0[MEM_PROJECT + MEM_PROJECT_OFFSET_PATH] = #project_path;
   0[MEM_PROJECT + MEM_PROJECT_OFFSET_NAME] = #project_name;
@@ -351,8 +386,8 @@ function handle_delta_change() local(i, track, receive_count, hw_out_count, trac
 
     GetTrackName(track, #track_name);
     strcmp(0[track_slot + MEM_TRACK_OFFSET_NAME], #track_name) != 0 ? (
-      ShowConsoleMsg("Track name changed \n");
       strcpy(0[track_slot + MEM_TRACK_OFFSET_NAME], #track_name);
+      send_tcp_message_track_name_changed(i, 0[track_slot + MEM_TRACK_OFFSET_NAME]);
     );
 
     receive_count = 0[track_slot + MEM_TRACK_OFFSET_RECV_COUNT];
