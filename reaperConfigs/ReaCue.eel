@@ -12,6 +12,18 @@ function normalized_to_linear(norm_val) local(slider_val, db) (
   db <= -140 ? 0.0 : exp(db * (log(10) / 20));
 );
 
+function close_tcp_client(slot) local(client_handle) (
+  client_handle = 0[slot];
+  client_handle > 0 ? (
+    DEBUG > 0 ? (
+      ShowConsoleMsg("Closing TCP client\n");
+    );
+
+    tcp_close(client_handle);
+    0[slot] = 0;
+  );
+);
+
 /*
  * Sends a payload with the specified length to tcp connections. Sends to all connections by default.
  * To override what clients are sent to, modify the slots under MEM_BASE_OFFSET_TCP_SEND_LIST to point
@@ -39,8 +51,7 @@ function send_tcp_message(payload, len) local(client_handle, bytes_sent, i, slot
       client_handle > 0 ? (
         bytes_sent = tcp_send(client_handle, payload, len);
         bytes_sent <= 0 ? (
-          tcp_close(client_handle);
-          0[slot] = 0;
+          close_tcp_client(slot);
         );
       );
     );
@@ -514,8 +525,22 @@ function handle_tcp_connection() local(connection, slot) (
   );
 );
 
-function handle_tcp_receive() (
-  0
+function handle_tcp_receive() local(i, client_handle, bytes) (
+  i = 0;
+  loop(TCP_MAX_CLIENTS,
+    client_handle = 0[MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + i];
+    client_handle > 0 ? (
+      bytes = tcp_recv(client_handle, #recv_buffer, RECV_BUFFER_SIZE);
+
+      bytes < 0 ? (
+        close_tcp_client(MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + i);
+      ) : bytes > 0 ? (
+        // TODO: handle incoming bytes in #recv_buffer
+        0
+      );
+    );
+    i += 1;
+  );
 );
 
 function reacue_loop() (
@@ -537,27 +562,26 @@ function reacue_loop() (
 function shutdown_server() local(i, client_handle) (
   i = 0;
   loop(TCP_MAX_CLIENTS,
-    client_handle = 0[i];
-    client_handle > 0 ? (
-      tcp_close(client_handle);
-      0[i] = 0;
-    );
+    close_tcp_client(MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + i);
     i += 1;
   );
 );
 
 function reacue() (
-    DEBUG = 0;
+    DEBUG = 1;
     TCP_PORT = 9001;
     TCP_MAX_CLIENTS = 10;
 
     /*
-     * Memory arena for project details:
+     * Memory arena for TCP:
      */
     MEM_BASE = 0;
     MEM_BASE_OFFSET_TCP_CLIENTS = 10;
     MEM_BASE_OFFSET_TCP_SEND_LIST = 20;
 
+    /*
+     * Memory arena for project details:
+     */
     MEM_PROJECT = 5000;
     MEM_PROJECT_OFFSET_NAME = 0;
     MEM_PROJECT_OFFSET_PATH = 1;
