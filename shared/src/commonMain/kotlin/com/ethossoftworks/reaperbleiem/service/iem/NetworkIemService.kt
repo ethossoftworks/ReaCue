@@ -25,7 +25,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-val SupportedSchemaVersion = 0
+private val SupportedSchemaVersion: Byte = 0x00
 
 class NetworkIemService(private val peripheralPreferencesService: PeripheralPreferencesService) : IIemService {
 
@@ -48,7 +48,7 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
                 val reader = socket.openReadChannel()
                 while (isActive && socket.isActive) {
                     val schemaVersion = reader.readByte()
-                    if (schemaVersion > SupportedSchemaVersion) {
+                    if (schemaVersion != SupportedSchemaVersion) {
                         Logger.e { "NetworkIemService - Received unsupported schema version $schemaVersion" }
                         close()
                         return@launch
