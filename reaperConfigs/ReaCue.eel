@@ -56,7 +56,6 @@ function send_tcp_message(payload, len) local(client_handle, bytes_sent, i, slot
       );
     );
 
-
     i += 1;
   );
 );
