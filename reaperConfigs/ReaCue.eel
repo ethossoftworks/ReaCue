@@ -12,16 +12,17 @@ function normalized_to_linear(norm_val) local(slider_val, db) (
   db <= -140 ? 0.0 : exp(db * (log(10) / 20));
 );
 
-function close_tcp_client(slot) local(client_handle) (
-  client_handle = 0[slot];
+function close_tcp_client(client_index) local(client_handle) (
+  client_handle = 0[MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + client_index];
   client_handle > 0 ? (
     DEBUG > 0 ? (
       ShowConsoleMsg("Closing TCP client\n");
     );
   
     tcp_close(client_handle);
-    0[MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + slot] = 0;
-    0[MEM_BASE + MEM_BASE_OFFSET_TCP_RECV_BUFFER + slot] = 0;
+    0[MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + client_index] = 0;
+    strcpy(MEM_BASE + MEM_BASE_OFFSET_TCP_RECV_BUFFER + client_index, "");
+    0[MEM_BASE + MEM_BASE_OFFSET_TCP_RECV_BUFFER + client_index] = 0;
   );
 );
 
@@ -52,12 +53,11 @@ function send_tcp_message(payload, len) local(client_handle, bytes_sent, i, slot
       client_handle > 0 ? (
         bytes_sent = tcp_send(client_handle, payload, len);
         bytes_sent <= 0 ? (
-          close_tcp_client(slot);
+          close_tcp_client(i);
         );
       );
     );
-    
-    
+
     i += 1;
   );
 );
@@ -587,10 +587,8 @@ function handle_tcp_message(client_index, accum, message_type, payload_size) (
     ShowConsoleMsg(#debug);
   );
 
-  str_getchar(accum, 0, 'cu') != TCP_SCHEMA_VERSION ? (
-    DEBUG > 0 ? ShowConsoleMsg("Schema version mismatch - dropping message\n");
-  ) : message_type == MESSAGE_TYPE_REFRESH ? (
-    tcp_send_list_add(MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + client_index);
+  message_type == MESSAGE_TYPE_REFRESH ? (
+    0[MEM_BASE + MEM_BASE_OFFSET_TCP_SEND_LIST + 0] = 0[MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + client_index];
     send_tcp_message_refreshed();
   ) : (
     DEBUG > 0 ? (
@@ -608,7 +606,7 @@ function handle_tcp_receive() local(i, client_handle, bytes, accum, payload_size
       bytes = tcp_recv(client_handle, #recv_buffer, TCP_RECV_BUFFER_SIZE);
 
       bytes < 0 ? (
-        close_tcp_client(MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + i);
+        close_tcp_client(i);
       ) : bytes > 0 ? (
         accum = MEM_BASE + MEM_BASE_OFFSET_TCP_RECV_BUFFER + i;
         strcat(accum, #recv_buffer);
@@ -617,15 +615,20 @@ function handle_tcp_receive() local(i, client_handle, bytes, accum, payload_size
         while (draining) (
           draining = 0;
           strlen(accum) >= TCP_HEADER_SIZE ? (
-            payload_size = str_getchar(accum, TCP_HEADER_PAYLOAD_SIZE_OFFSET, 'Iu');
+            str_getchar(accum, 0, 'cu') != TCP_SCHEMA_VERSION ? (
+              DEBUG > 0 ? ShowConsoleMsg("Schema version mismatch - closing client\n");
+              close_tcp_client(i);
+            ) : (
+              payload_size = str_getchar(accum, TCP_HEADER_PAYLOAD_SIZE_OFFSET, 'Iu');
 
-            payload_size > TCP_MAX_PAYLOAD_SIZE ? (
-              DEBUG > 0 ? ShowConsoleMsg("Invalid payload size - closing client\n");
-              close_tcp_client(MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + i);
-            ) : strlen(accum) >= TCP_HEADER_SIZE + payload_size ? (
-              handle_tcp_message(i, accum, str_getchar(accum, 1, 'cu'), payload_size);
-              str_delsub(accum, 0, TCP_HEADER_SIZE + payload_size);
-              draining = 1;
+              payload_size > TCP_MAX_PAYLOAD_SIZE ? (
+                DEBUG > 0 ? ShowConsoleMsg("Invalid payload size - closing client\n");
+                close_tcp_client(i);
+              ) : strlen(accum) >= TCP_HEADER_SIZE + payload_size ? (
+                handle_tcp_message(i, accum, str_getchar(accum, 1, 'cu'), payload_size);
+                str_delsub(accum, 0, TCP_HEADER_SIZE + payload_size);
+                draining = 1;
+              );
             );
           );
         );
@@ -659,7 +662,7 @@ function shutdown_server() local(i, client_handle) (
 
   i = 0;
   loop(TCP_MAX_CLIENTS,
-    close_tcp_client(MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + i);
+    close_tcp_client(i);
     i += 1;
   );
 
@@ -682,9 +685,10 @@ function reacue() (
      * TCP Header
      */
     TCP_HEADER_SIZE = 6;
-    TCP_HEADER_VERSION_OFFSET = 0;
+    TCP_HEADER_SCHEMA_VERSION_OFFSET = 0;
     TCP_HEADER_MESSAGE_TYPE_OFFSET = 1;
-    TCP_HEADER_PAYLOAD_SIZE_OFFSET = 3;
+    TCP_HEADER_PAYLOAD_SIZE_OFFSET = 2;
+    TCP_HEADER_PAYLOAD_OFFSET = 6;
 
     /*
      * Memory arena for TCP:
