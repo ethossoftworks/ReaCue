@@ -59,7 +59,7 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
                     val payload = reader.readByteArray(payloadSize).toKmpIoSource()
 
                     val event = when (messageType) {
-                        TcpMessageType.Refreshed.value -> parseRefreshedMessage(payload)
+                        TcpMessageType.StructureChanged.value -> parseRefreshedMessage(payload)
                         TcpMessageType.TrackNameChanged.value -> parseTrackNameChangedMessage(payload, payloadSize)
                         TcpMessageType.ReceiveVolChanged.value -> parseReceiveVolChangedMessage(payload)
                         TcpMessageType.ReceivePanChanged.value -> parseReceivePanChangedMessage(payload)
@@ -90,7 +90,7 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
         awaitClose { closeSocket() }
     }
 
-    private suspend inline fun parseRefreshedMessage(payload: IKmpIoSource): IemEvent.Refreshed {
+    private suspend inline fun parseRefreshedMessage(payload: IKmpIoSource): IemEvent.StructureChanged {
         val curve = payload.readFloat()
         val minDb = payload.readFloat()
         val maxDb = payload.readFloat()
@@ -138,12 +138,15 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
                 Track(
                     id = i,
                     name = trackName,
+                    volume = volume,
+                    pan = pan,
+                    isMuted = mute and 0xFF.toByte() > 0x00,
                     receives = receives.build(),
                     hardwareOuts = hardwareOuts.build(),
                 )
         }
 
-        return IemEvent.Refreshed(
+        return IemEvent.StructureChanged(
             projectName = projectName,
             faderInfo =
                 FaderInfo(
@@ -165,7 +168,7 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
         val trackId = payload.readShort().toInt()
         val hwOutId = payload.readShort().toInt()
         val value = payload.readFloat()
-        return IemEvent.OutputVolumeUpdated(trackId = trackId, value = value)
+        return IemEvent.HardwareOutputVolumeUpdated(trackId = trackId, hardwareOutId = hwOutId, value = value)
     }
 
     private suspend fun parseReceiveVolChangedMessage(payload: IKmpIoSource): IemEvent {
@@ -184,11 +187,17 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
 
     override suspend fun refresh() {}
 
-    override suspend fun setOutputVolume(trackId: Int, value: Float) {}
-
     override suspend fun setReceiveVolume(trackId: Int, receiveId: Int, value: Float) {}
 
     override suspend fun setReceivePan(trackId: Int, receiveId: Int, value: Float) {}
+
+    override suspend fun setReceiveMute(trackId: Int, receiveId: Int, value: Boolean) {}
+
+    override suspend fun setOutputVolume(trackId: Int, hardwareOutId: Int, value: Float) {}
+
+    override suspend fun setOutputPan(trackId: Int, hardwareOutId: Int, value: Float) {}
+
+    override suspend fun setOutputMute(trackId: Int, hardwareOutId: Int, value: Boolean) {}
 
     private fun closeSocket() {
         tcpSocket.value?.close()
@@ -198,12 +207,16 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
 }
 
 private enum class TcpMessageType(val value: Byte) {
-    Refreshed(0x00),
+    StructureChanged(0x00),
     TrackNameChanged(0x01),
-    ReceiveVolChanged(0x02),
-    ReceivePanChanged(0x03),
-    ReceiveMuteChanged(0x04),
-    HwOutVolChanged(0x05),
-    HwOutPanChanged(0x06),
-    HwOutMuteChanged(0x07),
+    TrackVolChanged(0x02),
+    TrackPanChanged(0x03),
+    TrackMuteChanged(0x04),
+    ReceiveVolChanged(0x05),
+    ReceivePanChanged(0x06),
+    ReceiveMuteChanged(0x07),
+    HwOutVolChanged(0x08),
+    HwOutPanChanged(0x09),
+    HwOutMuteChanged(0x0A),
+    Refresh(0x0B),
 }

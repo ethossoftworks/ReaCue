@@ -258,12 +258,18 @@ fun IemScreen(
                     range = 0f..1f,
                     step = state.faderInfo.sliderStep,
                     label = stringResource(Res.string.output),
-                    onChange = { interactor.onOutputVolumeChange(track.id, it) },
+                    onChange = {
+                        val hardwareOutId = track.hardwareOuts.keys.firstOrNull() ?: return@AppSlider
+                        interactor.onOutputVolumeChange(track.id, hardwareOutId, it)
+                    },
                     valueFormatter = { formatDb(it, state.faderInfo) },
                     stringToValue = { new, current ->
                         state.faderInfo.dbToNormalized(new.parseFloatOrNull() ?: return@AppSlider current)
                     },
-                    onDoubleTap = { interactor.onOutputVolumeChange(track.id, state.faderInfo.dbToNormalized(0f)) },
+                    onDoubleTap = {
+                        val hardwareOutId = track.hardwareOuts.keys.firstOrNull() ?: return@AppSlider
+                        interactor.onOutputVolumeChange(track.id, hardwareOutId, state.faderInfo.dbToNormalized(0f))
+                    },
                     ticks = ticks,
                 )
 

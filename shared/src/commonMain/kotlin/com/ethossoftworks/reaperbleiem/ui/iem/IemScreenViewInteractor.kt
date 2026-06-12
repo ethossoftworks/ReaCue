@@ -131,8 +131,8 @@ class IemScreenViewInteractor(
         update { state -> state.copy(numberInputModalType = null) }
     }
 
-    fun onOutputVolumeChange(trackId: Int, value: Float) {
-        iemInteractor.setOutputVolume(trackId, value)
+    fun onOutputVolumeChange(trackId: Int, hardwareOutId: Int, value: Float) {
+        iemInteractor.setOutputVolume(trackId, hardwareOutId, value)
     }
 
     fun onReceiveVolumeChange(trackId: Int, receiveId: Int, value: Float) {
@@ -165,7 +165,7 @@ class IemScreenViewInteractor(
                 .subscribe(iemContext)
                 .onEach {
                     when (it) {
-                        is IemEvent.Refreshed -> {
+                        is IemEvent.StructureChanged -> {
                             val trackMatch =
                                 it.tracks.values.firstOrNull { track -> track.name == state.lastSelectedIemName }
                             update { state -> state.copy(selectedIemId = trackMatch?.id) }
