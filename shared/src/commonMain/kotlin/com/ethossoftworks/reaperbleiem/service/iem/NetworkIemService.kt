@@ -55,16 +55,16 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
                     }
 
                     val messageType = reader.readByte()
-                    val payloadLength = reader.readInt()
-                    val payload = reader.readByteArray(payloadLength).toKmpIoSource()
+                    val payloadSize = reader.readInt()
+                    val payload = reader.readByteArray(payloadSize).toKmpIoSource()
 
                     val event = when (messageType) {
                         TcpMessageType.Refreshed.value -> parseRefreshedMessage(payload)
-                        TcpMessageType.TrackNameChanged.value -> {}
-                        TcpMessageType.ReceiveVolChanged.value -> parseReceiveVolChangeMessage(payload)
-                        TcpMessageType.ReceivePanChanged.value -> parseReceivePanChangeMessage(payload)
+                        TcpMessageType.TrackNameChanged.value -> parseTrackNameChangedMessage(payload, payloadSize)
+                        TcpMessageType.ReceiveVolChanged.value -> parseReceiveVolChangedMessage(payload)
+                        TcpMessageType.ReceivePanChanged.value -> parseReceivePanChangedMessage(payload)
                         TcpMessageType.ReceiveMuteChanged.value -> {}
-                        TcpMessageType.HwOutVolChanged.value -> parseHwOutVolChangeMessage(payload)
+                        TcpMessageType.HwOutVolChanged.value -> parseHwOutVolChangedMessage(payload)
                         TcpMessageType.HwOutPanChanged.value -> {}
                         TcpMessageType.HwOutMuteChanged.value -> {}
                         else -> continue
@@ -155,21 +155,27 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
         )
     }
 
-    private suspend fun parseHwOutVolChangeMessage(payload: IKmpIoSource): IemEvent.OutputVolumeUpdated {
+    private suspend fun parseTrackNameChangedMessage(payload: IKmpIoSource, payloadSize: Int): IemEvent {
+        val trackId = payload.readShort().toInt()
+        val value = payload.readUtf8(payloadSize - 2)
+        return IemEvent.TrackNameUpdated(trackId = trackId, name = value)
+    }
+
+    private suspend fun parseHwOutVolChangedMessage(payload: IKmpIoSource): IemEvent {
         val trackId = payload.readShort().toInt()
         val hwOutId = payload.readShort().toInt()
         val value = payload.readFloat()
         return IemEvent.OutputVolumeUpdated(trackId = trackId, value = value)
     }
 
-    private suspend fun parseReceiveVolChangeMessage(payload: IKmpIoSource): IemEvent.ReceiveVolumeUpdated {
+    private suspend fun parseReceiveVolChangedMessage(payload: IKmpIoSource): IemEvent {
         val trackId = payload.readShort().toInt()
         val receiveId = payload.readShort().toInt()
         val value = payload.readFloat()
         return IemEvent.ReceiveVolumeUpdated(trackId = trackId, receiveId = receiveId, value = value)
     }
 
-    private suspend fun parseReceivePanChangeMessage(payload: IKmpIoSource): IemEvent.ReceivePanUpdated {
+    private suspend fun parseReceivePanChangedMessage(payload: IKmpIoSource): IemEvent {
         val trackId = payload.readShort().toInt()
         val receiveId = payload.readShort().toInt()
         val value = payload.readFloat()

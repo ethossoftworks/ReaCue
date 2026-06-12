@@ -297,7 +297,7 @@ function send_tcp_message_track_name_changed(track_index, value) local(offset, n
   str_setchar(#buffer, offset, TCP_SCHEMA_VERSION, 'cu');
   offset += 1;
 
-  str_setchar(#buffer, offset, message_type, 'cu');
+  str_setchar(#buffer, offset, MESSAGE_TYPE_TRACK_NAME_CHANGED, 'cu');
   offset += 1;
 
   str_setchar(#buffer, offset, 2 + name_len, 'Iu');
@@ -307,7 +307,7 @@ function send_tcp_message_track_name_changed(track_index, value) local(offset, n
   str_setchar(#buffer, offset, track_index, 'Su');
   offset += 2;
 
-  str_setchar(#buffer, offset, name, 'Su');
+  str_insert(#buffer, value, offset);
   offset += name_len;
 
   send_tcp_message(#buffer, offset);
