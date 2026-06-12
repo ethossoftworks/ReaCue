@@ -605,7 +605,7 @@ function handle_tcp_receive() local(i, client_handle, bytes, accum, payload_size
     client_handle > 0 ? (
       bytes = tcp_recv(client_handle, #recv_buffer, TCP_RECV_BUFFER_SIZE);
 
-      bytes < 0 ? (
+      bytes == 0 ? (
         close_tcp_client(i);
       ) : bytes > 0 ? (
         accum = MEM_BASE + MEM_BASE_OFFSET_TCP_RECV_BUFFER + i;
