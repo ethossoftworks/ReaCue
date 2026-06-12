@@ -338,16 +338,11 @@ function handle_delta_change() local(i, track, receive_count, hw_out_count, trac
     );
 
     j = 0;
-    loop(receive_count + hw_out_count,
+    loop(receive_count,
       send_slot = MEM_SEND + (MEM_SEND_TRACK_STRIDE * i) + (MEM_SEND_STRIDE * j);
 
-      j < receive_count ? (
-        GetTrackReceiveUIVolPan(track, j, vol, pan);
-        GetTrackReceiveUIMute(track, j, mute);
-      ) : (
-        GetTrackSendUIVolPan(track, j - receive_count, vol, pan);
-        GetTrackSendUIMute(track, j - receive_count, mute);
-      );
+      GetTrackReceiveUIVolPan(track, j, vol, pan);
+      GetTrackReceiveUIMute(track, j, mute);
 
       vol = linear_to_normalized(vol);
       vol != 0[send_slot + MEM_SEND_OFFSET_VOL] ? (
@@ -361,9 +356,35 @@ function handle_delta_change() local(i, track, receive_count, hw_out_count, trac
         0[send_slot + MEM_SEND_OFFSET_PAN] = pan;
       );
 
-
       mute != 0[send_slot + MEM_SEND_OFFSET_MUTE] ? (
         ShowConsoleMsg("Send Mute changed\n");
+        0[send_slot + MEM_SEND_OFFSET_MUTE] = mute;
+      );
+
+      j += 1;
+    );
+
+    j = 0;
+    loop(hw_out_count,
+      send_slot = MEM_SEND + (MEM_SEND_TRACK_STRIDE * i) + (MEM_SEND_STRIDE * (j + receive_count));
+
+      GetTrackSendUIVolPan(track, j, vol, pan);
+      GetTrackSendUIMute(track, j, mute);
+
+      vol = linear_to_normalized(vol);
+      vol != 0[send_slot + MEM_SEND_OFFSET_VOL] ? (
+        ShowConsoleMsg("Hardware Output Volume changed\n");
+        0[send_slot + MEM_SEND_OFFSET_VOL] = vol;
+      );
+
+      pan = (pan + 1) / 2;
+      pan != 0[send_slot + MEM_SEND_OFFSET_PAN] ? (
+        ShowConsoleMsg("Hardware Output Pan changed\n");
+        0[send_slot + MEM_SEND_OFFSET_PAN] = pan;
+      );
+
+      mute != 0[send_slot + MEM_SEND_OFFSET_MUTE] ? (
+        ShowConsoleMsg("Hardware Output Mute changed\n");
         0[send_slot + MEM_SEND_OFFSET_MUTE] = mute;
       );
 
