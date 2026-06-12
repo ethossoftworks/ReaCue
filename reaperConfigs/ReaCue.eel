@@ -18,14 +18,14 @@ function send_tcp_message(payload, len) local(client_handle, bytes_sent) (
 
   i = 0;
   loop(TCP_MAX_CLIENTS,
-    client_handle = 0[i];
+    client_handle = 0[MEM_PROJECT_OFFSET_TCP_CLIENTS + i];
 
     client_handle > 0 ? (
       bytes_sent = tcp_send(client_handle, payload, len);
 
       bytes_sent <= 0 ? (
         tcp_close(client_handle);
-        0[i] = 0; // Clear the client slot
+        0[MEM_PROJECT_OFFSET_TCP_CLIENTS + i] = 0; // Clear the client slot
       );
     );
     i += 1;
@@ -38,12 +38,12 @@ function handle_tcp_connection() local(connection, slot) (
     slot = -1;
     i = 0;
     while (i < TCP_MAX_CLIENTS && slot == -1) (
-      0[i] == 0 ? slot = i;
+      0[MEM_PROJECT_OFFSET_TCP_CLIENTS + i] == 0 ? slot = i;
       i += 1;
     );
 
     slot != -1 ? (
-      0[slot] = connection;
+      0[MEM_PROJECT_OFFSET_TCP_CLIENTS + slot] = connection;
     ) : (
       tcp_close(connection);
     )
@@ -59,19 +59,19 @@ function has_project_structure_changed() local(has_changed, i, track, hw_out_cou
   project_fn = EnumProjects(-1);
   GetProjectPath(#project_path);
   GetProjectName(project_fn, #project_name);
-  strcmp(0[10], #project_path) != 0 ? has_changed = 1;
+  strcmp(0[MEM_PROJECT + MEM_PROJECT_OFFSET_PATH], #project_path) != 0 ? has_changed = 1;
 
   get_config_var_string("slidershex", #v) ? match("%f", #v, fader_curve);
-  has_changed == 0 && fader_curve != 0[12] ? has_changed = 1;
+  has_changed == 0 && fader_curve != 0[MEM_PROJECT + MEM_PROJECT_OFFSET_FADER_CURVE] ? has_changed = 1;
 
   get_config_var_string("sliderminv", #v) ? match("%f", #v, fader_min_db);
-  has_changed == 0 && fader_min_db != 0[13] ? has_changed = 1;
+  has_changed == 0 && fader_min_db != 0[MEM_PROJECT + MEM_PROJECT_OFFSET_FADER_MIN_DB] ? has_changed = 1;
 
   get_config_var_string("slidermaxv", #v) ? match("%f", #v, fader_max_db);
-  has_changed == 0 && fader_max_db != 0[14] ? has_changed = 1;
+  has_changed == 0 && fader_max_db != 0[MEM_PROJECT + MEM_PROJECT_OFFSET_FADER_MAX_DB] ? has_changed = 1;
 
   track_count = GetNumTracks();
-  has_changed == 0 && track_count != 0[15] ? has_changed = 1;
+  has_changed == 0 && track_count != 0[MEM_PROJECT + MEM_PROJECT_OFFSET_TRACK_COUNT] ? has_changed = 1;
 
   has_changed == 0 ? (
     i = 0;
@@ -80,15 +80,15 @@ function has_project_structure_changed() local(has_changed, i, track, hw_out_cou
       track_slot = MEM_TRACK + (MEM_TRACK_STRIDE * i);
 
       GetTrackGUID(#guid, track);
-      has_changed == 0 && strcmp(#guid, 0[track_slot + 0]) != 0 ? has_changed = 1;
+      has_changed == 0 && strcmp(#guid, 0[track_slot + MEM_TRACK_OFFSET_GUID]) != 0 ? has_changed = 1;
 
       // Receives
       receive_count = GetTrackNumSends(track, -1);
-      has_changed == 0 && receive_count != 0[track_slot + 3] ? has_changed = 1;
+      has_changed == 0 && receive_count != 0[track_slot + MEM_TRACK_OFFSET_RECV_COUNT] ? has_changed = 1;
 
       // Hardware outputs
       hw_out_count = GetTrackNumSends(track, 1);
-      has_changed == 0 && hw_out_count != 0[track_slot + 4] ? has_changed = 1;
+      has_changed == 0 && hw_out_count != 0[track_slot + MEM_TRACK_OFFSET_HWO_COUNT] ? has_changed = 1;
 
       i += 1;
     );
@@ -99,32 +99,32 @@ function has_project_structure_changed() local(has_changed, i, track, hw_out_cou
 
 /*
  * Header
- * 0 - byte - Schema Version
- * 1 - byte - Message Type
+ * byte - Schema Version
+ * byte - Message Type
+ * int - Payload Size
  *
  * Project Info
- * 0-4 - int - Payload Size
- * 5-8 - float - Fader Curve
- * 9-12 - float - Fader Min dB
- * 13-16 - float - Fader Max dB
- * 17-18 - short - Track Count
- * 19-20 - short - Project Name Size
- * 20-N - string - Project Name
+ * float - Fader Curve
+ * float - Fader Min dB
+ * float - Fader Max dB
+ * short - Track Count
+ * short - Project Name Size
+ * string - Project Name
  *
  * Track Info (Track info repeats with its corresponding send info. Track index can be inferred by position in bytes)
- * 0-1 - short - Receive Count
- * 2-3 - short - Hardware Output Count
- * 4-7 - float - Volume
- * 8-11 - float - Pan
- * 12 - byte - Mute
- * 13-14 - short - Name length
- * 15-N - string - Name
+ * short - Receive Count
+ * short - Hardware Output Count
+ * float - Volume
+ * float - Pan
+ * byte - Mute
+ * short - Name length
+ * string - Name
  *
  * Send Info (receives are listed first, then hardware outs. Actual sends are ignored for now. Indexes can be inferred by position in bytes).
- * 0-1 - short - Src Track Index
- * 2-5 - float - Volume
- * 6-9 - float - Pan
- * 9 - byte - Mute
+ * short - Src Track Index
+ * float - Volume
+ * float - Pan
+ * byte - Mute
  */
 function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j, base_track_size, base_project_info_size, base_send_size, name_len, send_slot, receive_count, hw_out_count, header_size, project_name_length) (
   header_size = 6;
@@ -139,8 +139,8 @@ function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j
     track_slot = MEM_TRACK + (MEM_TRACK_STRIDE * i);
 
     payload_size += base_track_size + strlen(0[track_slot + 2]);
-    receive_count = 0[track_slot + 3];
-    hw_out_count = 0[track_slot + 4];
+    receive_count = 0[track_slot + MEM_TRACK_OFFSET_RECV_COUNT];
+    hw_out_count = 0[track_slot + MEM_TRACK_OFFSET_HWO_COUNT];
     payload_size += ((receive_count + hw_out_count) * base_send_size);
 
     i+=1;
@@ -149,6 +149,7 @@ function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j
   #buffer = "";
   offset = 0;
 
+  // Header
   str_setchar(#buffer, offset, TCP_SCHEMA_VERSION, 'cu');
   offset += 1;
 
@@ -158,6 +159,7 @@ function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j
   str_setchar(#buffer, offset, payload_size, 'Iu');
   offset += 4;
 
+  // Project Info
   str_setchar(#buffer, offset, fader_curve, 'F');
   offset += 4;
 
@@ -177,25 +179,26 @@ function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j
   str_insert(#buffer, #project_name, offset);
   offset += project_name_length;
 
+  // Tracks
   i = 0;
   loop(track_count,
     track_slot = MEM_TRACK + (MEM_TRACK_STRIDE * i);
-    receive_count = 0[track_slot + 3];
-    hw_out_count = 0[track_slot + 4];
+    receive_count = 0[track_slot + MEM_TRACK_OFFSET_RECV_COUNT];
+    hw_out_count = 0[track_slot + MEM_TRACK_OFFSET_HWO_COUNT];
 
-    str_setchar(#buffer, offset, 0[track_slot + 3], 'Su');
+    str_setchar(#buffer, offset, 0[track_slot + MEM_TRACK_OFFSET_RECV_COUNT], 'Su');
     offset += 2;
 
-    str_setchar(#buffer, offset, 0[track_slot + 4], 'Su');
+    str_setchar(#buffer, offset, 0[track_slot + MEM_TRACK_OFFSET_HWO_COUNT], 'Su');
     offset += 2;
 
-    str_setchar(#buffer, offset, 0[track_slot + 5], 'F');
+    str_setchar(#buffer, offset, 0[track_slot + MEM_TRACK_OFFSET_VOL], 'F');
     offset += 4;
 
-    str_setchar(#buffer, offset, 0[track_slot + 6], 'F');
+    str_setchar(#buffer, offset, 0[track_slot + MEM_TRACK_OFFSET_PAN], 'F');
     offset += 4;
 
-    str_setchar(#buffer, offset, 0[track_slot + 7], 'cu');
+    str_setchar(#buffer, offset, 0[track_slot + MEM_TRACK_OFFSET_MUTE], 'cu');
     offset += 1;
 
     name_len = strlen(0[track_slot + 2]);
@@ -205,20 +208,21 @@ function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j
     str_insert(#buffer, 0[track_slot + 2], offset);
     offset += name_len;
 
+    // Receives/hardware sends
     j = 0;
     loop(receive_count + hw_out_count,
       send_slot = MEM_SEND + (MEM_SEND_TRACK_STRIDE * i) + (MEM_SEND_STRIDE * j);
 
-      str_setchar(#buffer, offset, 0[send_slot + 2], 'Su');
+      str_setchar(#buffer, offset, 0[send_slot + MEM_SEND_OFFSET_SOURCE_TRACK_INDEX], 'Su');
       offset += 2;
 
-      str_setchar(#buffer, offset, 0[send_slot + 3], 'F');
+      str_setchar(#buffer, offset, 0[send_slot + MEM_SEND_OFFSET_VOL], 'F');
       offset += 4;
 
-      str_setchar(#buffer, offset, 0[send_slot + 4], 'F');
+      str_setchar(#buffer, offset, 0[send_slot + MEM_SEND_OFFSET_PAN], 'F');
       offset += 4;
 
-      str_setchar(#buffer, offset, 0[send_slot + 5], 'cu');
+      str_setchar(#buffer, offset, 0[send_slot + MEM_SEND_OFFSET_MUTE], 'cu');
       offset += 1;
 
       j += 1;
@@ -231,12 +235,12 @@ function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j
 );
 
 function handle_project_structure_change() local(i, track, receive_count, hw_out_count, track_slot, guid_slot, vol, pan, mute, j, send_slot, src_track) (
-  0[10] = #project_path;
-  0[11] = #project_name;
-  0[12] = fader_curve;
-  0[13] = fader_min_db;
-  0[14] = fader_max_db;
-  0[15] = track_count;
+  0[MEM_PROJECT + MEM_PROJECT_OFFSET_PATH] = #project_path;
+  0[MEM_PROJECT + MEM_PROJECT_OFFSET_NAME] = #project_name;
+  0[MEM_PROJECT + MEM_PROJECT_OFFSET_FADER_CURVE] = fader_curve;
+  0[MEM_PROJECT + MEM_PROJECT_OFFSET_FADER_MIN_DB] = fader_min_db;
+  0[MEM_PROJECT + MEM_PROJECT_OFFSET_FADER_MAX_DB] = fader_max_db;
+  0[MEM_PROJECT + MEM_PROJECT_OFFSET_TRACK_COUNT] = track_count;
 
   i = 0;
   loop(track_count,
@@ -244,52 +248,47 @@ function handle_project_structure_change() local(i, track, receive_count, hw_out
     track_slot = MEM_TRACK + (MEM_TRACK_STRIDE * i);
 
     // Due to how EEL2 strings work, we have to initialize the string slot to point to a different location
-    0[track_slot + 0] = MEM_TRACK_STRINGS + (MEM_TRACK_STRINGS_STRIDE * i);
-    GetTrackGUID(0[track_slot + 0], track);
+    0[track_slot + MEM_TRACK_OFFSET_GUID] = MEM_TRACK_STRINGS + (MEM_TRACK_STRINGS_STRIDE * i);
+    GetTrackGUID(0[track_slot + MEM_TRACK_OFFSET_GUID], track);
 
-    0[track_slot + 1] = i;
-
-    0[track_slot + 2] = MEM_TRACK_STRINGS + (MEM_TRACK_STRINGS_STRIDE * i) + 1;
-    GetTrackName(track, 0[track_slot + 2]);
+    0[track_slot + MEM_TRACK_OFFSET_NAME] = MEM_TRACK_STRINGS + (MEM_TRACK_STRINGS_STRIDE * i) + 1;
+    GetTrackName(track, 0[track_slot + MEM_TRACK_OFFSET_NAME]);
 
     // Receives
     receive_count = GetTrackNumSends(track, -1);
-    0[track_slot + 3] = receive_count;
+    0[track_slot + MEM_TRACK_OFFSET_RECV_COUNT] = receive_count;
 
     // Hardware outputs
     hw_out_count = GetTrackNumSends(track, 1);
-    0[track_slot + 4] = hw_out_count;
+    0[track_slot + MEM_TRACK_OFFSET_HWO_COUNT] = hw_out_count;
 
     vol = 0;
     pan = 0;
     mute = 0;
     GetTrackUIVolPan(track, vol, pan);
     GetTrackUIMute(track, mute);
-    0[track_slot + 5] = linear_to_normalized(vol);
-    0[track_slot + 6] = (pan + 1) / 2;
-    0[track_slot + 7] = mute;
+    0[track_slot + MEM_TRACK_OFFSET_VOL] = linear_to_normalized(vol);
+    0[track_slot + MEM_TRACK_OFFSET_PAN] = (pan + 1) / 2;
+    0[track_slot + MEM_TRACK_OFFSET_MUTE] = mute;
 
     j = 0;
     loop(receive_count + hw_out_count,
       send_slot = MEM_SEND + (MEM_SEND_TRACK_STRIDE * i) + (MEM_SEND_STRIDE * j);
 
       j < receive_count ? (
-        0[send_slot + 0] = -1;
         GetTrackReceiveUIVolPan(track, j, vol, pan);
         GetTrackReceiveUIMute(track, j, mute);
         src_track = GetTrackSendInfo_Value(track, -1, j, "P_SRCTRACK");
       ) : (
-        0[send_slot + 0] = 1;
         GetTrackSendUIVolPan(track, j - receive_count, vol, pan);
         GetTrackSendUIMute(track, j - receive_count, mute);
         src_track = GetTrackSendInfo_Value(track, 1, j - receive_count, "P_SRCTRACK");
       );
 
-      0[send_slot + 1] = j;
-      0[send_slot + 2] = GetMediaTrackInfo_Value(src_track, "IP_TRACKNUMBER") - 1;
-      0[send_slot + 3] = linear_to_normalized(vol);
-      0[send_slot + 4] = (pan + 1) / 2;
-      0[send_slot + 5] = mute;
+      0[send_slot + MEM_SEND_OFFSET_SOURCE_TRACK_INDEX] = GetMediaTrackInfo_Value(src_track, "IP_TRACKNUMBER") - 1;
+      0[send_slot + MEM_SEND_OFFSET_VOL] = linear_to_normalized(vol);
+      0[send_slot + MEM_SEND_OFFSET_PAN] = (pan + 1) / 2;
+      0[send_slot + MEM_SEND_OFFSET_MUTE] = mute;
 
       j += 1;
     );
@@ -307,13 +306,13 @@ function handle_delta_change() local(i, track, receive_count, hw_out_count, trac
     track_slot = MEM_TRACK + (MEM_TRACK_STRIDE * i);
 
     GetTrackName(track, #track_name);
-    strcmp(0[track_slot + 2], #track_name) != 0 ? (
+    strcmp(0[track_slot + MEM_TRACK_OFFSET_NAME], #track_name) != 0 ? (
       ShowConsoleMsg("Track name changed \n");
-      strcpy(0[track_slot + 2], #track_name);
+      strcpy(0[track_slot + MEM_TRACK_OFFSET_NAME], #track_name);
     );
 
-    receive_count = 0[track_slot + 3];
-    hw_out_count = 0[track_slot + 4];
+    receive_count = 0[track_slot + MEM_TRACK_OFFSET_RECV_COUNT];
+    hw_out_count = 0[track_slot + MEM_TRACK_OFFSET_HWO_COUNT];
 
     vol = 0;
     pan = 0;
@@ -322,20 +321,20 @@ function handle_delta_change() local(i, track, receive_count, hw_out_count, trac
     GetTrackUIMute(track, mute);
 
     vol = linear_to_normalized(vol);
-    vol != 0[track_slot + 5] ? (
+    vol != 0[track_slot + MEM_TRACK_OFFSET_VOL] ? (
       ShowConsoleMsg("Volume changed\n");
-      0[track_slot + 5] = vol;
+      0[track_slot + MEM_TRACK_OFFSET_VOL] = vol;
     );
 
     pan = (pan + 1) / 2;
-    pan != 0[track_slot + 6] ? (
+    pan != 0[track_slot + MEM_TRACK_OFFSET_PAN] ? (
       ShowConsoleMsg("Pan changed\n");
-      0[track_slot + 6] = pan;
+      0[track_slot + MEM_TRACK_OFFSET_PAN] = pan;
     );
 
-    mute != 0[track_slot + 7] ? (
+    mute != 0[track_slot + MEM_TRACK_OFFSET_MUTE] ? (
       ShowConsoleMsg("Mute changed\n");
-      0[track_slot + 7] = mute;
+      0[track_slot + MEM_TRACK_OFFSET_MUTE] = mute;
     );
 
     j = 0;
@@ -351,21 +350,21 @@ function handle_delta_change() local(i, track, receive_count, hw_out_count, trac
       );
 
       vol = linear_to_normalized(vol);
-      vol != 0[send_slot + 3] ? (
+      vol != 0[send_slot + MEM_SEND_OFFSET_VOL] ? (
         ShowConsoleMsg("Send Volume changed\n");
-        0[send_slot + 3] = vol;
+        0[send_slot + MEM_SEND_OFFSET_VOL] = vol;
       );
 
       pan = (pan + 1) / 2;
-      pan != 0[send_slot + 4] ? (
+      pan != 0[send_slot + MEM_SEND_OFFSET_PAN] ? (
         ShowConsoleMsg("Send Pan changed\n");
-        0[send_slot + 4] = pan;
+        0[send_slot + MEM_SEND_OFFSET_PAN] = pan;
       );
 
 
-      mute != 0[send_slot + 5] ? (
+      mute != 0[send_slot + MEM_SEND_OFFSET_MUTE] ? (
         ShowConsoleMsg("Send Mute changed\n");
-        0[send_slot + 5] = mute;
+        0[send_slot + MEM_SEND_OFFSET_MUTE] = mute;
       );
 
       j += 1;
@@ -415,42 +414,39 @@ function reacue() (
 
     /*
      * Memory arena for project details:
-     * 0-9 - TCP Clients
-     * 10 - Project Name
-     * 11 - Project Path
-     * 12 - Fader Curve
-     * 13 - Fader Min dB
-     * 14 - Fader Max dB
-     * 15 - Track Count
      */
     MEM_PROJECT = 0;
+    MEM_PROJECT_OFFSET_TCP_CLIENTS = 0;
+    MEM_PROJECT_OFFSET_NAME = 10;
+    MEM_PROJECT_OFFSET_PATH = 11;
+    MEM_PROJECT_OFFSET_FADER_CURVE = 12;
+    MEM_PROJECT_OFFSET_FADER_MIN_DB = 13;
+    MEM_PROJECT_OFFSET_FADER_MAX_DB = 14;
+    MEM_PROJECT_OFFSET_TRACK_COUNT = 15;
 
     /*
      * Memory arena for Track info:
-     * 0 - GUID
-     * 1 - Index
-     * 2 - Name
-     * 3 - Receive Count
-     * 4 - Hardware Out Count
-     * 5 - Volume
-     * 6 - Pan
-     * 7 - Mute
      */
     MEM_TRACK = 10000;
     MEM_TRACK_STRIDE = 16;
+    MEM_TRACK_OFFSET_GUID = 0;
+    MEM_TRACK_OFFSET_NAME = 1;
+    MEM_TRACK_OFFSET_RECV_COUNT = 2;
+    MEM_TRACK_OFFSET_HWO_COUNT = 3;
+    MEM_TRACK_OFFSET_VOL = 4;
+    MEM_TRACK_OFFSET_PAN = 5;
+    MEM_TRACK_OFFSET_MUTE = 6;
 
     /*
      * Memory arena for send info:
-     * 0 - Type (-1 receive, 1 hw out). Sends are ignored at the moment.
-     * 1 - Index
-     * 2 - Source Track Index
-     * 3 - Volume
-     * 4 - Pan
-     * 5 - Mute
      */
     MEM_SEND = 20000;
     MEM_SEND_STRIDE = 16;
     MEM_SEND_TRACK_STRIDE = 2000;
+    MEM_SEND_OFFSET_SOURCE_TRACK_INDEX = 0;
+    MEM_SEND_OFFSET_VOL = 1;
+    MEM_SEND_OFFSET_PAN = 2;
+    MEM_SEND_OFFSET_MUTE = 3;
 
     /*
      * Memory arena for strings:
