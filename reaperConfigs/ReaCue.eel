@@ -121,7 +121,7 @@ function has_project_structure_changed() local(has_changed, i, track, hw_out_cou
  * 15-N - string - Name
  *
  * Send Info (receives are listed first, then hardware outs. Actual sends are ignored for now. Indexes can be inferred by position in bytes).
- * 0-1 - short - Src Track
+ * 0-1 - short - Src Track Index
  * 2-5 - float - Volume
  * 6-9 - float - Pan
  * 9 - byte - Mute
@@ -209,7 +209,7 @@ function send_tcp_message_refreshed(connection) local(payload_size, offset, i, j
     loop(receive_count + hw_out_count,
       send_slot = MEM_SEND + (MEM_SEND_TRACK_STRIDE * i) + (MEM_SEND_STRIDE * j);
 
-      str_setchar(#buffer, offset, 0[send_slot + 1], 'Su');
+      str_setchar(#buffer, offset, 0[send_slot + 2], 'Su');
       offset += 2;
 
       str_setchar(#buffer, offset, 0[send_slot + 3], 'F');
@@ -286,8 +286,7 @@ function handle_project_structure_change() local(i, track, receive_count, hw_out
       );
 
       0[send_slot + 1] = j;
-      0[send_slot + 2] = MEM_SEND_STRINGS + (MEM_SEND_STRINGS_TRACK_STRIDE * i) + j;
-      GetTrackGUID(0[send_slot + 2], src_track);
+      0[send_slot + 2] = GetMediaTrackInfo_Value(src_track, "IP_TRACKNUMBER") - 1;
       0[send_slot + 3] = linear_to_normalized(vol);
       0[send_slot + 4] = (pan + 1) / 2;
       0[send_slot + 5] = mute;
@@ -444,7 +443,7 @@ function reacue() (
      * Memory arena for send info:
      * 0 - Type (-1 receive, 1 hw out). Sends are ignored at the moment.
      * 1 - Index
-     * 2 - Source Track GUID
+     * 2 - Source Track Index
      * 3 - Volume
      * 4 - Pan
      * 5 - Mute
@@ -460,14 +459,6 @@ function reacue() (
      */
     MEM_TRACK_STRINGS = 10000;
     MEM_TRACK_STRINGS_STRIDE = 10;
-
-    /*
-     * Memory arena for send source GUID strings.
-     * One string slot per send, indexed by (track i, send j).
-     * Stride caps sends per track (200).
-     */
-    MEM_SEND_STRINGS = 20000;
-    MEM_SEND_STRINGS_TRACK_STRIDE = 200;
 
     TCP_SCHEMA_VERSION = 0;
     COMMAND_TYPE_REFRESHED = 0;
