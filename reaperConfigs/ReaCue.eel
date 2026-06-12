@@ -571,6 +571,11 @@ function handle_tcp_connection() local(connection, slot) (
       );
       tcp_close(connection);
     )
+  ) : connection < 0 ? (
+    DEBUG > 0 ? (
+      sprintf(#debug, "Server failed to start: %i\n", connection);
+      ShowConsoleMsg(#debug);
+    );
   );
 );
 
