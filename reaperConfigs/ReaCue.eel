@@ -27,25 +27,25 @@ function close_tcp_client(slot) local(client_handle) (
 /*
  * Sends a payload with the specified length to tcp connections. Sends to all connections by default.
  * To override what clients are sent to, modify the slots under MEM_BASE_OFFSET_TCP_SEND_LIST to point
- * to MEM_BASE_OFFSET_TCP_CLIENTS slot.
+ * to MEM_BASE_OFFSET_TCP_CLIENTS slot. The send list fills contiguously from slot 0. An empty slot 0 means broadcast.
  */
 function send_tcp_message(payload, len) local(client_handle, bytes_sent, i, slot, broadcast) (
   DEBUG > 0 ? (
     sprintf(#debug, "Sending message - %i bytes\n", len);
     ShowConsoleMsg(#debug);
   );
-  
+
   broadcast = 0[MEM_BASE + MEM_BASE_OFFSET_TCP_SEND_LIST] == 0;
   
   i = 0;
   loop(TCP_MAX_CLIENTS,
     broadcast ? (
       slot = MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + i;
-    ) : 0[MEM_BASE + MEM_BASE_OFFSET_TCP_SEND_LIST + i] > 0 ? (
+    ) : (
       slot = 0[MEM_BASE + MEM_BASE_OFFSET_TCP_SEND_LIST + i];
       0[MEM_BASE + MEM_BASE_OFFSET_TCP_SEND_LIST + i] = 0;
     );
-    
+
     slot != 0 ? (
       client_handle = 0[slot];
       client_handle > 0 ? (
@@ -562,7 +562,7 @@ function handle_tcp_connection() local(connection, slot) (
 
       0[MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + slot] = connection;
 
-      0[MEM_BASE + MEM_BASE_OFFSET_TCP_SEND_LIST + slot] = MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + slot;
+      0[MEM_BASE + MEM_BASE_OFFSET_TCP_SEND_LIST + 0] = MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + slot;
       send_tcp_message_refreshed();
     ) : (
       DEBUG > 0 ? (
