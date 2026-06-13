@@ -35,8 +35,6 @@ private val SupportedSchemaVersion: Byte = 0x00
 class NetworkIemService(private val peripheralPreferencesService: PeripheralPreferencesService) : IIemService {
 
     private val tcpIp = "127.0.0.1"
-    private var tcpPort = 9001
-
     private val selectorManager = SelectorManager(KmpDispatchers.IO)
     private val tcpSocket = atomic<Socket?>(null)
     private val writeChannel = atomic<ByteWriteChannel?>(null)
@@ -46,7 +44,10 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
             // TODO: Use user settings
             peripheralPreferencesService.awaitSettings()
 
-            val socket = aSocket(selectorManager).tcp().connect(tcpIp, tcpPort)
+            val socket =
+                aSocket(selectorManager)
+                    .tcp()
+                    .connect(tcpIp, peripheralPreferencesService.settings.value.reacueReaScriptPort)
             tcpSocket.update { socket }
 
             launch {
@@ -64,20 +65,21 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
                     val payloadSize = reader.readInt()
                     val payload = reader.readByteArray(payloadSize).toKmpIoSource()
 
-                    val event = when (messageType) {
-                        TcpMessageType.StructureChanged.value -> parseRefreshedMessage(payload)
-                        TcpMessageType.TrackNameChanged.value -> parseTrackNameChangedMessage(payload, payloadSize)
-                        TcpMessageType.TrackVolChanged.value -> parseTrackVolChangedMessage(payload)
-                        TcpMessageType.TrackPanChanged.value -> parseTrackPanChangedMessage(payload)
-                        TcpMessageType.TrackMuteChanged.value -> parseTrackMuteChangedMessage(payload)
-                        TcpMessageType.ReceiveVolChanged.value -> parseReceiveVolChangedMessage(payload)
-                        TcpMessageType.ReceivePanChanged.value -> parseReceivePanChangedMessage(payload)
-                        TcpMessageType.ReceiveMuteChanged.value -> parseReceiveMuteChangedMessage(payload)
-                        TcpMessageType.HwOutVolChanged.value -> parseHwOutVolChangedMessage(payload)
-                        TcpMessageType.HwOutPanChanged.value -> parseHwOutPanChangedMessage(payload)
-                        TcpMessageType.HwOutMuteChanged.value -> parseHwOutMuteChangedMessage(payload)
-                        else -> reader.readAvailable(unknownBuffer) // Attempt to drain unknown message
-                    }
+                    val event =
+                        when (messageType) {
+                            TcpMessageType.StructureChanged.value -> parseRefreshedMessage(payload)
+                            TcpMessageType.TrackNameChanged.value -> parseTrackNameChangedMessage(payload, payloadSize)
+                            TcpMessageType.TrackVolChanged.value -> parseTrackVolChangedMessage(payload)
+                            TcpMessageType.TrackPanChanged.value -> parseTrackPanChangedMessage(payload)
+                            TcpMessageType.TrackMuteChanged.value -> parseTrackMuteChangedMessage(payload)
+                            TcpMessageType.ReceiveVolChanged.value -> parseReceiveVolChangedMessage(payload)
+                            TcpMessageType.ReceivePanChanged.value -> parseReceivePanChangedMessage(payload)
+                            TcpMessageType.ReceiveMuteChanged.value -> parseReceiveMuteChangedMessage(payload)
+                            TcpMessageType.HwOutVolChanged.value -> parseHwOutVolChangedMessage(payload)
+                            TcpMessageType.HwOutPanChanged.value -> parseHwOutPanChangedMessage(payload)
+                            TcpMessageType.HwOutMuteChanged.value -> parseHwOutMuteChangedMessage(payload)
+                            else -> reader.readAvailable(unknownBuffer) // Attempt to drain unknown message
+                        }
 
                     if (event is IemEvent) {
                         println(event)

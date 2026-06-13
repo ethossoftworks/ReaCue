@@ -23,9 +23,7 @@ data class PeripheralSettings(
     val hostId: Uuid = Uuid.random(),
     val hostName: String = "ReaCue" + randomNumbers(2),
     val hostPasscode: String = randomCharacters(12).chunked(4).joinToString("-"),
-    val reaperWebPort: Int = 8080,
-    val reaperOscDevicePort: Int = 9000,
-    val reaperOscListenPort: Int = 8000,
+    val reacueReaScriptPort: Int = 9007,
 )
 
 class PeripheralPreferencesService(private val kvStore: IKmpKvStore) {
@@ -38,9 +36,7 @@ class PeripheralPreferencesService(private val kvStore: IKmpKvStore) {
     private val KeyHostId = "host_id"
     private val KeyHostName = "host_name"
     private val KeyHostPasscode = "host_passcode"
-    private val KeyReaperWebPort = "reaper_web_port"
-    private val KeyReaperOscDevicePort = "reaper_osc_device_port"
-    private val KeyReaperOscListenPort = "reaper_osc_listen_port"
+    private val KeyReacueReaScriptPort = "reacue_reascript_port"
 
     init {
         CoroutineScope(Dispatchers.IO).launch {
@@ -60,9 +56,7 @@ class PeripheralPreferencesService(private val kvStore: IKmpKvStore) {
                     hostId = Uuid.fromByteArray(nodeResult.getBytes(KeyHostId) ?: default.hostId.toByteArray()),
                     hostName = nodeResult.getString(KeyHostName) ?: default.hostName,
                     hostPasscode = nodeResult.getString(KeyHostPasscode) ?: default.hostPasscode,
-                    reaperWebPort = nodeResult.getInt(KeyReaperWebPort) ?: default.reaperWebPort,
-                    reaperOscDevicePort = nodeResult.getInt(KeyReaperOscDevicePort) ?: default.reaperOscDevicePort,
-                    reaperOscListenPort = nodeResult.getInt(KeyReaperOscListenPort) ?: default.reaperOscListenPort,
+                    reacueReaScriptPort = nodeResult.getInt(KeyReacueReaScriptPort) ?: default.reacueReaScriptPort,
                 )
 
             node.complete(nodeResult)
@@ -83,13 +77,7 @@ class PeripheralPreferencesService(private val kvStore: IKmpKvStore) {
         setHostPasscode(settings.hostPasscode).unwrapOrReturn {
             return it
         }
-        setReaperWebPort(settings.reaperWebPort).unwrapOrReturn {
-            return it
-        }
-        setReaperOscDevicePort(settings.reaperOscDevicePort).unwrapOrReturn {
-            return it
-        }
-        setReaperOscListenPort(settings.reaperOscListenPort).unwrapOrReturn {
+        setReaCueReaScriptPort(settings.reacueReaScriptPort).unwrapOrReturn {
             return it
         }
         _settings.value = settings
@@ -109,21 +97,9 @@ class PeripheralPreferencesService(private val kvStore: IKmpKvStore) {
         return result
     }
 
-    suspend fun setReaperWebPort(value: Int): Outcome<Unit, Any> {
-        val result = node.await().putInt(KeyReaperWebPort, value)
-        _settings.update { it.copy(reaperWebPort = value) }
-        return result
-    }
-
-    suspend fun setReaperOscDevicePort(value: Int): Outcome<Unit, Any> {
-        val result = node.await().putInt(KeyReaperOscDevicePort, value)
-        _settings.update { it.copy(reaperOscDevicePort = value) }
-        return result
-    }
-
-    suspend fun setReaperOscListenPort(value: Int): Outcome<Unit, Any> {
-        val result = node.await().putInt(KeyReaperOscListenPort, value)
-        _settings.update { it.copy(reaperOscListenPort = value) }
+    suspend fun setReaCueReaScriptPort(value: Int): Outcome<Unit, Any> {
+        val result = node.await().putInt(KeyReacueReaScriptPort, value)
+        _settings.update { it.copy(reacueReaScriptPort = value) }
         return result
     }
 }

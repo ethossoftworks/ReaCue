@@ -23,9 +23,7 @@ data class PeripheralSettingsState(
     val originalPeripheralSettings: PeripheralSettings = PeripheralSettings(),
     val hostId: String = "",
     val hostPasscode: String = "",
-    val reaperWebPort: String = "",
-    val reaperOscDevicePort: String = "",
-    val reaperOscListenPort: String = "",
+    val reacueReaScriptPort: String = "",
     val isSaving: Boolean = false,
     val isDefaultModalVisible: Boolean = false,
 )
@@ -60,23 +58,9 @@ class PeripheralSettingsScreenViewInteractor(
                 peripheralPreferencesService.setHostPasscode(state.hostPasscode).runOnError { hasError = true }
             }
 
-            val sanitizedReaperWebPort = state.reaperWebPort.toIntOrNull()
-            if (sanitizedReaperWebPort != null) {
-                peripheralPreferencesService.setReaperWebPort(sanitizedReaperWebPort).runOnError { hasError = true }
-            }
-
-            val sanitizedReaperOscDevicePort = state.reaperOscDevicePort.toIntOrNull()
-            if (sanitizedReaperOscDevicePort != null) {
-                peripheralPreferencesService.setReaperOscDevicePort(sanitizedReaperOscDevicePort).runOnError {
-                    hasError = true
-                }
-            }
-
-            val sanitizedReaperOscListenPort = state.reaperOscListenPort.toIntOrNull()
-            if (sanitizedReaperOscListenPort != null) {
-                peripheralPreferencesService.setReaperOscListenPort(sanitizedReaperOscListenPort).runOnError {
-                    hasError = true
-                }
+            val sanitizedReacuePort = state.reacueReaScriptPort.toIntOrNull()
+            if (sanitizedReacuePort != null) {
+                peripheralPreferencesService.setReaCueReaScriptPort(sanitizedReacuePort).runOnError { hasError = true }
             }
 
             update { state -> state.copy(isSaving = false) }
@@ -112,9 +96,7 @@ class PeripheralSettingsScreenViewInteractor(
                 state.copy(
                     hostId = "",
                     hostPasscode = "",
-                    reaperWebPort = "",
-                    reaperOscDevicePort = "",
-                    reaperOscListenPort = "",
+                    reacueReaScriptPort = "",
                 )
             }
 
@@ -130,15 +112,7 @@ class PeripheralSettingsScreenViewInteractor(
         update { state -> state.copy(hostPasscode = value.take(64)) }
     }
 
-    fun onReaperWebPortChange(value: String) {
-        update { state -> state.copy(reaperWebPort = value.replace(intRegexReplace, "").take(8)) }
-    }
-
-    fun onReaperOscDevicePortChange(value: String) {
-        update { state -> state.copy(reaperOscDevicePort = value.replace(intRegexReplace, "").take(8)) }
-    }
-
-    fun onReaperOscListenerPortChange(value: String) {
-        update { state -> state.copy(reaperOscListenPort = value.replace(intRegexReplace, "").take(8)) }
+    fun onReaCueReaScriptPortChange(value: String) {
+        update { state -> state.copy(reacueReaScriptPort = value.replace(intRegexReplace, "").take(8)) }
     }
 }

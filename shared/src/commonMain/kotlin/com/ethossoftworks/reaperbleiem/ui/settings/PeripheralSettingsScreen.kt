@@ -41,9 +41,7 @@ import reacue.shared.generated.resources.are_you_sure
 import reacue.shared.generated.resources.cancel
 import reacue.shared.generated.resources.host_id
 import reacue.shared.generated.resources.host_passcode
-import reacue.shared.generated.resources.reaper_osc_device_port
-import reacue.shared.generated.resources.reaper_osc_listen_port
-import reacue.shared.generated.resources.reaper_web_port
+import reacue.shared.generated.resources.reacue_reascript_port
 import reacue.shared.generated.resources.reset_to_default
 import reacue.shared.generated.resources.saving
 import reacue.shared.generated.resources.settings
@@ -97,22 +95,10 @@ fun PeripheralSettingsScreen(interactor: PeripheralSettingsScreenViewInteractor 
                 fontFamily = FontFamily.Monospace,
             )
             AppTextField(
-                label = stringResource(Res.string.reaper_web_port),
-                value = state.reaperWebPort,
-                placeholder = state.originalPeripheralSettings.reaperWebPort.toString(),
-                onChange = interactor::onReaperWebPortChange,
-            )
-            AppTextField(
-                label = stringResource(Res.string.reaper_osc_device_port),
-                value = state.reaperOscDevicePort,
-                placeholder = state.originalPeripheralSettings.reaperOscDevicePort.toString(),
-                onChange = interactor::onReaperOscDevicePortChange,
-            )
-            AppTextField(
-                label = stringResource(Res.string.reaper_osc_listen_port),
-                value = state.reaperOscListenPort,
-                placeholder = state.originalPeripheralSettings.reaperOscListenPort.toString(),
-                onChange = interactor::onReaperOscListenerPortChange,
+                label = stringResource(Res.string.reacue_reascript_port),
+                value = state.reacueReaScriptPort,
+                placeholder = state.originalPeripheralSettings.reacueReaScriptPort.toString(),
+                onChange = interactor::onReaCueReaScriptPortChange,
             )
 
             AppButton(

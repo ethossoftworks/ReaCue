@@ -29,9 +29,7 @@
     <string name="save">Save</string>
     <string name="host_id">Host ID</string>
     <string name="host_passcode">Host Passcode</string>
-    <string name="reaper_web_port">Reaper Web Port</string>
-    <string name="reaper_osc_device_port">Reaper OSC Device Port</string>
-    <string name="reaper_osc_listen_port">Reaper OSC Listen Port</string>
+    <string name="reacue_reascript_port">ReaCue ReaScript Port</string>
     <string name="settings_saved">Settings saved</string>
     <string name="settings_error">There was an error saving settings</string>
     <string name="saving">Saving...</string>
