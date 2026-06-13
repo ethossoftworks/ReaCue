@@ -79,19 +79,10 @@ class IemInteractor(private val iemService: IIemService) :
                         }
                     }
 
-                    is IemEvent.TrackNameUpdated ->
-                        update { state ->
-                            state.copy(
-                                tracks =
-                                    state.tracks.mutate { tracks ->
-                                        val track = tracks[event.trackId] ?: return@mutate
-                                        tracks[event.trackId] = track.copy(name = event.name)
-                                    }
-                            )
-                        }
-                    is IemEvent.TrackMuteUpdated -> {}
-                    is IemEvent.TrackPanUpdated -> {}
-                    is IemEvent.TrackVolumeUpdated -> {}
+                    is IemEvent.TrackNameUpdated -> updateTrack(event.trackId) { it.copy(name = event.name) }
+                    is IemEvent.TrackVolumeUpdated -> updateTrack(event.trackId) { it.copy(volume = event.value) }
+                    is IemEvent.TrackPanUpdated -> updateTrack(event.trackId) { it.copy(pan = event.value) }
+                    is IemEvent.TrackMuteUpdated -> updateTrack(event.trackId) { it.copy(isMuted = event.value) }
 
                     is IemEvent.HardwareOutputVolumeUpdated ->
                         updateHardwareOutput(event.trackId, event.hardwareOutId) { it.copy(volume = event.value) }
@@ -131,6 +122,13 @@ class IemInteractor(private val iemService: IIemService) :
         getThrottledChannel(ThrottleKey.ReceiveVolume(trackId, receiveId)).trySend(value)
     }
 
+    fun setReceiveMute(trackId: Int, receiveId: Int, value: Boolean) {
+        interactorScope.launch {
+            updateReceive(trackId, receiveId) { it.copy(isMuted = value) }
+            iemService.setReceiveMute(trackId, receiveId, value)
+        }
+    }
+
     fun setReceivePan(trackId: Int, receiveId: Int, value: Float) {
         updateReceive(trackId, receiveId) { it.copy(pan = value) }
         getThrottledChannel(ThrottleKey.ReceivePan(trackId, receiveId)).trySend(value)
@@ -138,6 +136,18 @@ class IemInteractor(private val iemService: IIemService) :
 
     suspend fun refresh() {
         iemService.refresh()
+    }
+
+    private inline fun updateTrack(trackId: Int, crossinline block: (Track) -> Track) {
+        update { state ->
+            state.copy(
+                tracks =
+                    state.tracks.mutate { tracks ->
+                        val track = tracks[trackId] ?: return@mutate
+                        tracks[trackId] = block(track)
+                    }
+            )
+        }
     }
 
     private inline fun updateReceive(trackId: Int, receiveId: Int, crossinline block: (Mix) -> Mix) {
@@ -178,17 +188,17 @@ class IemInteractor(private val iemService: IIemService) :
     }
 
     private sealed class ThrottleKey {
+        data class TrackVolume(val trackId: Int) : ThrottleKey()
+
+        data class TrackPan(val trackId: Int) : ThrottleKey()
+
         data class OutputVolume(val trackId: Int, val hardwareOutId: Int) : ThrottleKey()
 
         data class OutputPan(val trackId: Int, val hardwareOutId: Int) : ThrottleKey()
 
-        data class OutputMute(val trackId: Int, val hardwareOutId: Int) : ThrottleKey()
-
         data class ReceiveVolume(val trackId: Int, val receiveId: Int) : ThrottleKey()
 
         data class ReceivePan(val trackId: Int, val receiveId: Int) : ThrottleKey()
-
-        data class ReceiveMute(val trackId: Int, val receiveId: Int) : ThrottleKey()
     }
 
     private fun getThrottledChannel(key: ThrottleKey): Channel<Float> {
@@ -202,12 +212,12 @@ class IemInteractor(private val iemService: IIemService) :
         throttleScope.launch {
             for (value in throttle) {
                 when (key) {
+                    is ThrottleKey.TrackVolume -> iemService.setTrackVolume(key.trackId, value)
+                    is ThrottleKey.TrackPan -> iemService.setTrackPan(key.trackId, value)
                     is ThrottleKey.OutputVolume -> iemService.setOutputVolume(key.trackId, key.hardwareOutId, value)
                     is ThrottleKey.OutputPan -> iemService.setOutputVolume(key.trackId, key.hardwareOutId, value)
-                    is ThrottleKey.OutputMute -> iemService.setOutputVolume(key.trackId, key.hardwareOutId, value)
                     is ThrottleKey.ReceiveVolume -> iemService.setReceiveVolume(key.trackId, key.receiveId, value)
                     is ThrottleKey.ReceivePan -> iemService.setReceivePan(key.trackId, key.receiveId, value)
-                    is ThrottleKey.ReceiveMute -> iemService.setReceivePan(key.trackId, key.receiveId, value)
                 }
                 delay(THROTTLE_INTERVAL)
             }

@@ -5,10 +5,6 @@ package com.ethossoftworks.reaperbleiem.service.iem
 
 import com.ethossoftworks.reaperbleiem.lib.PersistentMapSerializer
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleScanRecord
-import kotlin.math.log10
-import kotlin.math.pow
-import kotlin.math.roundToInt
-import kotlin.math.sqrt
 import kotlinx.collections.immutable.PersistentMap
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
@@ -23,11 +19,21 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlin.math.log10
+import kotlin.math.pow
+import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 interface IIemService {
     fun subscribe(context: IemContext): Flow<IemEvent>
 
     suspend fun refresh()
+
+    suspend fun setTrackVolume(trackId: Int, value: Float)
+
+    suspend fun setTrackPan(trackId: Int, value: Float)
+
+    suspend fun setTrackMute(trackId: Int, value: Boolean)
 
     suspend fun setReceiveVolume(trackId: Int, receiveId: Int, value: Float)
 

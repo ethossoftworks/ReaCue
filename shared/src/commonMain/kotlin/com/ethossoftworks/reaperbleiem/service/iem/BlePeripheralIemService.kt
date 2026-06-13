@@ -274,6 +274,21 @@ class BlePeripheralIemService(
         return networkIemService.refresh()
     }
 
+    override suspend fun setTrackVolume(trackId: Int, value: Float) {
+        networkIemService.setTrackVolume(trackId, value)
+        sendBleNotification(IemEvent.TrackVolumeUpdated(trackId, value))
+    }
+
+    override suspend fun setTrackPan(trackId: Int, value: Float) {
+        networkIemService.setTrackPan(trackId, value)
+        sendBleNotification(IemEvent.TrackPanUpdated(trackId, value))
+    }
+
+    override suspend fun setTrackMute(trackId: Int, value: Boolean) {
+        networkIemService.setTrackMute(trackId, value)
+        sendBleNotification(IemEvent.TrackMuteUpdated(trackId, value))
+    }
+
     override suspend fun setReceiveVolume(trackId: Int, receiveId: Int, value: Float) {
         networkIemService.setReceiveVolume(trackId, receiveId, value)
         sendBleNotification(IemEvent.ReceiveVolumeUpdated(trackId, receiveId, value))
