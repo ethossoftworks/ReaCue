@@ -23,6 +23,7 @@ function close_tcp_client(client_index) local(client_handle) (
     0[MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + client_index] = 0;
     strcpy(MEM_BASE + MEM_BASE_OFFSET_TCP_RECV_BUFFER + client_index, "");
     0[MEM_BASE + MEM_BASE_OFFSET_TCP_RECV_BUFFER + client_index] = 0;
+    0[MEM_BASE + MEM_BASE_OFFSET_TCP_READ_OFFSET + client_index] = 0;
   );
 );
 
@@ -608,56 +609,77 @@ function handle_tcp_message(client_index, message, message_type, payload_size) l
   );
 );
 
-function handle_tcp_receive() local(i, client_handle, bytes, accum, payload_size, draining, guard, msg_size) (
+function handle_tcp_receive() local(i, client_handle, bytes_read, read_buffer, payload_size, draining, guard, msg_size, read_offset_ptr, read_offset, buffer_len, unread_bytes) (
   i = 0;
   loop(TCP_MAX_CLIENTS,
     client_handle = 0[MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + i];
     client_handle > 0 ? (
-      bytes = tcp_recv(client_handle, #recv_buffer, TCP_RECV_BUFFER_SIZE);
+      bytes_read = tcp_recv(client_handle, #recv_buffer, TCP_RECV_BUFFER_SIZE);
 
-      bytes == 0 ? (
+      bytes_read == 0 ? (
         close_tcp_client(i);
-      ) : bytes > 0 ? (
-        accum = MEM_BASE + MEM_BASE_OFFSET_TCP_RECV_BUFFER + i;
-        str_setlen(#recv_buffer, bytes);
-        strcat(accum, #recv_buffer);
+      ) : bytes_read > 0 ? (
+        read_buffer = MEM_BASE + MEM_BASE_OFFSET_TCP_RECV_BUFFER + i;
+        read_offset_ptr = MEM_BASE + MEM_BASE_OFFSET_TCP_READ_OFFSETS + i;
+        read_offset = 0[read_offset_ptr];
+
+        str_setlen(#recv_buffer, bytes_read);
+        strcat(read_buffer, #recv_buffer);
 
         draining = 1;
         guard = 0;
-        while (draining && guard < 100) ( // iteration cap: a stuck buffer must not freeze REAPER
+        buffer_len = strlen(read_buffer);
+
+        while (draining && guard < 100) ( // iteration cap if the buffer gets stuck for some reason
           draining = 0;
           guard += 1;
-          strlen(accum) >= TCP_HEADER_SIZE ? (
-            str_getchar(accum, TCP_HEADER_SCHEMA_VERSION_OFFSET, 'cu') != TCP_SCHEMA_VERSION ? (
+          unread_bytes = buffer_len - read_offset;
+
+          unread_bytes >= TCP_HEADER_SIZE ? (
+            str_getchar(read_buffer, read_offset + TCP_HEADER_SCHEMA_VERSION_OFFSET, 'cu') != TCP_SCHEMA_VERSION ? (
               DEBUG > 0 ? ShowConsoleMsg("Schema version mismatch - closing client\n");
               close_tcp_client(i);
             ) : (
-              payload_size = str_getchar(accum, TCP_HEADER_PAYLOAD_SIZE_OFFSET, 'Iu');
+              payload_size = str_getchar(read_buffer, read_offset + TCP_HEADER_PAYLOAD_SIZE_OFFSET, 'Iu');
+              msg_size = TCP_HEADER_SIZE + payload_size;
 
               payload_size > TCP_MAX_PAYLOAD_SIZE ? (
                 DEBUG > 0 ? ShowConsoleMsg("Invalid payload size - closing client\n");
                 close_tcp_client(i);
-              ) : strlen(accum) >= TCP_HEADER_SIZE + payload_size ? (
-                handle_tcp_message(i, accum, str_getchar(accum, TCP_HEADER_MESSAGE_TYPE_OFFSET, 'cu'), payload_size);
+              ) : unread_bytes >= msg_size ? (
 
-                // Consume the processed message by rebuilding the buffer from the tail
-                // (str_delsub proved unreliable here)
-                msg_size = TCP_HEADER_SIZE + payload_size;
-                strlen(accum) > msg_size ? (
-                  strcpy_from(#remaining, accum, msg_size);
-                  strcpy(accum, #remaining);
-                ) : (
-                  strcpy(accum, "");
-                );
+                // Full remaining message in received bytes. Grab just the remaining part of this message.
+                strcpy_substr(#msg_packet, read_buffer, read_offset, msg_size);
+                handle_tcp_message(i, #msg_packet, str_getchar(#msg_packet, TCP_HEADER_MESSAGE_TYPE_OFFSET, 'cu'), payload_size);
+
                 DEBUG > 0 ? (
-                  sprintf(#debug, "Consumed %i bytes, %i remain\n", msg_size, strlen(accum));
+                  sprintf(#debug, "Processed message at offset %i, size %i\n", read_offset, msg_size);
                   ShowConsoleMsg(#debug);
                 );
+
+                // Advance the sliding window pointer instead of copying/shifting the buffer
+                read_offset += msg_size;
                 draining = 1;
               );
             );
           );
         );
+
+        // The loop is done handling fully framed messages. Update or compact the buffer.
+        read_offset == buffer_len ? (
+          // Full message read with nothing left
+          strcpy(read_buffer, "");
+          0[read_offset_ptr] = 0;
+        ) : read_offset > 4096 ? (
+          // Defensive threshold: If the pointer is getting far out and a partial packet is left,
+          // shift the leftover bytes back to the beginning just once to prevent runaway memory size.
+          strcpy_from(read_buffer, read_buffer, read_offset);
+          0[read_offset_ptr] = 0;
+          DEBUG > 0 ? ShowConsoleMsg("Compacting buffer to front\n");
+        ) : (
+          0[read_offset_ptr] = read_offset;
+        );
+
       );
     );
     i += 1;
@@ -736,9 +758,10 @@ function reacue() (
      * Memory arena for TCP:
      */
     MEM_BASE = 0;
-    MEM_BASE_OFFSET_TCP_RECV_BUFFER = 0;
     MEM_BASE_OFFSET_TCP_CLIENTS = 10;
     MEM_BASE_OFFSET_TCP_SEND_LIST = 20;
+    MEM_BASE_OFFSET_TCP_RECV_BUFFER = 30;
+    MEM_BASE_OFFSET_TCP_READ_OFFSETS = 40;
 
     /*
      * Memory arena for project details:
