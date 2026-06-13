@@ -593,6 +593,25 @@ function handle_tcp_message(client_index, message, message_type, payload_size) l
   message_type == MESSAGE_TYPE_REFRESH ? (
     0[MEM_BASE + MEM_BASE_OFFSET_TCP_SEND_LIST + 0] = 0[MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + client_index];
     send_tcp_message_refreshed();
+ ) : message_type == MESSAGE_TYPE_TRACK_VOL_CHANGED ? (
+    track_index = str_getchar(message, offset, 'Su');
+    offset += 2;
+    volume = str_getchar(message, offset, 'F');
+    0[MEM_TRACK + (MEM_TRACK_STRIDE * track_index) + MEM_SEND_OFFSET_VOL] = volume;
+    SetMediaTrackInfo_Value(GetTrack(project_fn, track_index), "D_VOL", normalized_to_linear(volume));
+ ) : message_type == MESSAGE_TYPE_TRACK_PAN_CHANGED ? (
+    track_index = str_getchar(message, offset, 'Su');
+    offset += 2;
+    pan = str_getchar(message, offset, 'F');
+    pan = (pan * 2) - 1;
+    0[MEM_TRACK + (MEM_TRACK_STRIDE * track_index) + MEM_TRACK_OFFSET_PAN] = pan;
+    SetMediaTrackInfo_Value(GetTrack(project_fn, track_index), "D_PAN", pan);
+ ) : message_type == MESSAGE_TYPE_TRACK_MUTE_CHANGED ? (
+    track_index = str_getchar(message, offset, 'Su');
+    offset += 2;
+    mute = str_getchar(message, offset, 'cu');
+    0[MEM_TRACK + (MEM_TRACK_STRIDE * track_index) + MEM_TRACK_OFFSET_MUTE] = mute;
+    SetMediaTrackInfo_Value(GetTrack(project_fn, track_index), "B_MUTE", mute);
  ) : message_type == MESSAGE_TYPE_RECEIVE_VOL_CHANGED ? (
     track_index = str_getchar(message, offset, 'Su');
     offset += 2;
@@ -601,6 +620,48 @@ function handle_tcp_message(client_index, message, message_type, payload_size) l
     volume = str_getchar(message, offset, 'F');
     0[MEM_SEND + (MEM_SEND_TRACK_STRIDE * track_index) + (MEM_SEND_STRIDE * send_index) + MEM_SEND_OFFSET_VOL] = volume;
     SetTrackSendInfo_Value(GetTrack(project_fn, track_index), -1, send_index, "D_VOL", normalized_to_linear(volume));
+ ) : message_type == MESSAGE_TYPE_RECEIVE_PAN_CHANGED ? (
+    track_index = str_getchar(message, offset, 'Su');
+    offset += 2;
+    send_index = str_getchar(message, offset, 'Su');
+    offset += 2;
+    pan = str_getchar(message, offset, 'F');
+    pan = (pan * 2) - 1;
+    0[MEM_SEND + (MEM_SEND_TRACK_STRIDE * track_index) + (MEM_SEND_STRIDE * send_index) + MEM_SEND_OFFSET_PAN] = pan;
+    SetTrackSendInfo_Value(GetTrack(project_fn, track_index), -1, send_index, "D_PAN", pan);
+ ) : message_type == MESSAGE_TYPE_RECEIVE_MUTE_CHANGED ? (
+    track_index = str_getchar(message, offset, 'Su');
+    offset += 2;
+    send_index = str_getchar(message, offset, 'Su');
+    offset += 2;
+    mute = str_getchar(message, offset, 'cu');
+    0[MEM_SEND + (MEM_SEND_TRACK_STRIDE * track_index) + (MEM_SEND_STRIDE * send_index) + MEM_SEND_OFFSET_MUTE] = mute;
+    SetTrackSendInfo_Value(GetTrack(project_fn, track_index), -1, send_index, "B_MUTE", mute);
+ ) : message_type == MESSAGE_TYPE_HWOUT_VOL_CHANGED ? (
+    track_index = str_getchar(message, offset, 'Su');
+    offset += 2;
+    send_index = str_getchar(message, offset, 'Su');
+    offset += 2;
+    volume = str_getchar(message, offset, 'F');
+    0[MEM_SEND + (MEM_SEND_TRACK_STRIDE * track_index) + (MEM_SEND_STRIDE * send_index) + MEM_SEND_OFFSET_VOL] = volume;
+    SetTrackSendInfo_Value(GetTrack(project_fn, track_index), 1, send_index, "D_VOL", normalized_to_linear(volume));
+ ) : message_type == MESSAGE_TYPE_HWOUT_PAN_CHANGED ? (
+    track_index = str_getchar(message, offset, 'Su');
+    offset += 2;
+    send_index = str_getchar(message, offset, 'Su');
+    offset += 2;
+    pan = str_getchar(message, offset, 'F');
+    pan = (pan * 2) - 1;
+    0[MEM_SEND + (MEM_SEND_TRACK_STRIDE * track_index) + (MEM_SEND_STRIDE * send_index) + MEM_SEND_OFFSET_PAN] = pan;
+    SetTrackSendInfo_Value(GetTrack(project_fn, track_index), 1, send_index, "D_PAN", pan);
+ ) : message_type == MESSAGE_TYPE_HWOUT_MUTE_CHANGED ? (
+    track_index = str_getchar(message, offset, 'Su');
+    offset += 2;
+    send_index = str_getchar(message, offset, 'Su');
+    offset += 2;
+    mute = str_getchar(message, offset, 'cu');
+    0[MEM_SEND + (MEM_SEND_TRACK_STRIDE * track_index) + (MEM_SEND_STRIDE * send_index) + MEM_SEND_OFFSET_MUTE] = mute;
+    SetTrackSendInfo_Value(GetTrack(project_fn, track_index), 1, send_index, "B_MUTE", mute);
   ) : (
     DEBUG > 0 ? (
       sprintf(#debug, "Unknown message type: %i\n", message_type);
