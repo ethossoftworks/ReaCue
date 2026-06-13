@@ -84,21 +84,19 @@ class IemInteractor(private val iemService: IIemService) :
                     is IemEvent.TrackPanUpdated -> updateTrack(event.trackId) { it.copy(pan = event.value) }
                     is IemEvent.TrackMuteUpdated -> updateTrack(event.trackId) { it.copy(isMuted = event.value) }
 
+                    is IemEvent.ReceiveVolumeUpdated ->
+                        updateReceive(event.trackId, event.receiveId) { it.copy(volume = event.value) }
+                    is IemEvent.ReceivePanUpdated ->
+                        updateReceive(event.trackId, event.receiveId) { it.copy(pan = event.value) }
+                    is IemEvent.ReceiveMuteUpdated ->
+                        updateReceive(event.trackId, event.receiveId) { it.copy(isMuted = event.value) }
+
                     is IemEvent.HardwareOutputVolumeUpdated ->
                         updateHardwareOutput(event.trackId, event.hardwareOutId) { it.copy(volume = event.value) }
                     is IemEvent.HardwareOutputPanUpdated ->
                         updateHardwareOutput(event.trackId, event.hardwareOutId) { it.copy(pan = event.value) }
                     is IemEvent.HardwareOutputMuteUpdated ->
                         updateHardwareOutput(event.trackId, event.hardwareOutId) { it.copy(isMuted = event.value) }
-
-                    is IemEvent.ReceivePanUpdated ->
-                        updateReceive(event.trackId, event.receiveId) { it.copy(pan = event.value) }
-
-                    is IemEvent.ReceiveVolumeUpdated ->
-                        updateReceive(event.trackId, event.receiveId) { it.copy(volume = event.value) }
-
-                    is IemEvent.ReceiveMuteUpdated ->
-                        updateReceive(event.trackId, event.receiveId) { it.copy(isMuted = event.value) }
 
                     is IemEvent.Error -> update { state -> state.copy(tracks = persistentMapOf()) }
                 }
