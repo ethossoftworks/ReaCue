@@ -582,7 +582,7 @@ function handle_tcp_connection() local(connection, slot) (
   );
 );
 
-function handle_tcp_message(client_index, message, message_type, payload_size) local(volume, offset, send_slot, send_index, track_index) (
+function handle_tcp_message(client_index, message, message_type, payload_size) local(volume, offset, send_slot, send_index, track_index, i, send_list_index, client_handle) (
   DEBUG > 0 ? (
     sprintf(#debug, "Received message - Type: %i, Payload: %i bytes\n", message_type, payload_size);
     ShowConsoleMsg(#debug);
@@ -593,26 +593,26 @@ function handle_tcp_message(client_index, message, message_type, payload_size) l
   message_type == MESSAGE_TYPE_REFRESH ? (
     0[MEM_BASE + MEM_BASE_OFFSET_TCP_SEND_LIST + 0] = 0[MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + client_index];
     send_tcp_message_refreshed();
- ) : message_type == MESSAGE_TYPE_TRACK_VOL_CHANGED ? (
+  ) : message_type == MESSAGE_TYPE_TRACK_VOL_CHANGED ? (
     track_index = str_getchar(message, offset, 'Su');
     offset += 2;
     volume = str_getchar(message, offset, 'F');
     0[MEM_TRACK + (MEM_TRACK_STRIDE * track_index) + MEM_SEND_OFFSET_VOL] = volume;
     SetMediaTrackInfo_Value(GetTrack(project_fn, track_index), "D_VOL", normalized_to_linear(volume));
- ) : message_type == MESSAGE_TYPE_TRACK_PAN_CHANGED ? (
+  ) : message_type == MESSAGE_TYPE_TRACK_PAN_CHANGED ? (
     track_index = str_getchar(message, offset, 'Su');
     offset += 2;
     pan = str_getchar(message, offset, 'F');
     pan = (pan * 2) - 1;
     0[MEM_TRACK + (MEM_TRACK_STRIDE * track_index) + MEM_TRACK_OFFSET_PAN] = pan;
     SetMediaTrackInfo_Value(GetTrack(project_fn, track_index), "D_PAN", pan);
- ) : message_type == MESSAGE_TYPE_TRACK_MUTE_CHANGED ? (
+  ) : message_type == MESSAGE_TYPE_TRACK_MUTE_CHANGED ? (
     track_index = str_getchar(message, offset, 'Su');
     offset += 2;
     mute = str_getchar(message, offset, 'cu');
     0[MEM_TRACK + (MEM_TRACK_STRIDE * track_index) + MEM_TRACK_OFFSET_MUTE] = mute;
     SetMediaTrackInfo_Value(GetTrack(project_fn, track_index), "B_MUTE", mute);
- ) : message_type == MESSAGE_TYPE_RECEIVE_VOL_CHANGED ? (
+  ) : message_type == MESSAGE_TYPE_RECEIVE_VOL_CHANGED ? (
     track_index = str_getchar(message, offset, 'Su');
     offset += 2;
     send_index = str_getchar(message, offset, 'Su');
@@ -620,7 +620,7 @@ function handle_tcp_message(client_index, message, message_type, payload_size) l
     volume = str_getchar(message, offset, 'F');
     0[MEM_SEND + (MEM_SEND_TRACK_STRIDE * track_index) + (MEM_SEND_STRIDE * send_index) + MEM_SEND_OFFSET_VOL] = volume;
     SetTrackSendInfo_Value(GetTrack(project_fn, track_index), -1, send_index, "D_VOL", normalized_to_linear(volume));
- ) : message_type == MESSAGE_TYPE_RECEIVE_PAN_CHANGED ? (
+  ) : message_type == MESSAGE_TYPE_RECEIVE_PAN_CHANGED ? (
     track_index = str_getchar(message, offset, 'Su');
     offset += 2;
     send_index = str_getchar(message, offset, 'Su');
@@ -629,7 +629,7 @@ function handle_tcp_message(client_index, message, message_type, payload_size) l
     pan = (pan * 2) - 1;
     0[MEM_SEND + (MEM_SEND_TRACK_STRIDE * track_index) + (MEM_SEND_STRIDE * send_index) + MEM_SEND_OFFSET_PAN] = pan;
     SetTrackSendInfo_Value(GetTrack(project_fn, track_index), -1, send_index, "D_PAN", pan);
- ) : message_type == MESSAGE_TYPE_RECEIVE_MUTE_CHANGED ? (
+  ) : message_type == MESSAGE_TYPE_RECEIVE_MUTE_CHANGED ? (
     track_index = str_getchar(message, offset, 'Su');
     offset += 2;
     send_index = str_getchar(message, offset, 'Su');
@@ -637,7 +637,7 @@ function handle_tcp_message(client_index, message, message_type, payload_size) l
     mute = str_getchar(message, offset, 'cu');
     0[MEM_SEND + (MEM_SEND_TRACK_STRIDE * track_index) + (MEM_SEND_STRIDE * send_index) + MEM_SEND_OFFSET_MUTE] = mute;
     SetTrackSendInfo_Value(GetTrack(project_fn, track_index), -1, send_index, "B_MUTE", mute);
- ) : message_type == MESSAGE_TYPE_HWOUT_VOL_CHANGED ? (
+  ) : message_type == MESSAGE_TYPE_HWOUT_VOL_CHANGED ? (
     track_index = str_getchar(message, offset, 'Su');
     offset += 2;
     send_index = str_getchar(message, offset, 'Su');
@@ -645,7 +645,7 @@ function handle_tcp_message(client_index, message, message_type, payload_size) l
     volume = str_getchar(message, offset, 'F');
     0[MEM_SEND + (MEM_SEND_TRACK_STRIDE * track_index) + (MEM_SEND_STRIDE * send_index) + MEM_SEND_OFFSET_VOL] = volume;
     SetTrackSendInfo_Value(GetTrack(project_fn, track_index), 1, send_index, "D_VOL", normalized_to_linear(volume));
- ) : message_type == MESSAGE_TYPE_HWOUT_PAN_CHANGED ? (
+  ) : message_type == MESSAGE_TYPE_HWOUT_PAN_CHANGED ? (
     track_index = str_getchar(message, offset, 'Su');
     offset += 2;
     send_index = str_getchar(message, offset, 'Su');
@@ -654,7 +654,7 @@ function handle_tcp_message(client_index, message, message_type, payload_size) l
     pan = (pan * 2) - 1;
     0[MEM_SEND + (MEM_SEND_TRACK_STRIDE * track_index) + (MEM_SEND_STRIDE * send_index) + MEM_SEND_OFFSET_PAN] = pan;
     SetTrackSendInfo_Value(GetTrack(project_fn, track_index), 1, send_index, "D_PAN", pan);
- ) : message_type == MESSAGE_TYPE_HWOUT_MUTE_CHANGED ? (
+  ) : message_type == MESSAGE_TYPE_HWOUT_MUTE_CHANGED ? (
     track_index = str_getchar(message, offset, 'Su');
     offset += 2;
     send_index = str_getchar(message, offset, 'Su');
@@ -666,6 +666,24 @@ function handle_tcp_message(client_index, message, message_type, payload_size) l
     DEBUG > 0 ? (
       sprintf(#debug, "Unknown message type: %i\n", message_type);
       ShowConsoleMsg(#debug);
+    );
+  );
+
+  // Send events to clients that did not send the event except for refresh. Refresh is just a single client command.
+  message_type != MESSAGE_TYPE_REFRESH ? (
+    i = 0;
+    send_list_index = 0;
+    loop(TCP_MAX_CLIENTS,
+      client_handle = 0[MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + i];
+      client_index != i && client_handle > 0 ? (
+        0[MEM_BASE + MEM_BASE_OFFSET_TCP_SEND_LIST + send_list_index] = 0[MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + i];
+        send_list_index += 1;
+      );
+      i += 1;
+    );
+
+    send_list_index > 0 ? (
+      send_tcp_message(message, TCP_HEADER_SIZE + payload_size);
     );
   );
 );
