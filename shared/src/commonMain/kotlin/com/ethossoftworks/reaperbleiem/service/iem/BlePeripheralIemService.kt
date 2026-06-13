@@ -421,10 +421,14 @@ class BlePeripheralIemService(
                 tracks =
                     state.tracks.mutate { tracks ->
                         val track = tracks[trackId] ?: return@mutate
-                        track.receives.mutate { receives ->
-                            val receive = receives[receiveId] ?: return@mutate
-                            receives[receiveId] = block(receive)
-                        }
+                        tracks[trackId] =
+                            track.copy(
+                                receives =
+                                    track.receives.mutate { receives ->
+                                        val receive = receives[receiveId] ?: return@mutate
+                                        receives[receiveId] = block(receive)
+                                    }
+                            )
                     }
             )
         }
@@ -437,10 +441,14 @@ class BlePeripheralIemService(
                 tracks =
                     state.tracks.mutate { tracks ->
                         val track = tracks[trackId] ?: return@mutate
-                        track.hardwareOuts.mutate { hwOuts ->
-                            val hwOut = hwOuts[hardwareOutId] ?: return@mutate
-                            hwOuts[hwOut.id] = block(hwOut)
-                        }
+                        tracks[trackId] =
+                            track.copy(
+                                hardwareOuts =
+                                    track.hardwareOuts.mutate { hwOuts ->
+                                        val hwOut = hwOuts[hardwareOutId] ?: return@mutate
+                                        hwOuts[hwOut.id] = block(hwOut)
+                                    }
+                            )
                     }
             )
         }
