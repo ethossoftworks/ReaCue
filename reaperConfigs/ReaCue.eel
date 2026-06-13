@@ -582,7 +582,7 @@ function handle_tcp_connection() local(connection, ptr) (
   );
 );
 
-function handle_tcp_message(client_index, message, message_type, payload_size) local(volume, offset, send_ptr, send_index, track_index, i, send_list_index, client_handle) (
+function handle_tcp_message(client_index, message, message_type, payload_size) local(volume, offset, send_ptr, send_index, track_index, i, send_list_index, client_handle, receive_count) (
   DEBUG > 0 ? (
     sprintf(#debug, "Received message - Type: %i, Payload: %i bytes\n", message_type, payload_size);
     ShowConsoleMsg(#debug);
@@ -643,7 +643,8 @@ function handle_tcp_message(client_index, message, message_type, payload_size) l
     send_index = str_getchar(message, offset, 'Su');
     offset += 2;
     volume = str_getchar(message, offset, 'F');
-    0[MEM_SEND + (MEM_SEND_TRACK_STRIDE * track_index) + (MEM_SEND_STRIDE * send_index) + MEM_SEND_OFFSET_VOL] = volume;
+    receive_count = 0[MEM_TRACK + (MEM_TRACK_STRIDE * track_index) + MEM_TRACK_OFFSET_RECV_COUNT];
+    0[MEM_SEND + (MEM_SEND_TRACK_STRIDE * track_index) + (MEM_SEND_STRIDE * (receive_count + send_index)) + MEM_SEND_OFFSET_VOL] = volume;
     SetTrackSendInfo_Value(GetTrack(0, track_index), 1, send_index, "D_VOL", normalized_to_linear(volume));
   ) : message_type == MESSAGE_TYPE_HWOUT_PAN_CHANGED ? (
     track_index = str_getchar(message, offset, 'Su');
@@ -652,7 +653,8 @@ function handle_tcp_message(client_index, message, message_type, payload_size) l
     offset += 2;
     pan = str_getchar(message, offset, 'F');
     pan = (pan * 2) - 1;
-    0[MEM_SEND + (MEM_SEND_TRACK_STRIDE * track_index) + (MEM_SEND_STRIDE * send_index) + MEM_SEND_OFFSET_PAN] = pan;
+    receive_count = 0[MEM_TRACK + (MEM_TRACK_STRIDE * track_index) + MEM_TRACK_OFFSET_RECV_COUNT];
+    0[MEM_SEND + (MEM_SEND_TRACK_STRIDE * track_index) + (MEM_SEND_STRIDE * (receive_count + send_index)) + MEM_SEND_OFFSET_PAN] = pan;
     SetTrackSendInfo_Value(GetTrack(0, track_index), 1, send_index, "D_PAN", pan);
   ) : message_type == MESSAGE_TYPE_HWOUT_MUTE_CHANGED ? (
     track_index = str_getchar(message, offset, 'Su');
@@ -660,7 +662,8 @@ function handle_tcp_message(client_index, message, message_type, payload_size) l
     send_index = str_getchar(message, offset, 'Su');
     offset += 2;
     mute = str_getchar(message, offset, 'cu');
-    0[MEM_SEND + (MEM_SEND_TRACK_STRIDE * track_index) + (MEM_SEND_STRIDE * send_index) + MEM_SEND_OFFSET_MUTE] = mute;
+    receive_count = 0[MEM_TRACK + (MEM_TRACK_STRIDE * track_index) + MEM_TRACK_OFFSET_RECV_COUNT];
+    0[MEM_SEND + (MEM_SEND_TRACK_STRIDE * track_index) + (MEM_SEND_STRIDE * (receive_count + send_index)) + MEM_SEND_OFFSET_MUTE] = mute;
     SetTrackSendInfo_Value(GetTrack(0, track_index), 1, send_index, "B_MUTE", mute);
   ) : (
     DEBUG > 0 ? (
