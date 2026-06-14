@@ -10,11 +10,11 @@ Live IEM mixing with REAPER typically requires every device to be on the same Wi
 
 ReaCue has two roles:
 
-- **Host (macOS)** — Connects to REAPER via its web interface and OSC, reads track/send/hardware output state, and advertises a custom BLE peripheral service. State updates are serialized as CBOR and sent to connected mobile clients as BLE notifications.
-- **Client (Android/iOS)** — Scans for a ReaCue BLE host, connects, and receives the full mix state. Mix adjustments made on the client are written back to the host over BLE, which forwards them to REAPER as OSC commands.
+- **Host (macOS)** — Connects to REAPER via a locally bound TCP socket from the ReaCue ReaScript, reads track/send/hardware output state, and advertises a custom BLE peripheral service. State updates are serialized as CBOR and sent to connected mobile clients as BLE notifications.
+- **Client (Android/iOS)** — Scans for a ReaCue BLE host, connects, and receives the full mix state. Mix adjustments made on the client are written back to the host over BLE, which forwards them to REAPER.
 
 ```
-REAPER <—HTTP/OSC—> macOS Host <—BLE—> Android/iOS Client
+REAPER <—TCP—> macOS Host <—BLE—> Android/iOS Client
 ```
 
 ## Features
@@ -24,8 +24,9 @@ REAPER <—HTTP/OSC—> macOS Host <—BLE—> Android/iOS Client
 - Output volume control for each monitor track's hardware output
 - Bulk mix actions: set all receives to 0 dB, set all to a specific percentage, or adjust all by an offset
 - Live project name display and automatic project change detection
-- Automatic state sync — changes made in REAPER are reflected on clients in real time
-- BLE transport — no Wi-Fi or hotspot needed
+- Automatic state sync - changes made in REAPER are reflected on clients in real time
+- BLE transport - no Wi-Fi or hotspot needed
+- BLE security - Prevent unwanted users from accessing your IEM setup via a passcode 
 
 ## REAPER Setup
 
@@ -46,6 +47,9 @@ For a track to appear as a selectable monitor in ReaCue, it must have both **rec
 1. Create a monitor track for each band member
 2. Add sends from each source track (vocals, guitar, drums, etc.) to the monitor track
 3. Route the monitor track to a hardware output on your audio interface
+
+## Technical Design
+To read more about the technical design, read the [Technical Design Journey](./TECHNICAL_DESIGN_JOURNEY.md).
 
 ## Building
 
