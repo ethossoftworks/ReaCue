@@ -143,6 +143,11 @@ class IemScreenViewInteractor(
         iemInteractor.setReceivePan(trackId, receiveId, value)
     }
 
+    fun onReceiveMuteToggle(trackId: Int, receiveId: Int) {
+        val isMuted = state.tracks[trackId]?.receives[receiveId]?.isMuted ?: return
+        iemInteractor.setReceiveMute(trackId, receiveId, !isMuted)
+    }
+
     fun onPasscodeEntryDismiss() {
         update { state -> state.copy(passcodeEntry = null) }
     }
