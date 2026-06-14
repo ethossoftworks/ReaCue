@@ -20,14 +20,14 @@ import io.ktor.utils.io.writeFloat
 import io.ktor.utils.io.writeInt
 import io.ktor.utils.io.writeShort
 import kotlin.experimental.and
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
 import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlin.time.Duration.Companion.seconds
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -242,103 +242,86 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
         return IemEvent.HardwareOutputMuteUpdated(trackId = trackId, hardwareOutId = hwOutId, value = value)
     }
 
-    private suspend inline fun sendFrame(block: suspend ByteWriteChannel.() -> Unit) {
+    private suspend fun sendHeartbeat() = sendFrame(TcpMessageType.Heartbeat, 0)
+
+    override suspend fun refresh() = sendFrame(TcpMessageType.Refresh, 0)
+
+    override suspend fun setTrackVolume(trackId: Int, value: Float) =
+        sendFrame(TcpMessageType.TrackVolChanged, 6) {
+            writeShort(trackId.toShort())
+            writeFloat(value)
+        }
+
+    override suspend fun setTrackPan(trackId: Int, value: Float) =
+        sendFrame(TcpMessageType.TrackPanChanged, 6) {
+            writeShort(trackId.toShort())
+            writeFloat(value)
+        }
+
+    override suspend fun setTrackMute(trackId: Int, value: Boolean) =
+        sendFrame(TcpMessageType.TrackMuteChanged, 3) {
+            writeShort(trackId.toShort())
+            writeByte(if (value) 1 else 0)
+        }
+
+    override suspend fun setReceiveVolume(trackId: Int, receiveId: Int, value: Float) =
+        sendFrame(TcpMessageType.ReceiveVolChanged, 8) {
+            writeShort(trackId.toShort())
+            writeShort(receiveId.toShort())
+            writeFloat(value)
+        }
+
+    override suspend fun setReceivePan(trackId: Int, receiveId: Int, value: Float) =
+        sendFrame(TcpMessageType.ReceivePanChanged, 8) {
+            writeShort(trackId.toShort())
+            writeShort(receiveId.toShort())
+            writeFloat(value)
+        }
+
+    override suspend fun setReceiveMute(trackId: Int, receiveId: Int, value: Boolean) =
+        sendFrame(TcpMessageType.ReceiveMuteChanged, 5) {
+            writeShort(trackId.toShort())
+            writeShort(receiveId.toShort())
+            writeByte(if (value) 1 else 0)
+        }
+
+    override suspend fun setOutputVolume(trackId: Int, hardwareOutId: Int, value: Float) =
+        sendFrame(TcpMessageType.HwOutVolChanged, 8) {
+            writeShort(trackId.toShort())
+            writeShort(hardwareOutId.toShort())
+            writeFloat(value)
+        }
+
+    override suspend fun setOutputPan(trackId: Int, hardwareOutId: Int, value: Float) =
+        sendFrame(TcpMessageType.HwOutPanChanged, 8) {
+            writeShort(trackId.toShort())
+            writeShort(hardwareOutId.toShort())
+            writeFloat(value)
+        }
+
+    override suspend fun setOutputMute(trackId: Int, hardwareOutId: Int, value: Boolean) =
+        sendFrame(TcpMessageType.HwOutMuteChanged, 5) {
+            writeShort(trackId.toShort())
+            writeShort(hardwareOutId.toShort())
+            writeByte(if (value) 1 else 0)
+        }
+
+    private suspend inline fun sendFrame(
+        type: TcpMessageType,
+        payloadSize: Int,
+        block: suspend ByteWriteChannel.() -> Unit = {},
+    ) {
         val channel = writeChannel.value ?: return
         try {
-            writeMutex.withLock { channel.block() }
+            writeMutex.withLock {
+                channel.writeByte(SupportedSchemaVersion)
+                channel.writeByte(type.value)
+                channel.writeInt(payloadSize)
+                channel.block()
+            }
         } catch (e: Exception) {
             Logger.e { "NetworkIemService - $e" }
         }
-    }
-
-    private suspend fun sendHeartbeat() = sendFrame {
-        writeByte(SupportedSchemaVersion)
-        writeByte(TcpMessageType.Heartbeat.value)
-        writeInt(0)
-    }
-
-    override suspend fun refresh() = sendFrame {
-        writeByte(SupportedSchemaVersion)
-        writeByte(TcpMessageType.Refresh.value)
-        writeInt(0)
-    }
-
-    override suspend fun setTrackVolume(trackId: Int, value: Float) = sendFrame {
-        writeByte(SupportedSchemaVersion)
-        writeByte(TcpMessageType.TrackVolChanged.value)
-        writeInt(6)
-        writeShort(trackId.toShort())
-        writeFloat(value)
-    }
-
-    override suspend fun setTrackPan(trackId: Int, value: Float) = sendFrame {
-        writeByte(SupportedSchemaVersion)
-        writeByte(TcpMessageType.TrackPanChanged.value)
-        writeInt(6)
-        writeShort(trackId.toShort())
-        writeFloat(value)
-    }
-
-    override suspend fun setTrackMute(trackId: Int, value: Boolean) = sendFrame {
-        writeByte(SupportedSchemaVersion)
-        writeByte(TcpMessageType.TrackMuteChanged.value)
-        writeInt(3)
-        writeShort(trackId.toShort())
-        writeByte(if (value) 1 else 0)
-    }
-
-    override suspend fun setReceiveVolume(trackId: Int, receiveId: Int, value: Float) = sendFrame {
-        writeByte(SupportedSchemaVersion)
-        writeByte(TcpMessageType.ReceiveVolChanged.value)
-        writeInt(8)
-        writeShort(trackId.toShort())
-        writeShort(receiveId.toShort())
-        writeFloat(value)
-    }
-
-    override suspend fun setReceivePan(trackId: Int, receiveId: Int, value: Float) = sendFrame {
-        writeByte(SupportedSchemaVersion)
-        writeByte(TcpMessageType.ReceivePanChanged.value)
-        writeInt(8)
-        writeShort(trackId.toShort())
-        writeShort(receiveId.toShort())
-        writeFloat(value)
-    }
-
-    override suspend fun setReceiveMute(trackId: Int, receiveId: Int, value: Boolean) = sendFrame {
-        writeByte(SupportedSchemaVersion)
-        writeByte(TcpMessageType.ReceiveMuteChanged.value)
-        writeInt(5)
-        writeShort(trackId.toShort())
-        writeShort(receiveId.toShort())
-        writeByte(if (value) 1 else 0)
-    }
-
-    override suspend fun setOutputVolume(trackId: Int, hardwareOutId: Int, value: Float) = sendFrame {
-        writeByte(SupportedSchemaVersion)
-        writeByte(TcpMessageType.HwOutVolChanged.value)
-        writeInt(8)
-        writeShort(trackId.toShort())
-        writeShort(hardwareOutId.toShort())
-        writeFloat(value)
-    }
-
-    override suspend fun setOutputPan(trackId: Int, hardwareOutId: Int, value: Float) = sendFrame {
-        writeByte(SupportedSchemaVersion)
-        writeByte(TcpMessageType.HwOutPanChanged.value)
-        writeInt(8)
-        writeShort(trackId.toShort())
-        writeShort(hardwareOutId.toShort())
-        writeFloat(value)
-    }
-
-    override suspend fun setOutputMute(trackId: Int, hardwareOutId: Int, value: Boolean) = sendFrame {
-        writeByte(SupportedSchemaVersion)
-        writeByte(TcpMessageType.HwOutMuteChanged.value)
-        writeInt(5)
-        writeShort(trackId.toShort())
-        writeShort(hardwareOutId.toShort())
-        writeByte(if (value) 1 else 0)
     }
 
     private fun closeSocket() {
