@@ -49,7 +49,7 @@ For a track to appear as a selectable monitor in ReaCue, it must have both **rec
 3. Route the monitor track to a hardware output on your audio interface
 
 ## Technical Design
-To read more about the technical design, read the [Technical Design Journey](./TECHNICAL_DESIGN_JOURNEY.md).
+To read more about the technical design, read the [Technical Design Journey](docs/TECHNICAL_DESIGN_JOURNEY.md).
 
 ## Building
 
@@ -87,6 +87,10 @@ Or open the project in Android Studio and run the `androidApp` configuration.
 1. Open `iosApp/ReaCue.xcodeproj` in Xcode
 2. Select a development team under **Signing & Capabilities**
 3. Build and run on a device (BLE is not available in the simulator)
+
+## Roadmap
+1. Presets - Storing values for tracks based on name for later recall
+2. Talkback - Allow using the phone microphone to talk to other band members with IEMs in
 
 ## License
 
