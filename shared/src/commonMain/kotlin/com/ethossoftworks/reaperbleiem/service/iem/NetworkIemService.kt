@@ -12,7 +12,6 @@ import io.ktor.network.sockets.openReadChannel
 import io.ktor.network.sockets.openWriteChannel
 import io.ktor.utils.io.ByteWriteChannel
 import io.ktor.utils.io.CancellationException
-import io.ktor.utils.io.readAvailable
 import io.ktor.utils.io.readByte
 import io.ktor.utils.io.readByteArray
 import io.ktor.utils.io.readInt
@@ -27,10 +26,15 @@ import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 private val SupportedSchemaVersion: Byte = 0x00
+private val HeartbeatInterval = 2.seconds
 
 class NetworkIemService(private val peripheralPreferencesService: PeripheralPreferencesService) : IIemService {
 
@@ -38,10 +42,10 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
     private val selectorManager = SelectorManager(KmpDispatchers.IO)
     private val tcpSocket = atomic<Socket?>(null)
     private val writeChannel = atomic<ByteWriteChannel?>(null)
+    private val writeMutex = Mutex()
 
     override fun subscribe(context: IemContext): Flow<IemEvent> = callbackFlow {
         try {
-            // TODO: Use user settings
             peripheralPreferencesService.awaitSettings()
 
             val socket =
@@ -51,7 +55,6 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
             tcpSocket.update { socket }
 
             launch {
-                val unknownBuffer = ByteArray(16384)
                 val reader = socket.openReadChannel()
                 while (isActive && socket.isActive) {
                     val schemaVersion = reader.readByte()
@@ -78,17 +81,21 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
                             TcpMessageType.HwOutVolChanged.value -> parseHwOutVolChangedMessage(payload)
                             TcpMessageType.HwOutPanChanged.value -> parseHwOutPanChangedMessage(payload)
                             TcpMessageType.HwOutMuteChanged.value -> parseHwOutMuteChangedMessage(payload)
-                            else -> reader.readAvailable(unknownBuffer) // Attempt to drain unknown message
+                            else -> {}
                         }
 
-                    if (event is IemEvent) {
-                        println(event)
-                        send(event)
-                    }
+                    if (event is IemEvent) send(event)
                 }
             }
 
             writeChannel.update { socket.openWriteChannel(autoFlush = true) }
+
+            launch {
+                while (isActive) {
+                    delay(HeartbeatInterval)
+                    sendHeartbeat()
+                }
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (t: Throwable) {
@@ -235,144 +242,103 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
         return IemEvent.HardwareOutputMuteUpdated(trackId = trackId, hardwareOutId = hwOutId, value = value)
     }
 
-    override suspend fun refresh() {
-        writeChannel.value?.apply {
-            writeByte(SupportedSchemaVersion)
-            writeByte(TcpMessageType.Refresh.value)
-            writeInt(0)
-        }
-    }
-
-    override suspend fun setTrackVolume(trackId: Int, value: Float) {
+    private suspend inline fun sendFrame(block: suspend ByteWriteChannel.() -> Unit) {
+        val channel = writeChannel.value ?: return
         try {
-            writeChannel.value?.apply {
-                writeByte(SupportedSchemaVersion)
-                writeByte(TcpMessageType.TrackVolChanged.value)
-                writeInt(6)
-                writeShort(trackId.toShort())
-                writeFloat(value)
-            }
+            writeMutex.withLock { channel.block() }
         } catch (e: Exception) {
             Logger.e { "NetworkIemService - $e" }
         }
     }
 
-    override suspend fun setTrackPan(trackId: Int, value: Float) {
-        try {
-            writeChannel.value?.apply {
-                writeByte(SupportedSchemaVersion)
-                writeByte(TcpMessageType.TrackVolChanged.value)
-                writeInt(6)
-                writeShort(trackId.toShort())
-                writeFloat(value)
-            }
-        } catch (e: Exception) {
-            Logger.e { "NetworkIemService - $e" }
-        }
+    private suspend fun sendHeartbeat() = sendFrame {
+        writeByte(SupportedSchemaVersion)
+        writeByte(TcpMessageType.Heartbeat.value)
+        writeInt(0)
     }
 
-    override suspend fun setTrackMute(trackId: Int, value: Boolean) {
-        try {
-            writeChannel.value?.apply {
-                writeByte(SupportedSchemaVersion)
-                writeByte(TcpMessageType.TrackMuteChanged.value)
-                writeInt(3)
-                writeShort(trackId.toShort())
-                writeByte(if (value) 1 else 0)
-            }
-        } catch (e: Exception) {
-            Logger.e { "NetworkIemService - $e" }
-        }
+    override suspend fun refresh() = sendFrame {
+        writeByte(SupportedSchemaVersion)
+        writeByte(TcpMessageType.Refresh.value)
+        writeInt(0)
     }
 
-    override suspend fun setReceiveVolume(trackId: Int, receiveId: Int, value: Float) {
-        try {
-            writeChannel.value?.apply {
-                writeByte(SupportedSchemaVersion)
-                writeByte(TcpMessageType.ReceiveVolChanged.value)
-                writeInt(8)
-                writeShort(trackId.toShort())
-                writeShort(receiveId.toShort())
-                writeFloat(value)
-            }
-        } catch (e: Exception) {
-            Logger.e { "NetworkIemService - $e" }
-        }
+    override suspend fun setTrackVolume(trackId: Int, value: Float) = sendFrame {
+        writeByte(SupportedSchemaVersion)
+        writeByte(TcpMessageType.TrackVolChanged.value)
+        writeInt(6)
+        writeShort(trackId.toShort())
+        writeFloat(value)
     }
 
-    override suspend fun setReceivePan(trackId: Int, receiveId: Int, value: Float) {
-        try {
-            writeChannel.value?.apply {
-                writeByte(SupportedSchemaVersion)
-                writeByte(TcpMessageType.ReceivePanChanged.value)
-                writeInt(8)
-                writeShort(trackId.toShort())
-                writeShort(receiveId.toShort())
-                writeFloat(value)
-            }
-        } catch (e: Exception) {
-            Logger.e { "NetworkIemService - $e" }
-        }
+    override suspend fun setTrackPan(trackId: Int, value: Float) = sendFrame {
+        writeByte(SupportedSchemaVersion)
+        writeByte(TcpMessageType.TrackPanChanged.value)
+        writeInt(6)
+        writeShort(trackId.toShort())
+        writeFloat(value)
     }
 
-    override suspend fun setReceiveMute(trackId: Int, receiveId: Int, value: Boolean) {
-        try {
-            writeChannel.value?.apply {
-                writeByte(SupportedSchemaVersion)
-                writeByte(TcpMessageType.ReceiveMuteChanged.value)
-                writeInt(5)
-                writeShort(trackId.toShort())
-                writeShort(receiveId.toShort())
-                writeByte(if (value) 1 else 0)
-            }
-        } catch (e: Exception) {
-            Logger.e { "NetworkIemService - $e" }
-        }
+    override suspend fun setTrackMute(trackId: Int, value: Boolean) = sendFrame {
+        writeByte(SupportedSchemaVersion)
+        writeByte(TcpMessageType.TrackMuteChanged.value)
+        writeInt(3)
+        writeShort(trackId.toShort())
+        writeByte(if (value) 1 else 0)
     }
 
-    override suspend fun setOutputVolume(trackId: Int, hardwareOutId: Int, value: Float) {
-        try {
-            writeChannel.value?.apply {
-                writeByte(SupportedSchemaVersion)
-                writeByte(TcpMessageType.HwOutVolChanged.value)
-                writeInt(8)
-                writeShort(trackId.toShort())
-                writeShort(hardwareOutId.toShort())
-                writeFloat(value)
-            }
-        } catch (e: Exception) {
-            Logger.e { "NetworkIemService - $e" }
-        }
+    override suspend fun setReceiveVolume(trackId: Int, receiveId: Int, value: Float) = sendFrame {
+        writeByte(SupportedSchemaVersion)
+        writeByte(TcpMessageType.ReceiveVolChanged.value)
+        writeInt(8)
+        writeShort(trackId.toShort())
+        writeShort(receiveId.toShort())
+        writeFloat(value)
     }
 
-    override suspend fun setOutputPan(trackId: Int, hardwareOutId: Int, value: Float) {
-        try {
-            writeChannel.value?.apply {
-                writeByte(SupportedSchemaVersion)
-                writeByte(TcpMessageType.HwOutPanChanged.value)
-                writeInt(8)
-                writeShort(trackId.toShort())
-                writeShort(hardwareOutId.toShort())
-                writeFloat(value)
-            }
-        } catch (e: Exception) {
-            Logger.e { "NetworkIemService - $e" }
-        }
+    override suspend fun setReceivePan(trackId: Int, receiveId: Int, value: Float) = sendFrame {
+        writeByte(SupportedSchemaVersion)
+        writeByte(TcpMessageType.ReceivePanChanged.value)
+        writeInt(8)
+        writeShort(trackId.toShort())
+        writeShort(receiveId.toShort())
+        writeFloat(value)
     }
 
-    override suspend fun setOutputMute(trackId: Int, hardwareOutId: Int, value: Boolean) {
-        try {
-            writeChannel.value?.apply {
-                writeByte(SupportedSchemaVersion)
-                writeByte(TcpMessageType.HwOutMuteChanged.value)
-                writeInt(5)
-                writeShort(trackId.toShort())
-                writeShort(hardwareOutId.toShort())
-                writeByte(if (value) 1 else 0)
-            }
-        } catch (e: Exception) {
-            Logger.e { "NetworkIemService - $e" }
-        }
+    override suspend fun setReceiveMute(trackId: Int, receiveId: Int, value: Boolean) = sendFrame {
+        writeByte(SupportedSchemaVersion)
+        writeByte(TcpMessageType.ReceiveMuteChanged.value)
+        writeInt(5)
+        writeShort(trackId.toShort())
+        writeShort(receiveId.toShort())
+        writeByte(if (value) 1 else 0)
+    }
+
+    override suspend fun setOutputVolume(trackId: Int, hardwareOutId: Int, value: Float) = sendFrame {
+        writeByte(SupportedSchemaVersion)
+        writeByte(TcpMessageType.HwOutVolChanged.value)
+        writeInt(8)
+        writeShort(trackId.toShort())
+        writeShort(hardwareOutId.toShort())
+        writeFloat(value)
+    }
+
+    override suspend fun setOutputPan(trackId: Int, hardwareOutId: Int, value: Float) = sendFrame {
+        writeByte(SupportedSchemaVersion)
+        writeByte(TcpMessageType.HwOutPanChanged.value)
+        writeInt(8)
+        writeShort(trackId.toShort())
+        writeShort(hardwareOutId.toShort())
+        writeFloat(value)
+    }
+
+    override suspend fun setOutputMute(trackId: Int, hardwareOutId: Int, value: Boolean) = sendFrame {
+        writeByte(SupportedSchemaVersion)
+        writeByte(TcpMessageType.HwOutMuteChanged.value)
+        writeInt(5)
+        writeShort(trackId.toShort())
+        writeShort(hardwareOutId.toShort())
+        writeByte(if (value) 1 else 0)
     }
 
     private fun closeSocket() {
@@ -395,4 +361,5 @@ private enum class TcpMessageType(val value: Byte) {
     HwOutPanChanged(0x09),
     HwOutMuteChanged(0x0A),
     Refresh(0x0B),
+    Heartbeat(0x0C),
 }

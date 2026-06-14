@@ -63,6 +63,17 @@ function send_tcp_message(payload, len) local(client_handle, bytes_sent, i, ptr,
   );
 );
 
+function check_client_timeouts() local(i, now) (
+  now = time_precise();
+  i = 0;
+  loop(TCP_MAX_CLIENTS,
+    0[MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + i] > 0 && now - 0[MEM_BASE + MEM_BASE_OFFSET_TCP_LAST_SEEN + i] > TCP_CLIENT_TIMEOUT ? (
+      close_tcp_client(i);
+    );
+    i += 1;
+  );
+);
+
 function has_project_structure_changed() local(has_changed, i, track, hw_out_count, receive_count, track_ptr) (
   has_changed = 0;
   project_fn = EnumProjects(-1);
@@ -563,6 +574,7 @@ function handle_tcp_connection() local(connection, ptr) (
       );
 
       0[MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + ptr] = connection;
+      0[MEM_BASE + MEM_BASE_OFFSET_TCP_LAST_SEEN + ptr] = time_precise();
       strcpy(MEM_BASE + MEM_BASE_OFFSET_TCP_RECV_BUFFER + ptr, ""); // Clear receive buffer
 
       0[MEM_BASE + MEM_BASE_OFFSET_TCP_SEND_LIST + 0] = MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + ptr;
@@ -665,6 +677,8 @@ function handle_tcp_message(client_index, message, message_type, payload_size) l
     receive_count = 0[MEM_TRACK + (MEM_TRACK_STRIDE * track_index) + MEM_TRACK_OFFSET_RECV_COUNT];
     0[MEM_SEND + (MEM_SEND_TRACK_STRIDE * track_index) + (MEM_SEND_STRIDE * (receive_count + send_index)) + MEM_SEND_OFFSET_MUTE] = mute;
     SetTrackSendInfo_Value(GetTrack(0, track_index), 1, send_index, "B_MUTE", mute);
+  ) : message_type == MESSAGE_TYPE_HEARTBEAT ? (
+    0;
   ) : (
     DEBUG > 0 ? (
       sprintf(#debug, "Unknown message type: %i\n", message_type);
@@ -672,8 +686,8 @@ function handle_tcp_message(client_index, message, message_type, payload_size) l
     );
   );
 
-  // Send events to clients that did not send the event except for refresh. Refresh is just a single client command.
-  message_type != MESSAGE_TYPE_REFRESH ? (
+  // Re-broadcast change events to the other clients. Ignore Refresh and Heartbeat messages.
+  message_type != MESSAGE_TYPE_REFRESH && message_type != MESSAGE_TYPE_HEARTBEAT ? (
     i = 0;
     send_list_index = 0;
     loop(TCP_MAX_CLIENTS,
@@ -701,6 +715,7 @@ function handle_tcp_receive() local(i, client_handle, bytes_read, read_buffer, p
       bytes_read == 0 ? (
         close_tcp_client(i);
       ) : bytes_read > 0 ? (
+        0[MEM_BASE + MEM_BASE_OFFSET_TCP_LAST_SEEN + i] = time_precise();
         read_buffer = MEM_BASE + MEM_BASE_OFFSET_TCP_RECV_BUFFER + i;
         read_offset_ptr = MEM_BASE + MEM_BASE_OFFSET_TCP_READ_OFFSETS + i;
         read_offset = 0[read_offset_ptr];
@@ -764,7 +779,6 @@ function handle_tcp_receive() local(i, client_handle, bytes_read, read_buffer, p
 );
 
 function reacue_loop() (
-  start = 0;
   handle_tcp_connection();
   handle_tcp_receive();
 
@@ -774,7 +788,7 @@ function reacue_loop() (
     handle_delta_change();
   );
 
-  end = 0;
+  check_client_timeouts();
 
   runloop("reacue_loop();");
 );
@@ -805,6 +819,7 @@ function reacue() (
     TCP_MAX_PAYLOAD_SIZE = 65536;
     TCP_RECV_BUFFER_SIZE = 4096;
     TCP_SCHEMA_VERSION = 0;
+    TCP_CLIENT_TIMEOUT = 6.0; // seconds;
 
     /*
      * TCP Header
@@ -830,6 +845,7 @@ function reacue() (
     MESSAGE_TYPE_HWOUT_PAN_CHANGED = 9;
     MESSAGE_TYPE_HWOUT_MUTE_CHANGED = 10;
     MESSAGE_TYPE_REFRESH = 11;
+    MESSAGE_TYPE_HEARTBEAT = 12;
 
     /*
      * Memory arena for TCP:
@@ -839,6 +855,7 @@ function reacue() (
     MEM_BASE_OFFSET_TCP_SEND_LIST = 20;
     MEM_BASE_OFFSET_TCP_RECV_BUFFER = 30;
     MEM_BASE_OFFSET_TCP_READ_OFFSETS = 40;
+    MEM_BASE_OFFSET_TCP_LAST_SEEN = 50;
 
     /*
      * Memory arena for project details:
