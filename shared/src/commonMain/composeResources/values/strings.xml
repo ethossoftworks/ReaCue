@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">ReaCue</string>
+    <string name="project_url">https://github.com/ethossoftworks/ReaCue</string>
     <string name="connecting">Connecting</string>
     <string name="disconnected_from_peripheral">Disconnected from host</string>
     <string name="disconnected_from_reaper">Disconnected from Reaper</string>
@@ -39,4 +40,6 @@
     <string name="passcode">Passcode</string>
     <string name="view_passcode">View Passcode</string>
     <string name="apply">Apply</string>
+    <string name="open_source_licenses">Open Source Licenses</string>
+    <string name="project_page">Project Page</string>
 </resources>

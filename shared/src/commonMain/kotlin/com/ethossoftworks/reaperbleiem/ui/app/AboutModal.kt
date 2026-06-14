@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ethossoftworks.reaperbleiem.interactor.AboutViewInteractor
@@ -32,12 +33,15 @@ import org.jetbrains.compose.resources.stringResource
 import reacue.shared.generated.resources.Res
 import reacue.shared.generated.resources.app_icon
 import reacue.shared.generated.resources.app_name
+import reacue.shared.generated.resources.open_source_licenses
+import reacue.shared.generated.resources.project_page
 
 @Composable
 fun AboutModal(isVisible: Boolean, onDismissRequest: () -> Unit, interactor: AboutViewInteractor = rememberInject()) {
     val state = interactor.collectAsState()
     val theme = AppTheme.colors
 
+    val uriHandler = LocalUriHandler.current
     val environment = KmpBuildInfo.environment
     val versionText = remember {
         buildString {
@@ -78,10 +82,18 @@ fun AboutModal(isVisible: Boolean, onDismissRequest: () -> Unit, interactor: Abo
                 color = theme.textSecondary,
             )
             AppButton(
-                label = "Open Source Licenses",
+                label = stringResource(Res.string.open_source_licenses),
                 onClick = {
                     onDismissRequest()
                     interactor.onOssDisclaimerClick()
+                },
+            )
+
+            AppButton(
+                label = stringResource(Res.string.project_page),
+                onClick = {
+                    onDismissRequest()
+                    interactor.onProjectPageClick(uriHandler)
                 },
             )
         }

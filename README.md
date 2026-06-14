@@ -1,24 +1,28 @@
 # ReaCue
-
-ReaCue is a personal in-ear monitor (IEM) mixing app for [REAPER](https://www.reaper.fm/) that uses Bluetooth Low Energy instead of Wi-Fi. A macOS host app connects to REAPER and communicates over BLE to Android and iOS clients so band members can adjust their own monitor mixes from their phones.
+ReaCue is a personal in-ear monitor (IEM) mixing app for [REAPER](https://www.reaper.fm/) that uses Bluetooth Low Energy 
+instead of Wi-Fi. A macOS host app connects to REAPER and communicates over BLE to Android and iOS clients so band 
+members can adjust their own monitor mixes from their phones.
 
 ## Why
-
-Live IEM mixing with REAPER typically requires every device to be on the same Wi-Fi network. That means creating a hotspot, connecting every phone, and troubleshooting dropped connections mid-set. ReaCue eliminates that by using BLE as the transport layer. The macOS host connects to REAPER locally and advertises a BLE service that mobile devices can connect to directly. In addition, the built in web interface for controlling monitors does not handle changing projects well.
+Live IEM mixing with REAPER typically requires every device to be on the same Wi-Fi network. That means creating a 
+hotspot, connecting every phone, and troubleshooting dropped connections mid-set. ReaCue eliminates that by using BLE 
+as the transport layer. The macOS host connects to REAPER locally and advertises a BLE service that mobile devices can 
+connect to directly. In addition, the builtin web interface for controlling monitors does not handle changing projects 
+well.
 
 ## How It Works
+**Host (macOS)** — Connects to REAPER via a locally bound TCP socket from the ReaCue ReaScript, reads 
+  track/send/hardware output state, and advertises a custom BLE peripheral service. State updates are serialized as 
+  CBOR and sent to connected mobile clients as BLE notifications.
 
-ReaCue has two roles:
-
-- **Host (macOS)** — Connects to REAPER via a locally bound TCP socket from the ReaCue ReaScript, reads track/send/hardware output state, and advertises a custom BLE peripheral service. State updates are serialized as CBOR and sent to connected mobile clients as BLE notifications.
-- **Client (Android/iOS)** — Scans for a ReaCue BLE host, connects, and receives the full mix state. Mix adjustments made on the client are written back to the host over BLE, which forwards them to REAPER.
+**Client (Android/iOS)** — Scans for a ReaCue BLE host, connects, and receives the full mix state. Mix adjustments 
+  made on the client are written back to the host over BLE, which forwards them to REAPER.
 
 ```
 REAPER <—TCP—> macOS Host <—BLE—> Android/iOS Client
 ```
 
 ## Features
-
 - Automatic monitor track detection (tracks with hardware outs and receives, but no sends)
 - Per-track monitor mix control with volume, pan, and mute controls
 - Output volume control for each monitor track's hardware output
@@ -28,17 +32,30 @@ REAPER <—TCP—> macOS Host <—BLE—> Android/iOS Client
 - BLE transport - no Wi-Fi or hotspot needed
 - BLE security - Prevent unwanted users from accessing your IEM setup via a passcode 
 
-## REAPER Setup
+## Platform Support
+### Host Platforms
+* MacOS
 
+### Client Platforms
+* iOS
+* Android
+
+## REAPER Setup
 ReaCue requires a ReaScript to be run
 
-1. Copy `reaperConfigs/ReaCue.eel` to your REAPER resource path's `Scripts` directory
+1. Copy `reaperConfigs/ReaCue.eel` to your REAPER resource path's `Scripts` directory 
+  (typically `~/Library/Application Support/REAPER/Scripts`)
 2. Create or edit `__startup.eel` in the `Scripts` directory and add the following lines:
    ```lua
    @import ReaCue.eel
    reacue();
    ```
 3. Restart REAPER
+
+**Note:** it is possible to change the TCP port ReaCue serves by editing ReaCue.eel and modifying the TCP_PORT variable.
+
+**Note:** for security reasons, the ReaCue TCP port is only available on localhost. The host application listens to
+the TCP port and advertises BLE for all clients.
 
 ### REAPER Track Setup
 
@@ -47,6 +64,12 @@ For a track to appear as a selectable monitor in ReaCue, it must have both **rec
 1. Create a monitor track for each band member
 2. Add sends from each source track (vocals, guitar, drums, etc.) to the monitor track
 3. Route the monitor track to a hardware output on your audio interface
+
+## Getting Started
+1. Make sure the REAPER Setup instructions have been followed
+2. Open Reaper
+3. Open ReaCue on host machine (macOS)
+4. Open ReaCue on client machine (iOS, Android)
 
 ## Technical Design
 To read more about the technical design, read the [Technical Design Journey](docs/TECHNICAL_DESIGN_JOURNEY.md).

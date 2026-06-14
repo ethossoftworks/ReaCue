@@ -1,6 +1,11 @@
 package com.ethossoftworks.reaperbleiem.interactor
 
+import androidx.compose.ui.platform.UriHandler
 import com.outsidesource.oskitkmp.interactor.Interactor
+import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.getString
+import reacue.shared.generated.resources.Res
+import reacue.shared.generated.resources.project_url
 
 data class AboutViewState(val isOssDisclaimerVisible: Boolean = false)
 
@@ -12,5 +17,11 @@ class AboutViewInteractor : Interactor<AboutViewState>(initialState = AboutViewS
 
     fun onOssDisclaimerDismiss() {
         update { state -> state.copy(isOssDisclaimerVisible = false) }
+    }
+
+    fun onProjectPageClick(uriHandler: UriHandler) {
+        interactorScope.launch {
+            uriHandler.openUri(getString(Res.string.project_url))
+        }
     }
 }
