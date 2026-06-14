@@ -117,6 +117,31 @@ function has_project_structure_changed() local(has_changed, i, track, hw_out_cou
   has_changed;
 );
 
+function write_value(buffer, offset, value, type) (
+    str_setchar(buffer, offset, value, type);
+    type == 'cu' ? (
+        offset + 1;
+    ) : type == 'Iu' ? (
+        offset + 4;
+    ) : type == 'F' ? (
+        offset + 4;
+    ) : type == 'Su' ? (
+        offset + 2;
+    ) : (
+        offset;
+    );
+);
+
+function write_string(buffer, value, offset) (
+    str_insert(buffer, value, offset);
+    offset + strlen(value);
+);
+
+function write_string(buffer, value, offset) (
+    str_insert(buffer, value, offset);
+    offset + strlen(value);
+);
+
 /*
  * Header
  * byte - Schema Version
@@ -170,34 +195,17 @@ function send_tcp_message_refreshed() local(payload_size, offset, i, j, base_tra
   offset = 0;
 
   // Header
-  str_setchar(#buffer, offset, TCP_SCHEMA_VERSION, 'cu');
-  offset += 1;
-
-  str_setchar(#buffer, offset, MESSAGE_TYPE_STRUCTURE_CHANGED, 'cu');
-  offset += 1;
-
-  str_setchar(#buffer, offset, payload_size, 'Iu');
-  offset += 4;
+  offset = write_value(#buffer, offset, TCP_SCHEMA_VERSION, 'cu');
+  offset = write_value(#buffer, offset, MESSAGE_TYPE_STRUCTURE_CHANGED, 'cu');
+  offset = write_value(#buffer, offset, payload_size, 'Iu');
 
   // Project Info
-  str_setchar(#buffer, offset, fader_curve, 'F');
-  offset += 4;
-
-  str_setchar(#buffer, offset, fader_min_db, 'F');
-  offset += 4;
-
-  str_setchar(#buffer, offset, fader_max_db, 'F');
-  offset += 4;
-
-  str_setchar(#buffer, offset, track_count, 'Su');
-  offset += 2;
-
-  project_name_length = strlen(#project_name);
-  str_setchar(#buffer, offset, project_name_length, 'Su');
-  offset += 2;
-
-  str_insert(#buffer, #project_name, offset);
-  offset += project_name_length;
+  offset = write_value(#buffer, offset, fader_curve, 'F');
+  offset = write_value(#buffer, offset, fader_min_db, 'F');
+  offset = write_value(#buffer, offset, fader_max_db, 'F');
+  offset = write_value(#buffer, offset, track_count, 'Su');
+  offset = write_value(#buffer, offset, strlen(#project_name), 'Su');
+  offset = write_string(#buffer, #project_name, offset);
 
   // Tracks
   i = 0;
@@ -206,44 +214,23 @@ function send_tcp_message_refreshed() local(payload_size, offset, i, j, base_tra
     receive_count = 0[track_ptr + MEM_TRACK_OFFSET_RECV_COUNT];
     hw_out_count = 0[track_ptr + MEM_TRACK_OFFSET_HWO_COUNT];
 
-    str_setchar(#buffer, offset, 0[track_ptr + MEM_TRACK_OFFSET_RECV_COUNT], 'Su');
-    offset += 2;
-
-    str_setchar(#buffer, offset, 0[track_ptr + MEM_TRACK_OFFSET_HWO_COUNT], 'Su');
-    offset += 2;
-
-    str_setchar(#buffer, offset, 0[track_ptr + MEM_TRACK_OFFSET_VOL], 'F');
-    offset += 4;
-
-    str_setchar(#buffer, offset, 0[track_ptr + MEM_TRACK_OFFSET_PAN], 'F');
-    offset += 4;
-
-    str_setchar(#buffer, offset, 0[track_ptr + MEM_TRACK_OFFSET_MUTE], 'cu');
-    offset += 1;
-
-    name_len = strlen(0[track_ptr + MEM_TRACK_OFFSET_NAME]);
-    str_setchar(#buffer, offset, name_len, 'Su');
-    offset += 2;
-
-    str_insert(#buffer, 0[track_ptr + MEM_TRACK_OFFSET_NAME], offset);
-    offset += name_len;
+    offset = write_value(#buffer, offset, 0[track_ptr + MEM_TRACK_OFFSET_RECV_COUNT], 'Su');
+    offset = write_value(#buffer, offset, 0[track_ptr + MEM_TRACK_OFFSET_HWO_COUNT], 'Su');
+    offset = write_value(#buffer, offset, 0[track_ptr + MEM_TRACK_OFFSET_VOL], 'F');
+    offset = write_value(#buffer, offset, 0[track_ptr + MEM_TRACK_OFFSET_PAN], 'F');
+    offset = write_value(#buffer, offset, 0[track_ptr + MEM_TRACK_OFFSET_MUTE], 'cu');
+    offset = write_value(#buffer, offset, strlen(0[track_ptr + MEM_TRACK_OFFSET_NAME]), 'Su');
+    offset = write_string(#buffer, 0[track_ptr + MEM_TRACK_OFFSET_NAME], offset);
 
     // Receives/hardware sends
     j = 0;
     loop(receive_count + hw_out_count,
       send_ptr = MEM_SEND + (MEM_SEND_TRACK_STRIDE * i) + (MEM_SEND_STRIDE * j);
 
-      str_setchar(#buffer, offset, 0[send_ptr + MEM_SEND_OFFSET_SOURCE_TRACK_INDEX], 'Su');
-      offset += 2;
-
-      str_setchar(#buffer, offset, 0[send_ptr + MEM_SEND_OFFSET_VOL], 'F');
-      offset += 4;
-
-      str_setchar(#buffer, offset, 0[send_ptr + MEM_SEND_OFFSET_PAN], 'F');
-      offset += 4;
-
-      str_setchar(#buffer, offset, 0[send_ptr + MEM_SEND_OFFSET_MUTE], 'cu');
-      offset += 1;
+      offset = write_value(#buffer, offset, 0[send_ptr + MEM_SEND_OFFSET_SOURCE_TRACK_INDEX], 'Su');
+      offset = write_value(#buffer, offset, 0[send_ptr + MEM_SEND_OFFSET_VOL], 'F');
+      offset = write_value(#buffer, offset, 0[send_ptr + MEM_SEND_OFFSET_PAN], 'F');
+      offset = write_value(#buffer, offset, 0[send_ptr + MEM_SEND_OFFSET_MUTE], 'cu');
 
       j += 1;
     );
@@ -273,7 +260,7 @@ function send_tcp_message_send_changed(message_type, track_index, src_index, val
 
   value_type == 'F' ? (
     value_size = 4;
-  ) ? value_type == 'cu' ? (
+  ) : value_type == 'cu' ? (
     value_size = 1;
   );
 
@@ -282,24 +269,14 @@ function send_tcp_message_send_changed(message_type, track_index, src_index, val
   payload_size = 4 + value_size;
 
   // Header
-  str_setchar(#buffer, offset, TCP_SCHEMA_VERSION, 'cu');
-  offset += 1;
-
-  str_setchar(#buffer, offset, message_type, 'cu');
-  offset += 1;
-
-  str_setchar(#buffer, offset, payload_size, 'Iu');
-  offset += 4;
+  offset = write_value(#buffer, offset, TCP_SCHEMA_VERSION, 'cu');
+  offset = write_value(#buffer, offset, message_type, 'cu');
+  offset = write_value(#buffer, offset, payload_size, 'Iu');
 
   // Payload
-  str_setchar(#buffer, offset, track_index, 'Su');
-  offset += 2;
-
-  str_setchar(#buffer, offset, src_index, 'Su');
-  offset += 2;
-
-  str_setchar(#buffer, offset, value, value_type);
-  offset += value_size;
+  offset = write_value(#buffer, offset, track_index, 'Su');
+  offset = write_value(#buffer, offset, src_index, 'Su');
+  offset = write_value(#buffer, offset, value, value_type);
 
   send_tcp_message(#buffer, offset);
 );
@@ -331,21 +308,13 @@ function send_tcp_message_track_changed(message_type, track_index, value, value_
   payload_size = 2 + value_size;
 
   // Header
-  str_setchar(#buffer, offset, TCP_SCHEMA_VERSION, 'cu');
-  offset += 1;
-
-  str_setchar(#buffer, offset, message_type, 'cu');
-  offset += 1;
-
-  str_setchar(#buffer, offset, payload_size, 'Iu');
-  offset += 4;
+  offset = write_value(#buffer, offset, TCP_SCHEMA_VERSION, 'cu');
+  offset = write_value(#buffer, offset, message_type, 'cu');
+  offset = write_value(#buffer, offset, payload_size, 'Iu');
 
   // Payload
-  str_setchar(#buffer, offset, track_index, 'Su');
-  offset += 2;
-
-  str_setchar(#buffer, offset, value, value_type);
-  offset += value_size;
+  offset = write_value(#buffer, offset, track_index, 'Su');
+  offset = write_value(#buffer, offset, value, value_type);
 
   send_tcp_message(#buffer, offset);
 );
@@ -371,23 +340,14 @@ function send_tcp_message_track_name_changed(track_index, value) local(offset, n
   name_len = strlen(value);
   payload_size = 2 + name_len;
 
-
   // Header
-  str_setchar(#buffer, offset, TCP_SCHEMA_VERSION, 'cu');
-  offset += 1;
-
-  str_setchar(#buffer, offset, MESSAGE_TYPE_TRACK_NAME_CHANGED, 'cu');
-  offset += 1;
-
-  str_setchar(#buffer, offset, payload_size, 'Iu');
-  offset += 4;
+  offset = write_value(#buffer, offset, TCP_SCHEMA_VERSION, 'cu');
+  offset = write_value(#buffer, offset, MESSAGE_TYPE_TRACK_NAME_CHANGED, 'cu');
+  offset = write_value(#buffer, offset, payload_size, 'Iu');
 
   // Payload
-  str_setchar(#buffer, offset, track_index, 'Su');
-  offset += 2;
-
-  str_insert(#buffer, value, offset);
-  offset += name_len;
+  offset = write_value(#buffer, offset, track_index, 'Su');
+  offset = write_string(#buffer, value, offset);
 
   send_tcp_message(#buffer, offset);
 );
