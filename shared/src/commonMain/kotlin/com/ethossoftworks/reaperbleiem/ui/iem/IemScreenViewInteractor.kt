@@ -131,8 +131,8 @@ class IemScreenViewInteractor(
         update { state -> state.copy(numberInputModalType = null) }
     }
 
-    fun onOutputVolumeChange(trackId: Int, value: Float) {
-        iemInteractor.setOutputVolume(trackId, value)
+    fun onOutputVolumeChange(trackId: Int, hardwareOutId: Int, value: Float) {
+        iemInteractor.setOutputVolume(trackId, hardwareOutId, value)
     }
 
     fun onReceiveVolumeChange(trackId: Int, receiveId: Int, value: Float) {
@@ -141,6 +141,11 @@ class IemScreenViewInteractor(
 
     fun onReceivePanChange(trackId: Int, receiveId: Int, value: Float) {
         iemInteractor.setReceivePan(trackId, receiveId, value)
+    }
+
+    fun onReceiveMuteToggle(trackId: Int, receiveId: Int) {
+        val isMuted = state.tracks[trackId]?.receives[receiveId]?.isMuted ?: return
+        iemInteractor.setReceiveMute(trackId, receiveId, !isMuted)
     }
 
     fun onPasscodeEntryDismiss() {
@@ -165,7 +170,7 @@ class IemScreenViewInteractor(
                 .subscribe(iemContext)
                 .onEach {
                     when (it) {
-                        is IemEvent.Refreshed -> {
+                        is IemEvent.StructureChanged -> {
                             val trackMatch =
                                 it.tracks.values.firstOrNull { track -> track.name == state.lastSelectedIemName }
                             update { state -> state.copy(selectedIemId = trackMatch?.id) }
@@ -174,9 +179,7 @@ class IemScreenViewInteractor(
                         else -> {}
                     }
                 }
-                .onCompletion {
-                    update { state -> state.copy(passcodeEntry = null) }
-                }
+                .onCompletion { update { state -> state.copy(passcodeEntry = null) } }
                 .launchIn(interactorScope)
     }
 }

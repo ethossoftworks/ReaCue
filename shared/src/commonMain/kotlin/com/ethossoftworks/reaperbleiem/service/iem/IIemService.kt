@@ -5,10 +5,6 @@ package com.ethossoftworks.reaperbleiem.service.iem
 
 import com.ethossoftworks.reaperbleiem.lib.PersistentMapSerializer
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleScanRecord
-import kotlin.math.log10
-import kotlin.math.pow
-import kotlin.math.roundToInt
-import kotlin.math.sqrt
 import kotlinx.collections.immutable.PersistentMap
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
@@ -23,17 +19,33 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlin.math.log10
+import kotlin.math.pow
+import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 interface IIemService {
     fun subscribe(context: IemContext): Flow<IemEvent>
 
     suspend fun refresh()
 
-    suspend fun setOutputVolume(trackId: Int, value: Float)
+    suspend fun setTrackVolume(trackId: Int, value: Float)
+
+    suspend fun setTrackPan(trackId: Int, value: Float)
+
+    suspend fun setTrackMute(trackId: Int, value: Boolean)
 
     suspend fun setReceiveVolume(trackId: Int, receiveId: Int, value: Float)
 
     suspend fun setReceivePan(trackId: Int, receiveId: Int, value: Float)
+
+    suspend fun setReceiveMute(trackId: Int, receiveId: Int, value: Boolean)
+
+    suspend fun setOutputVolume(trackId: Int, hardwareOutId: Int, value: Float)
+
+    suspend fun setOutputPan(trackId: Int, hardwareOutId: Int, value: Float)
+
+    suspend fun setOutputMute(trackId: Int, hardwareOutId: Int, value: Boolean)
 }
 
 sealed class IemContext {
@@ -45,58 +57,103 @@ sealed class IemContext {
 @Serializable
 @SerialName("IemEvent")
 sealed class IemEvent {
-    @Serializable @SerialName("0") data object Refresh : IemEvent()
+    @Serializable
+    @SerialName("0")
+    data class StructureChanged(
+        @CborLabel(0) val projectName: String,
+        @CborLabel(1) val tracks: PersistentMap<Int, Track>,
+        @CborLabel(2) val faderInfo: FaderInfo,
+    ) : IemEvent()
 
-    @Serializable @SerialName("1") data object Refreshing : IemEvent()
+    @Serializable
+    @SerialName("1")
+    data class TrackNameUpdated(@CborLabel(0) val trackId: Int, @CborLabel(1) val name: String) : IemEvent()
 
     @Serializable
     @SerialName("2")
-    data class Refreshed(
-        @CborLabel(1) val projectName: String,
-        @CborLabel(2) val tracks: PersistentMap<Int, Track>,
-        @CborLabel(3) val faderInfo: FaderInfo,
+    data class TrackVolumeUpdated(
+        @CborLabel(0) val trackId: Int,
+        @CborLabel(1) val value: Float,
     ) : IemEvent()
 
     @Serializable
     @SerialName("3")
-    data class TrackNameUpdated(@CborLabel(1) val trackId: Int, @CborLabel(2) val name: String) : IemEvent()
+    data class TrackPanUpdated(
+        @CborLabel(0) val trackId: Int,
+        @CborLabel(1) val value: Float,
+    ) : IemEvent()
 
     @Serializable
     @SerialName("4")
-    data class ReceivePanUpdated(
-        @CborLabel(1) val trackId: Int,
-        @CborLabel(2) val receiveId: Int,
-        @CborLabel(3) val value: Float,
+    data class TrackMuteUpdated(
+        @CborLabel(0) val trackId: Int,
+        @CborLabel(1) val value: Boolean,
     ) : IemEvent()
 
     @Serializable
     @SerialName("5")
     data class ReceiveVolumeUpdated(
-        @CborLabel(1) val trackId: Int,
-        @CborLabel(2) val receiveId: Int,
-        @CborLabel(3) val value: Float,
+        @CborLabel(0) val trackId: Int,
+        @CborLabel(1) val receiveId: Int,
+        @CborLabel(2) val value: Float,
     ) : IemEvent()
 
     @Serializable
     @SerialName("6")
-    data class OutputVolumeUpdated(@CborLabel(1) val trackId: Int, @CborLabel(2) val value: Float) : IemEvent()
+    data class ReceivePanUpdated(
+        @CborLabel(0) val trackId: Int,
+        @CborLabel(1) val receiveId: Int,
+        @CborLabel(2) val value: Float,
+    ) : IemEvent()
 
-    @SerialName("7") @Serializable data object Reset : IemEvent()
-
-    @SerialName("8")
     @Serializable
-    data class PasscodeRequired(@CborLabel(1) val passcode: CompletableDeferred<String>) : IemEvent()
+    @SerialName("7")
+    data class ReceiveMuteUpdated(
+        @CborLabel(0) val trackId: Int,
+        @CborLabel(1) val receiveId: Int,
+        @CborLabel(2) val value: Boolean,
+    ) : IemEvent()
+
+    @Serializable
+    @SerialName("8")
+    data class HardwareOutputVolumeUpdated(
+        @CborLabel(0) val trackId: Int,
+        @CborLabel(1) val hardwareOutId: Int,
+        @CborLabel(2) val value: Float,
+    ) : IemEvent()
 
     @Serializable
     @SerialName("9")
+    data class HardwareOutputPanUpdated(
+        @CborLabel(0) val trackId: Int,
+        @CborLabel(1) val hardwareOutId: Int,
+        @CborLabel(2) val value: Float,
+    ) : IemEvent()
+
+    @Serializable
+    @SerialName("10")
+    data class HardwareOutputMuteUpdated(
+        @CborLabel(0) val trackId: Int,
+        @CborLabel(1) val hardwareOutId: Int,
+        @CborLabel(2) val value: Boolean,
+    ) : IemEvent()
+
+    @Serializable @SerialName("11") data object Refresh : IemEvent()
+
+    @SerialName("12")
+    @Serializable
+    data class PasscodeRequired(@CborLabel(0) val passcode: CompletableDeferred<String>) : IemEvent()
+
+    @Serializable
+    @SerialName("13")
     sealed class Error : IemEvent() {
-        @SerialName("10")
+        @SerialName("14")
         @Serializable(with = IemUnknownErrorEventSerializer::class)
-        data class Unknown(@CborLabel(1) val error: Any) : Error()
+        data class Unknown(@CborLabel(0) val error: Any) : Error()
 
-        @SerialName("11") @Serializable data object BleProtocolMismatch : Error()
+        @SerialName("15") @Serializable data object BleProtocolMismatch : Error()
 
-        @SerialName("12") @Serializable data object DisconnectedPeripheral : Error()
+        @SerialName("16") @Serializable data object DisconnectedPeripheral : Error()
     }
 }
 
@@ -104,8 +161,11 @@ sealed class IemEvent {
 data class Track(
     @CborLabel(1) val id: Int,
     @CborLabel(2) val name: String,
-    @CborLabel(4) val receives: PersistentMap<Int, Mix>,
-    @CborLabel(5) val hardwareOuts: PersistentMap<Int, Mix>,
+    @CborLabel(3) val volume: Float,
+    @CborLabel(4) val pan: Float,
+    @CborLabel(5) val isMuted: Boolean,
+    @CborLabel(6) val receives: PersistentMap<Int, Mix>,
+    @CborLabel(7) val hardwareOuts: PersistentMap<Int, Mix>,
 ) {
     val isIem = hardwareOuts.isNotEmpty() && receives.isNotEmpty()
 }

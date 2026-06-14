@@ -67,7 +67,7 @@ class BlePeripheralIemService(
     private var hostName: String = "ReaCue"
     private var hostPasscode: String = ""
 
-    private val lastRefreshedEvent = atomic<IemEvent.Refreshed?>(null)
+    private val lastStructureChangedEvent = atomic<IemEvent.StructureChanged?>(null)
     private val bleNotificationChannel = Channel<IemEvent>(capacity = Channel.UNLIMITED)
     private val notificationId = atomic<UShort>(0u)
     private val cbor = Cbor {
@@ -232,27 +232,29 @@ class BlePeripheralIemService(
 
             when (event) {
                 IemEvent.Refresh -> {
-                    sendBleNotification(IemEvent.Refreshing, setOf(request.centralId))
-                    sendBleNotification(lastRefreshedEvent.value ?: return, setOf(request.centralId))
+                    sendBleNotification(lastStructureChangedEvent.value ?: return, setOf(request.centralId))
                     return
                 }
-
-                IemEvent.Reset -> {
-                    networkIemService.refresh()
-                    return
-                }
-
-                is IemEvent.OutputVolumeUpdated -> networkIemService.setOutputVolume(event.trackId, event.value)
-                is IemEvent.ReceivePanUpdated ->
-                    networkIemService.setReceivePan(event.trackId, event.receiveId, event.value)
-
                 is IemEvent.ReceiveVolumeUpdated ->
                     networkIemService.setReceiveVolume(event.trackId, event.receiveId, event.value)
+                is IemEvent.ReceivePanUpdated ->
+                    networkIemService.setReceivePan(event.trackId, event.receiveId, event.value)
+                is IemEvent.ReceiveMuteUpdated ->
+                    networkIemService.setReceiveMute(event.trackId, event.receiveId, event.value)
+
+                is IemEvent.HardwareOutputVolumeUpdated ->
+                    networkIemService.setOutputVolume(event.trackId, event.hardwareOutId, event.value)
+                is IemEvent.HardwareOutputPanUpdated ->
+                    networkIemService.setOutputPan(event.trackId, event.hardwareOutId, event.value)
+                is IemEvent.HardwareOutputMuteUpdated ->
+                    networkIemService.setOutputMute(event.trackId, event.hardwareOutId, event.value)
 
                 is IemEvent.Error,
-                IemEvent.Refreshing,
-                is IemEvent.Refreshed,
+                is IemEvent.StructureChanged,
                 is IemEvent.TrackNameUpdated,
+                is IemEvent.TrackVolumeUpdated,
+                is IemEvent.TrackPanUpdated,
+                is IemEvent.TrackMuteUpdated,
                 is IemEvent.PasscodeRequired -> return
             }
 
@@ -272,9 +274,19 @@ class BlePeripheralIemService(
         return networkIemService.refresh()
     }
 
-    override suspend fun setOutputVolume(trackId: Int, value: Float) {
-        networkIemService.setOutputVolume(trackId, value)
-        sendBleNotification(IemEvent.OutputVolumeUpdated(trackId, value))
+    override suspend fun setTrackVolume(trackId: Int, value: Float) {
+        networkIemService.setTrackVolume(trackId, value)
+        sendBleNotification(IemEvent.TrackVolumeUpdated(trackId, value))
+    }
+
+    override suspend fun setTrackPan(trackId: Int, value: Float) {
+        networkIemService.setTrackPan(trackId, value)
+        sendBleNotification(IemEvent.TrackPanUpdated(trackId, value))
+    }
+
+    override suspend fun setTrackMute(trackId: Int, value: Boolean) {
+        networkIemService.setTrackMute(trackId, value)
+        sendBleNotification(IemEvent.TrackMuteUpdated(trackId, value))
     }
 
     override suspend fun setReceiveVolume(trackId: Int, receiveId: Int, value: Float) {
@@ -285,6 +297,26 @@ class BlePeripheralIemService(
     override suspend fun setReceivePan(trackId: Int, receiveId: Int, value: Float) {
         networkIemService.setReceivePan(trackId, receiveId, value)
         sendBleNotification(IemEvent.ReceivePanUpdated(trackId, receiveId, value))
+    }
+
+    override suspend fun setReceiveMute(trackId: Int, receiveId: Int, value: Boolean) {
+        networkIemService.setReceiveMute(trackId, receiveId, value)
+        sendBleNotification(IemEvent.ReceiveMuteUpdated(trackId, receiveId, value))
+    }
+
+    override suspend fun setOutputVolume(trackId: Int, hardwareOutId: Int, value: Float) {
+        networkIemService.setOutputVolume(trackId, hardwareOutId, value)
+        sendBleNotification(IemEvent.HardwareOutputVolumeUpdated(trackId, hardwareOutId, value))
+    }
+
+    override suspend fun setOutputPan(trackId: Int, hardwareOutId: Int, value: Float) {
+        networkIemService.setOutputPan(trackId, hardwareOutId, value)
+        sendBleNotification(IemEvent.HardwareOutputPanUpdated(trackId, hardwareOutId, value))
+    }
+
+    override suspend fun setOutputMute(trackId: Int, hardwareOutId: Int, value: Boolean) {
+        networkIemService.setOutputMute(trackId, hardwareOutId, value)
+        sendBleNotification(IemEvent.HardwareOutputMuteUpdated(trackId, hardwareOutId, value))
     }
 
     private fun sendBleNotification(event: IemEvent, centralList: Set<KmpBleCentralId>? = null) {
@@ -325,81 +357,100 @@ class BlePeripheralIemService(
 
     private fun updateLastRefreshedEvent(event: IemEvent) {
         when (event) {
-            is IemEvent.OutputVolumeUpdated ->
-                lastRefreshedEvent.update {
-                    val state = it ?: return@update null
-                    state.copy(
-                        tracks =
-                            state.tracks.mutate { tracks ->
-                                val track = tracks[event.trackId] ?: return@mutate
-                                tracks[event.trackId] =
-                                    track.copy(
-                                        hardwareOuts =
-                                            track.hardwareOuts.mutate { hwOuts ->
-                                                val hwOut = hwOuts.values.firstOrNull() ?: return@mutate
-                                                hwOuts[hwOut.id] = hwOut.copy(volume = event.value)
-                                            }
-                                    )
-                            }
-                    )
+            is IemEvent.StructureChanged -> lastStructureChangedEvent.update { event }
+
+            is IemEvent.ReceiveVolumeUpdated ->
+                updateLastStructureChangeReceive(event.trackId, event.receiveId) {
+                    it.copy(volume = event.value)
                 }
 
             is IemEvent.ReceivePanUpdated ->
-                lastRefreshedEvent.update {
-                    val state = it ?: return@update null
-                    state.copy(
-                        tracks =
-                            state.tracks.mutate { tracks ->
-                                val track = tracks[event.trackId] ?: return@mutate
-                                tracks[event.trackId] =
-                                    track.copy(
-                                        receives =
-                                            track.receives.mutate { receives ->
-                                                val receive = receives[event.receiveId] ?: return@mutate
-                                                receives[receive.id] = receive.copy(pan = event.value)
-                                            }
-                                    )
-                            }
-                    )
+                updateLastStructureChangeReceive(event.trackId, event.receiveId) {
+                    it.copy(pan = event.value)
                 }
 
-            is IemEvent.ReceiveVolumeUpdated ->
-                lastRefreshedEvent.update {
-                    val state = it ?: return@update null
-                    state.copy(
-                        tracks =
-                            state.tracks.mutate { tracks ->
-                                val track = tracks[event.trackId] ?: return@mutate
-                                tracks[event.trackId] =
-                                    track.copy(
-                                        receives =
-                                            track.receives.mutate { receives ->
-                                                val receive = receives[event.receiveId] ?: return@mutate
-                                                receives[receive.id] = receive.copy(volume = event.value)
-                                            }
-                                    )
-                            }
-                    )
+            is IemEvent.ReceiveMuteUpdated ->
+                updateLastStructureChangeReceive(event.trackId, event.receiveId) {
+                    it.copy(isMuted = event.value)
                 }
 
-            is IemEvent.Refreshed -> lastRefreshedEvent.update { event }
-            is IemEvent.TrackNameUpdated ->
-                lastRefreshedEvent.update {
-                    val state = it ?: return@update null
-                    state.copy(
-                        tracks =
-                            state.tracks.mutate { tracks ->
-                                val track = tracks[event.trackId] ?: return@mutate
-                                tracks[event.trackId] = track.copy(name = track.name)
-                            }
-                    )
+            is IemEvent.HardwareOutputVolumeUpdated ->
+                updateLastStructureChangeHardwareOut(event.trackId, event.hardwareOutId) {
+                    it.copy(volume = event.value)
                 }
+
+            is IemEvent.HardwareOutputPanUpdated ->
+                updateLastStructureChangeHardwareOut(event.trackId, event.hardwareOutId) {
+                    it.copy(pan = event.value)
+                }
+
+            is IemEvent.HardwareOutputMuteUpdated ->
+                updateLastStructureChangeHardwareOut(event.trackId, event.hardwareOutId) {
+                    it.copy(isMuted = event.value)
+                }
+            is IemEvent.TrackNameUpdated -> updateLastStructureChangeTrack(event.trackId) { it.copy(name = event.name) }
+            is IemEvent.TrackVolumeUpdated ->
+                updateLastStructureChangeTrack(event.trackId) { it.copy(volume = event.value) }
+            is IemEvent.TrackPanUpdated -> updateLastStructureChangeTrack(event.trackId) { it.copy(pan = event.value) }
+            is IemEvent.TrackMuteUpdated ->
+                updateLastStructureChangeTrack(event.trackId) { it.copy(isMuted = event.value) }
 
             IemEvent.Refresh,
-            IemEvent.Refreshing,
-            IemEvent.Reset,
             is IemEvent.PasscodeRequired,
             is IemEvent.Error -> return
+        }
+    }
+
+    private inline fun updateLastStructureChangeTrack(trackId: Int, block: (Track) -> Track) {
+        lastStructureChangedEvent.update {
+            val state = it ?: return@update null
+            state.copy(
+                tracks =
+                    state.tracks.mutate { tracks ->
+                        val track = tracks[trackId] ?: return@mutate
+                        tracks[trackId] = block(track)
+                    }
+            )
+        }
+    }
+
+    private inline fun updateLastStructureChangeReceive(trackId: Int, receiveId: Int, block: (Mix) -> Mix) {
+        lastStructureChangedEvent.update {
+            val state = it ?: return@update null
+            state.copy(
+                tracks =
+                    state.tracks.mutate { tracks ->
+                        val track = tracks[trackId] ?: return@mutate
+                        tracks[trackId] =
+                            track.copy(
+                                receives =
+                                    track.receives.mutate { receives ->
+                                        val receive = receives[receiveId] ?: return@mutate
+                                        receives[receiveId] = block(receive)
+                                    }
+                            )
+                    }
+            )
+        }
+    }
+
+    private inline fun updateLastStructureChangeHardwareOut(trackId: Int, hardwareOutId: Int, block: (Mix) -> Mix) {
+        lastStructureChangedEvent.update {
+            val state = it ?: return@update null
+            state.copy(
+                tracks =
+                    state.tracks.mutate { tracks ->
+                        val track = tracks[trackId] ?: return@mutate
+                        tracks[trackId] =
+                            track.copy(
+                                hardwareOuts =
+                                    track.hardwareOuts.mutate { hwOuts ->
+                                        val hwOut = hwOuts[hardwareOutId] ?: return@mutate
+                                        hwOuts[hwOut.id] = block(hwOut)
+                                    }
+                            )
+                    }
+            )
         }
     }
 }

@@ -1,6 +1,13 @@
 package com.ethossoftworks.reaperbleiem.ui.iem
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -9,13 +16,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -27,12 +37,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -45,6 +60,7 @@ import com.ethossoftworks.reaperbleiem.service.iem.IemContext
 import com.ethossoftworks.reaperbleiem.ui.app.AppToolbar
 import com.ethossoftworks.reaperbleiem.ui.app.Screen
 import com.ethossoftworks.reaperbleiem.ui.form.AppButton
+import com.ethossoftworks.reaperbleiem.ui.form.AppButtonType
 import com.ethossoftworks.reaperbleiem.ui.form.AppDropdown
 import com.ethossoftworks.reaperbleiem.ui.form.AppDropdownItem
 import com.ethossoftworks.reaperbleiem.ui.form.AppLoadingIndicator
@@ -59,14 +75,19 @@ import com.outsidesource.oskitcompose.form.KmpSliderAlignment
 import com.outsidesource.oskitcompose.form.KmpSliderTick
 import com.outsidesource.oskitcompose.form.KmpSliderTickPosition
 import com.outsidesource.oskitcompose.form.KmpSliderTickStyle
+import com.outsidesource.oskitcompose.form.Label
 import com.outsidesource.oskitcompose.interactor.collectAsState
 import com.outsidesource.oskitcompose.lib.rememberInjectForRoute
+import com.outsidesource.oskitcompose.modifier.kmpOuterShadow
 import com.outsidesource.oskitcompose.popup.Modal
 import com.outsidesource.oskitcompose.popup.ModalStyles
 import com.outsidesource.oskitcompose.systemui.KmpWindowInsets
 import com.outsidesource.oskitcompose.systemui.top
 import com.outsidesource.oskitkmp.text.KmpNumberFormatter
 import com.outsidesource.oskitkmp.text.parseFloatOrNull
+import kotlin.math.absoluteValue
+import kotlin.math.roundToInt
+import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.core.parameter.parametersOf
 import reacue.shared.generated.resources.Res
@@ -88,8 +109,8 @@ import reacue.shared.generated.resources.set_all_0db
 import reacue.shared.generated.resources.set_all_n
 import reacue.shared.generated.resources.untitled
 import reacue.shared.generated.resources.view_passcode
-import kotlin.math.absoluteValue
-import kotlin.math.roundToInt
+import reacue.shared.generated.resources.volume_mute
+import reacue.shared.generated.resources.volume_up
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -258,12 +279,18 @@ fun IemScreen(
                     range = 0f..1f,
                     step = state.faderInfo.sliderStep,
                     label = stringResource(Res.string.output),
-                    onChange = { interactor.onOutputVolumeChange(track.id, it) },
+                    onChange = {
+                        val hardwareOutId = track.hardwareOuts.keys.firstOrNull() ?: return@AppSlider
+                        interactor.onOutputVolumeChange(track.id, hardwareOutId, it)
+                    },
                     valueFormatter = { formatDb(it, state.faderInfo) },
                     stringToValue = { new, current ->
                         state.faderInfo.dbToNormalized(new.parseFloatOrNull() ?: return@AppSlider current)
                     },
-                    onDoubleTap = { interactor.onOutputVolumeChange(track.id, state.faderInfo.dbToNormalized(0f)) },
+                    onDoubleTap = {
+                        val hardwareOutId = track.hardwareOuts.keys.firstOrNull() ?: return@AppSlider
+                        interactor.onOutputVolumeChange(track.id, hardwareOutId, state.faderInfo.dbToNormalized(0f))
+                    },
                     ticks = ticks,
                 )
 
@@ -280,6 +307,18 @@ fun IemScreen(
                             label = state.tracks[receive.value.trackId]?.name ?: continue,
                             onChange = { interactor.onReceiveVolumeChange(track.id, receive.key, it) },
                             valueFormatter = { formatDb(it, state.faderInfo) },
+                            labelSlot = {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    MuteButton(
+                                        isMuted = receive.value.isMuted,
+                                        onToggle = { interactor.onReceiveMuteToggle(track.id, receive.key) }
+                                    )
+                                    Label()
+                                }
+                            },
                             stringToValue = { new, current ->
                                 state.faderInfo.dbToNormalized(new.parseFloatOrNull() ?: return@AppSlider current)
                             },
@@ -370,6 +409,52 @@ private fun formatDb(normalized: Float, faderInfo: FaderInfo): String {
 }
 
 @Composable
+private fun MuteButton(
+    isMuted: Boolean,
+    onToggle: () -> Unit,
+) {
+    val colors = AppTheme.colors
+    val shape = remember { RoundedCornerShape(8.dp) }
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val ripple = ripple(color = if (isMuted) colors.error else colors.accent)
+
+    Box(
+        modifier = Modifier.size(28.dp)
+            .clickable(
+                onClick = onToggle,
+                interactionSource = interactionSource,
+                indication = ripple,
+            )
+            .semantics { role = Role.Button }
+            .border(width = 1.dp, color = if (isMuted) colors.error else colors.strokePrimary, shape = shape)
+            .kmpOuterShadow(blur = 8.dp, shape = shape, color = Color.Black.copy(alpha = 0.25f))
+            .background(brush = colors.bgControl, shape = shape)
+            .background(
+                color = if (isMuted) colors.errorTint else Color.Transparent,
+                shape = shape,
+            )
+            .background(
+                color =
+                    if (isHovered) {
+                        if (isMuted) colors.errorTint20 else colors.accentTint
+                    } else {
+                        Color.Transparent
+                    },
+                shape = shape,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Image(
+            modifier = Modifier.size(16.dp),
+            painter = painterResource(if (isMuted) Res.drawable.volume_mute else Res.drawable.volume_up),
+            colorFilter = ColorFilter.tint(if (isMuted) colors.error else colors.textPrimary),
+            contentDescription = null,
+        )
+    }
+}
+
+@Composable
 private fun rememberTicks(faderInfo: FaderInfo): List<KmpSliderTick> {
     val theme = AppTheme.colors
     return remember(faderInfo) {
@@ -397,12 +482,7 @@ private fun rememberTicks(faderInfo: FaderInfo): List<KmpSliderTick> {
 }
 
 @Composable
-fun PasscodeEntryModal(
-    isVisible: Boolean,
-    maxWidth: Dp = 300.dp,
-    onCancel: () -> Unit,
-    onCommit: (String) -> Unit,
-) {
+fun PasscodeEntryModal(isVisible: Boolean, maxWidth: Dp = 300.dp, onCancel: () -> Unit, onCommit: (String) -> Unit) {
     val focusRequester = remember { FocusRequester() }
 
     Modal(
@@ -451,12 +531,7 @@ fun PasscodeEntryModal(
 }
 
 @Composable
-fun ViewPasscodeModal(
-    isVisible: Boolean,
-    passcode: String,
-    maxWidth: Dp = 300.dp,
-    onDismiss: () -> Unit,
-) {
+fun ViewPasscodeModal(isVisible: Boolean, passcode: String, maxWidth: Dp = 300.dp, onDismiss: () -> Unit) {
     Modal(
         modifier = Modifier.widthIn(max = maxWidth).appModalSurface().padding(16.dp),
         isVisible = isVisible,

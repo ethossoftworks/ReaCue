@@ -17,10 +17,10 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Label
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -61,6 +61,7 @@ import com.outsidesource.oskitcompose.form.KmpSliderStyle
 import com.outsidesource.oskitcompose.form.KmpSliderTick
 import com.outsidesource.oskitcompose.form.KmpSliderTickPosition
 import com.outsidesource.oskitcompose.form.KmpSliderTickStyle
+import com.outsidesource.oskitcompose.form.Label
 import com.outsidesource.oskitcompose.form.MultiThumbMode
 import com.outsidesource.oskitcompose.popup.Modal
 import com.outsidesource.oskitcompose.popup.ModalStyles
@@ -78,6 +79,7 @@ fun AppSlider(
     onDoubleTap: () -> Unit = {},
     onChange: (Float) -> Unit,
     label: String,
+    labelSlot: @Composable KmpSliderScope.() -> Unit = { Label() },
     step: Float,
     valueFormatter: (Float) -> String,
     stringToValue: (String, Float) -> Float = { new, current -> new.toFloatOrNull() ?: current },
@@ -111,6 +113,7 @@ fun AppSlider(
         stringToValue = stringToValue,
         ticks = ticks,
         onDoubleTap = onDoubleTap,
+        labelSlot = labelSlot,
         manualEntrySlot = { isVisible, valueString, onTextChange, onCancel, onCommit ->
             AppManualEntryModal(
                 isVisible = isVisible,

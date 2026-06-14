@@ -12,9 +12,7 @@ import androidx.compose.ui.unit.dp
 import com.outsidesource.oskitcompose.modifier.kmpOuterShadow
 
 @Composable
-fun Modifier.appModalSurface(
-    shape: Shape = remember { RoundedCornerShape(12.dp) },
-): Modifier {
+fun Modifier.appModalSurface(shape: Shape = remember { RoundedCornerShape(12.dp) }): Modifier {
     val colors = AppTheme.colors
     return this.border(width = 1.dp, color = colors.strokePrimary, shape = shape)
         .kmpOuterShadow(blur = 8.dp, shape = shape, color = Color.Black.copy(alpha = 0.25f))

@@ -16,10 +16,11 @@ class CentralPreferencesService(private val kvStore: IKmpKvStore) {
 
     init {
         CoroutineScope(Dispatchers.IO).launch {
-            val nodeResult = kvStore.openNode("ReaCue").unwrapOrReturn {
-                Logger.i { "Could not open KvStore" }
-                return@launch
-            }
+            val nodeResult =
+                kvStore.openNode("ReaCue").unwrapOrReturn {
+                    Logger.i { "Could not open KvStore" }
+                    return@launch
+                }
             node.complete(nodeResult)
         }
     }

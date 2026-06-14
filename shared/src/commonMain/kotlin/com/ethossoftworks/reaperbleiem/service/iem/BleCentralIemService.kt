@@ -189,8 +189,21 @@ class BleCentralIemService(
         peripheral.value?.write(REACUE_COMMAND_CHARACTERISTIC_UUID, payload, KmpBleWriteMode.WithoutResponse)
     }
 
-    override suspend fun setOutputVolume(trackId: Int, value: Float) {
-        val payload = cbor.encodeToByteArray(IemEvent.serializer(), IemEvent.OutputVolumeUpdated(trackId, value))
+    override suspend fun setTrackVolume(trackId: Int, value: Float) {
+        val payload =
+            cbor.encodeToByteArray(IemEvent.serializer(), IemEvent.TrackVolumeUpdated(trackId, value))
+        peripheral.value?.write(REACUE_COMMAND_CHARACTERISTIC_UUID, payload, KmpBleWriteMode.WithoutResponse)
+    }
+
+    override suspend fun setTrackPan(trackId: Int, value: Float) {
+        val payload =
+            cbor.encodeToByteArray(IemEvent.serializer(), IemEvent.TrackPanUpdated(trackId, value))
+        peripheral.value?.write(REACUE_COMMAND_CHARACTERISTIC_UUID, payload, KmpBleWriteMode.WithoutResponse)
+    }
+
+    override suspend fun setTrackMute(trackId: Int, value: Boolean) {
+        val payload =
+            cbor.encodeToByteArray(IemEvent.serializer(), IemEvent.TrackMuteUpdated(trackId, value))
         peripheral.value?.write(REACUE_COMMAND_CHARACTERISTIC_UUID, payload, KmpBleWriteMode.WithoutResponse)
     }
 
@@ -203,6 +216,39 @@ class BleCentralIemService(
     override suspend fun setReceivePan(trackId: Int, receiveId: Int, value: Float) {
         val payload =
             cbor.encodeToByteArray(IemEvent.serializer(), IemEvent.ReceivePanUpdated(trackId, receiveId, value))
+        peripheral.value?.write(REACUE_COMMAND_CHARACTERISTIC_UUID, payload, KmpBleWriteMode.WithoutResponse)
+    }
+
+    override suspend fun setReceiveMute(trackId: Int, receiveId: Int, value: Boolean) {
+        val payload =
+            cbor.encodeToByteArray(IemEvent.serializer(), IemEvent.ReceiveMuteUpdated(trackId, receiveId, value))
+        peripheral.value?.write(REACUE_COMMAND_CHARACTERISTIC_UUID, payload, KmpBleWriteMode.WithoutResponse)
+    }
+
+    override suspend fun setOutputVolume(trackId: Int, hardwareOutId: Int, value: Float) {
+        val payload =
+            cbor.encodeToByteArray(
+                IemEvent.serializer(),
+                IemEvent.HardwareOutputVolumeUpdated(trackId, hardwareOutId, value),
+            )
+        peripheral.value?.write(REACUE_COMMAND_CHARACTERISTIC_UUID, payload, KmpBleWriteMode.WithoutResponse)
+    }
+
+    override suspend fun setOutputPan(trackId: Int, hardwareOutId: Int, value: Float) {
+        val payload =
+            cbor.encodeToByteArray(
+                IemEvent.serializer(),
+                IemEvent.HardwareOutputPanUpdated(trackId, hardwareOutId, value),
+            )
+        peripheral.value?.write(REACUE_COMMAND_CHARACTERISTIC_UUID, payload, KmpBleWriteMode.WithoutResponse)
+    }
+
+    override suspend fun setOutputMute(trackId: Int, hardwareOutId: Int, value: Boolean) {
+        val payload =
+            cbor.encodeToByteArray(
+                IemEvent.serializer(),
+                IemEvent.HardwareOutputMuteUpdated(trackId, hardwareOutId, value),
+            )
         peripheral.value?.write(REACUE_COMMAND_CHARACTERISTIC_UUID, payload, KmpBleWriteMode.WithoutResponse)
     }
 }
