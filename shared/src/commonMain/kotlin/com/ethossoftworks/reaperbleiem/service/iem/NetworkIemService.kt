@@ -17,6 +17,7 @@ import io.ktor.utils.io.readByteArray
 import io.ktor.utils.io.readInt
 import io.ktor.utils.io.writeByte
 import io.ktor.utils.io.writeFloat
+import io.ktor.utils.io.writeFully
 import io.ktor.utils.io.writeInt
 import io.ktor.utils.io.writeShort
 import kotlin.experimental.and
@@ -32,6 +33,9 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.io.Buffer
+import kotlinx.io.readByteArray
+import kotlinx.io.writeFloat
 
 private val SupportedSchemaVersion: Byte = 0x00
 private val HeartbeatInterval = 2.seconds
@@ -242,65 +246,65 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
         return IemEvent.HardwareOutputMuteUpdated(trackId = trackId, hardwareOutId = hwOutId, value = value)
     }
 
-    private suspend fun sendHeartbeat() = sendFrame(TcpMessageType.Heartbeat, 0)
+    private suspend fun sendHeartbeat() = sendFrame(TcpMessageType.Heartbeat) {}
 
-    override suspend fun refresh() = sendFrame(TcpMessageType.Refresh, 0)
+    override suspend fun refresh() = sendFrame(TcpMessageType.Refresh) {}
 
     override suspend fun setTrackVolume(trackId: Int, value: Float) =
-        sendFrame(TcpMessageType.TrackVolChanged, 6) {
+        sendFrame(TcpMessageType.TrackVolChanged) {
             writeShort(trackId.toShort())
             writeFloat(value)
         }
 
     override suspend fun setTrackPan(trackId: Int, value: Float) =
-        sendFrame(TcpMessageType.TrackPanChanged, 6) {
+        sendFrame(TcpMessageType.TrackPanChanged) {
             writeShort(trackId.toShort())
             writeFloat(value)
         }
 
     override suspend fun setTrackMute(trackId: Int, value: Boolean) =
-        sendFrame(TcpMessageType.TrackMuteChanged, 3) {
+        sendFrame(TcpMessageType.TrackMuteChanged) {
             writeShort(trackId.toShort())
             writeByte(if (value) 1 else 0)
         }
 
     override suspend fun setReceiveVolume(trackId: Int, receiveId: Int, value: Float) =
-        sendFrame(TcpMessageType.ReceiveVolChanged, 8) {
+        sendFrame(TcpMessageType.ReceiveVolChanged) {
             writeShort(trackId.toShort())
             writeShort(receiveId.toShort())
             writeFloat(value)
         }
 
     override suspend fun setReceivePan(trackId: Int, receiveId: Int, value: Float) =
-        sendFrame(TcpMessageType.ReceivePanChanged, 8) {
+        sendFrame(TcpMessageType.ReceivePanChanged) {
             writeShort(trackId.toShort())
             writeShort(receiveId.toShort())
             writeFloat(value)
         }
 
     override suspend fun setReceiveMute(trackId: Int, receiveId: Int, value: Boolean) =
-        sendFrame(TcpMessageType.ReceiveMuteChanged, 5) {
+        sendFrame(TcpMessageType.ReceiveMuteChanged) {
             writeShort(trackId.toShort())
             writeShort(receiveId.toShort())
             writeByte(if (value) 1 else 0)
         }
 
     override suspend fun setOutputVolume(trackId: Int, hardwareOutId: Int, value: Float) =
-        sendFrame(TcpMessageType.HwOutVolChanged, 8) {
+        sendFrame(TcpMessageType.HwOutVolChanged) {
             writeShort(trackId.toShort())
             writeShort(hardwareOutId.toShort())
             writeFloat(value)
         }
 
     override suspend fun setOutputPan(trackId: Int, hardwareOutId: Int, value: Float) =
-        sendFrame(TcpMessageType.HwOutPanChanged, 8) {
+        sendFrame(TcpMessageType.HwOutPanChanged) {
             writeShort(trackId.toShort())
             writeShort(hardwareOutId.toShort())
             writeFloat(value)
         }
 
     override suspend fun setOutputMute(trackId: Int, hardwareOutId: Int, value: Boolean) =
-        sendFrame(TcpMessageType.HwOutMuteChanged, 5) {
+        sendFrame(TcpMessageType.HwOutMuteChanged) {
             writeShort(trackId.toShort())
             writeShort(hardwareOutId.toShort())
             writeByte(if (value) 1 else 0)
@@ -308,16 +312,16 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
 
     private suspend inline fun sendFrame(
         type: TcpMessageType,
-        payloadSize: Int,
-        block: suspend ByteWriteChannel.() -> Unit = {},
+        block: suspend Buffer.() -> Unit,
     ) {
         val channel = writeChannel.value ?: return
+        val bytes = Buffer().apply { block() }
         try {
             writeMutex.withLock {
                 channel.writeByte(SupportedSchemaVersion)
                 channel.writeByte(type.value)
-                channel.writeInt(payloadSize)
-                channel.block()
+                channel.writeInt(bytes.size.toInt())
+                channel.writeFully(bytes.readByteArray())
             }
         } catch (e: Exception) {
             Logger.e { "NetworkIemService - $e" }

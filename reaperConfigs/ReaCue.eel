@@ -769,7 +769,7 @@ function shutdown_server() local(i, client_handle) (
 );
 
 function reacue() (
-    DEBUG = 1;
+    DEBUG = 0;
 
     /*
      * TCP Settings
