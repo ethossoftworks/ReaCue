@@ -558,7 +558,7 @@ function handle_delta_change() local(i, track, receive_count, hw_out_count, trac
 );
 
 function handle_tcp_connection() local(connection, ptr) (
-  connection = tcp_listen(TCP_PORT);
+  connection = tcp_listen(TCP_PORT, "127.0.0.1");
   connection > 0 ? (
     ptr = -1;
     i = 0;
