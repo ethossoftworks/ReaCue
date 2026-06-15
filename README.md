@@ -1,7 +1,15 @@
+<div align="center">
+    <img src="images/app-icon.png" width="100" alt="ReaCue">
+</div>
+
 # ReaCue
 ReaCue is a personal in-ear monitor (IEM) mixing app for [REAPER](https://www.reaper.fm/) that uses Bluetooth Low Energy 
 instead of Wi-Fi. A macOS host app connects to REAPER and communicates over BLE to Android and iOS clients so band 
 members can adjust their own monitor mixes from their phones.
+
+<div align="center">
+    <img src="images/ReaCue.png" width="400" alt="ReaCue">
+</div>
 
 ## Why
 Live IEM mixing with REAPER typically requires every device to be on the same Wi-Fi network. That means creating a 
