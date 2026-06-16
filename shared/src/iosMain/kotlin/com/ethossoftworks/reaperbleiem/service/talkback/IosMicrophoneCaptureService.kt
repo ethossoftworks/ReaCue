@@ -34,6 +34,10 @@ class IosMicrophoneCaptureService : IMicrophoneCaptureService {
 
             val engine = AVAudioEngine()
             val input = engine.inputNode
+            // Enable Apple's voice-processing I/O (AGC + noise suppression + AEC) so iOS capture level and noise floor
+            // match Android's processed source. Must be set before reading the format / starting the engine, since it
+            // can change the input format. AEC is harmless here (the app plays no audio to cancel).
+            input.setVoiceProcessingEnabled(true, null)
             val inputFormat = input.inputFormatForBus(0.convert())
             val inputRate = inputFormat.sampleRate
             // Input samples consumed per output sample (e.g. 48000/16000 = 3.0).

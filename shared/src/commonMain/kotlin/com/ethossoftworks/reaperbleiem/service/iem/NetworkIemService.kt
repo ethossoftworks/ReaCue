@@ -25,6 +25,7 @@ import kotlin.time.Duration.Companion.seconds
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
 import kotlinx.collections.immutable.persistentMapOf
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -45,8 +46,11 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
     private val tcpIp = "127.0.0.1"
     private val selectorManager = SelectorManager(KmpDispatchers.IO)
     private val tcpSocket = atomic<Socket?>(null)
-    private val writeChannel = atomic<ByteWriteChannel?>(null)
-    private val writeMutex = Mutex()
+
+    // All TCP frames are written by a single dedicated coroutine — the only safe way to use ktor's ByteWriteChannel
+    // (writing from multiple talker coroutines/threads, even mutex-serialized, can corrupt the stream). Senders
+    // enqueue complete, pre-framed messages here; the channel preserves ordering and there is no cross-thread write.
+    private val outgoing = atomic<Channel<ByteArray>?>(null)
 
     override fun subscribe(context: IemContext): Flow<IemEvent> = callbackFlow {
         try {
@@ -92,7 +96,20 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
                 }
             }
 
-            writeChannel.update { socket.openWriteChannel(autoFlush = true) }
+            val outgoingFrames = Channel<ByteArray>(Channel.UNLIMITED)
+            outgoing.update { outgoingFrames }
+            val writeChannel = socket.openWriteChannel(autoFlush = true)
+
+            // Single writer: drains pre-framed messages from the queue to the socket, in order, on one coroutine.
+            launch {
+                try {
+                    for (frame in outgoingFrames) writeChannel.writeFully(frame)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (t: Throwable) {
+                    Logger.e("NetworkIemService writer", t)
+                }
+            }
 
             launch {
                 while (isActive) {
@@ -332,28 +349,29 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
             writeByte(if (value) 1 else 0)
         }
 
-    private suspend inline fun sendFrame(
+    private fun sendFrame(
         type: TcpMessageType,
-        block: suspend Buffer.() -> Unit,
+        block: Buffer.() -> Unit,
     ) {
-        val channel = writeChannel.value ?: return
-        val bytes = Buffer().apply { block() }
-        try {
-            writeMutex.withLock {
-                channel.writeByte(SupportedSchemaVersion)
-                channel.writeByte(type.value)
-                channel.writeInt(bytes.size.toInt())
-                channel.writeFully(bytes.readByteArray())
-            }
-        } catch (e: Exception) {
-            Logger.e { "NetworkIemService - $e" }
-        }
+        val out = outgoing.value ?: return
+        val payload = Buffer().apply(block).readByteArray()
+        val frame =
+            Buffer()
+                .apply {
+                    writeByte(SupportedSchemaVersion)
+                    writeByte(type.value)
+                    writeInt(payload.size)
+                    write(payload)
+                }
+                .readByteArray()
+        out.trySend(frame)
     }
 
     private fun closeSocket() {
+        outgoing.value?.close()
+        outgoing.update { null }
         tcpSocket.value?.close()
         tcpSocket.update { null }
-        writeChannel.update { null }
     }
 }
 

@@ -274,7 +274,7 @@ fun IemScreen(
                 modifier =
                     Modifier.weight(1f)
                         .verticalScroll(rememberScrollState())
-                        .padding(bottom = dimensions.screenPadding),
+                        .padding(bottom = dimensions.screenPadding + 88.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 val ticks = rememberTicks(state.faderInfo)

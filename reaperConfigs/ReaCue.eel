@@ -746,7 +746,7 @@ function handle_tcp_message(client_index, message, message_type, payload_size) l
   );
 );
 
-function handle_tcp_receive() local(i, client_handle, bytes_read, read_buffer, payload_size, draining, guard, msg_size, read_offset_ptr, read_offset, buffer_len, unread_bytes, socket_draining, recv_iters, client_closed) (
+function handle_tcp_receive() local(i, client_handle, bytes_read, read_buffer, payload_size, draining, guard, msg_size, read_offset_ptr, read_offset, buffer_len, unread_bytes, socket_draining, recv_iters) (
   i = 0;
   loop(TCP_MAX_CLIENTS,
     client_handle = 0[MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + i];
@@ -754,78 +754,74 @@ function handle_tcp_receive() local(i, client_handle, bytes_read, read_buffer, p
       read_buffer = MEM_BASE + MEM_BASE_OFFSET_TCP_RECV_BUFFER + i;
       read_offset_ptr = MEM_BASE + MEM_BASE_OFFSET_TCP_READ_OFFSETS + i;
 
-      // Drain the socket fully each loop so bursty talkback audio never backs
-      // up across the ~30 Hz defer cadence. tcp_recv returns >0 with data, <0
-      // when nothing is currently available, and 0 when the peer has closed.
+      // Read and PARSE in lockstep: drain complete frames after every recv so the receive buffer never accumulates a
+      // backlog. EEL strings are capped at 65536 bytes, so batching many recvs before parsing (at the 2-talker data
+      // rate) overflowed strcat and desynced the stream. tcp_recv returns >0 with data, <0 when nothing is available,
+      // and 0 when the peer has closed.
       socket_draining = 1;
       recv_iters = 0;
-      client_closed = 0;
       while (socket_draining && recv_iters < TCP_RECV_MAX_ITERS) (
         bytes_read = tcp_recv(client_handle, #recv_buffer, TCP_RECV_BUFFER_SIZE);
 
         bytes_read == 0 ? (
           close_tcp_client(i);
-          client_closed = 1;
           socket_draining = 0;
         ) : bytes_read > 0 ? (
           0[MEM_BASE + MEM_BASE_OFFSET_TCP_LAST_SEEN + i] = time_precise();
           str_setlen(#recv_buffer, bytes_read);
           strcat(read_buffer, #recv_buffer);
           recv_iters += 1;
-        ) : (
-          socket_draining = 0; // nothing more available right now
-        );
-      );
 
-      client_closed == 0 ? (
-        read_offset = 0[read_offset_ptr];
-        draining = 1;
-        guard = 0;
-        buffer_len = strlen(read_buffer);
+          read_offset = 0[read_offset_ptr];
+          draining = 1;
+          guard = 0;
+          buffer_len = strlen(read_buffer);
 
-        while (draining && guard < 1000) ( // iteration cap if the buffer gets stuck for some reason
-          draining = 0;
-          guard += 1;
-          unread_bytes = buffer_len - read_offset;
+          while (draining && guard < 1000) ( // iteration cap if the buffer gets stuck for some reason
+            draining = 0;
+            guard += 1;
+            unread_bytes = buffer_len - read_offset;
 
-          unread_bytes >= TCP_HEADER_SIZE ? (
-            str_getchar(read_buffer, read_offset + TCP_HEADER_SCHEMA_VERSION_OFFSET, 'cu') != TCP_SCHEMA_VERSION ? (
-              DEBUG > 0 ? ShowConsoleMsg("Schema version mismatch - closing client\n");
-              close_tcp_client(i);
-            ) : (
-              payload_size = str_getchar(read_buffer, read_offset + TCP_HEADER_PAYLOAD_SIZE_OFFSET, 'Iu');
-              msg_size = TCP_HEADER_SIZE + payload_size;
-
-              payload_size > TCP_MAX_PAYLOAD_SIZE ? (
-                DEBUG > 0 ? ShowConsoleMsg("Invalid payload size - closing client\n");
+            unread_bytes >= TCP_HEADER_SIZE ? (
+              str_getchar(read_buffer, read_offset + TCP_HEADER_SCHEMA_VERSION_OFFSET, 'cu') != TCP_SCHEMA_VERSION ? (
+                DEBUG > 0 ? ShowConsoleMsg("Schema version mismatch - closing client\n");
                 close_tcp_client(i);
-              ) : unread_bytes >= msg_size ? (
+                socket_draining = 0;
+              ) : (
+                payload_size = str_getchar(read_buffer, read_offset + TCP_HEADER_PAYLOAD_SIZE_OFFSET, 'Iu');
+                msg_size = TCP_HEADER_SIZE + payload_size;
 
-                // Full remaining message in received bytes. Grab just the remaining part of this message.
-                strcpy_substr(#msg_packet, read_buffer, read_offset, msg_size);
-                handle_tcp_message(i, #msg_packet, str_getchar(#msg_packet, TCP_HEADER_MESSAGE_TYPE_OFFSET, 'cu'), payload_size);
-
-                // Advance the sliding window pointer instead of copying/shifting the buffer
-                read_offset += msg_size;
-                draining = 1;
+                payload_size > TCP_MAX_PAYLOAD_SIZE ? (
+                  DEBUG > 0 ? ShowConsoleMsg("Invalid payload size - closing client\n");
+                  close_tcp_client(i);
+                  socket_draining = 0;
+                ) : unread_bytes >= msg_size ? (
+                  strcpy_substr(#msg_packet, read_buffer, read_offset, msg_size);
+                  handle_tcp_message(i, #msg_packet, str_getchar(#msg_packet, TCP_HEADER_MESSAGE_TYPE_OFFSET, 'cu'), payload_size);
+                  read_offset += msg_size;
+                  draining = 1;
+                );
               );
             );
           );
-        );
 
-        // The loop is done handling fully framed messages. Update or compact the buffer.
-        read_offset == buffer_len ? (
-          // Full message read with nothing left
-          strcpy(read_buffer, "");
-          0[read_offset_ptr] = 0;
-        ) : read_offset > 4096 ? (
-          // Defensive threshold: If the pointer is getting far out and a partial packet is left,
-          // shift the leftover bytes back to the beginning just once to prevent runaway memory size.
-          strcpy_from(read_buffer, read_buffer, read_offset);
-          0[read_offset_ptr] = 0;
-          DEBUG > 0 ? ShowConsoleMsg("Compacting buffer to front\n");
+          // Compact the (small) leftover to the front every pass so read_buffer stays well under the 65536 string cap.
+          socket_draining > 0 ? (
+            read_offset == buffer_len ? (
+              strcpy(read_buffer, "");
+              0[read_offset_ptr] = 0;
+            ) : read_offset > 0 ? (
+              strcpy_from(read_buffer, read_buffer, read_offset);
+              0[read_offset_ptr] = 0;
+            ) : (
+              0[read_offset_ptr] = read_offset;
+            );
+
+            // Read less than a full buffer => socket is drained for now; stop this pass.
+            bytes_read < TCP_RECV_BUFFER_SIZE ? socket_draining = 0;
+          );
         ) : (
-          0[read_offset_ptr] = read_offset;
+          socket_draining = 0; // nothing more available right now
         );
       );
     );
