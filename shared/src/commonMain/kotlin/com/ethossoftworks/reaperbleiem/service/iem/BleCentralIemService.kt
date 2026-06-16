@@ -11,6 +11,7 @@ import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleConnectionStatus
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleError
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleWriteMode
 import com.ethossoftworks.reaperbleiem.service.preferences.CentralPreferencesService
+import com.ethossoftworks.reaperbleiem.service.talkback.AdpcmEncoder
 import com.ethossoftworks.reaperbleiem.service.talkback.IMicrophoneCaptureService
 import com.outsidesource.oskitkmp.lib.toUShort
 import com.outsidesource.oskitkmp.lib.update
@@ -232,22 +233,27 @@ class BleCentralIemService(
         val job =
             peripheral.scope.launch {
                 Logger.i { "Talkback: starting mic capture" }
+                // Compress to IMA ADPCM (~4:1) so 16 kHz fits the BLE link; each block is length-prefixed (u16 LE) so
+                // the host can deframe whole blocks from the L2CAP byte stream. A fresh encoder per press resets state.
+                val encoder = AdpcmEncoder()
                 var frames = 0
-                var bytes = 0L
                 try {
                     microphoneCaptureService.capture().collect { pcm ->
                         frames++
-                        bytes += pcm.size
-                        val result = channel.write(pcm)
+                        val block = encoder.encode(pcm)
+                        val framed = ByteArray(2 + block.size)
+                        framed[0] = (block.size and 0xFF).toByte()
+                        framed[1] = ((block.size shr 8) and 0xFF).toByte()
+                        block.copyInto(framed, destinationOffset = 2)
+                        val result = channel.write(framed)
                         if (result is Outcome.Error) {
-                            Logger.e { "Talkback: L2CAP write failed at frame $frames ($bytes bytes): ${result.error}" }
+                            Logger.e { "Talkback: L2CAP write failed at frame $frames: ${result.error}" }
                             return@collect
                         }
-                        if (frames % 50 == 0) Logger.i { "Talkback: sent $frames frames / $bytes bytes" }
                     }
-                    Logger.i { "Talkback: mic capture completed after $frames frames / $bytes bytes" }
+                    Logger.i { "Talkback: mic capture completed after $frames frames" }
                 } catch (t: Throwable) {
-                    Logger.e(t) { "Talkback: capture error after $frames frames / $bytes bytes" }
+                    Logger.e(t) { "Talkback: capture error after $frames frames" }
                 }
             }
         talkbackMicJob.update { job }

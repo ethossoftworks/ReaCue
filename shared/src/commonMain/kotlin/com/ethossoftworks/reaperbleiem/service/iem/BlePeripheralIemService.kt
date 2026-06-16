@@ -15,6 +15,7 @@ import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattProperty
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralEvent
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralGattResult
 import com.ethossoftworks.reaperbleiem.service.preferences.PeripheralPreferencesService
+import com.ethossoftworks.reaperbleiem.service.talkback.AdpcmDecoder
 import com.outsidesource.oskitkmp.lib.update
 import com.outsidesource.oskitkmp.outcome.Outcome
 import dev.whyoleg.cryptography.CryptographyProvider
@@ -341,34 +342,41 @@ class BlePeripheralIemService(
                     }
                 }
 
-            var totalBytes = 0L
             try {
-                // L2CAP is a byte stream; a 16-bit sample may straddle two reads. Carry any odd trailing byte forward
-                // so only whole samples are forwarded to Reaper.
-                var carry = ByteArray(0)
+                // The client sends length-prefixed (u16 LE) IMA-ADPCM blocks. Accumulate the L2CAP byte stream, pull
+                // out whole blocks, decode each back to 16 kHz PCM, and forward to Reaper.
+                var acc = ByteArray(0)
                 event.channel.incoming.collect { chunk ->
-                    dataSeq++
-                    totalBytes += chunk.size
-                    rateBytes += chunk.size
+                    acc += chunk
+                    var off = 0
+                    while (acc.size - off >= 2) {
+                        val len = (acc[off].toInt() and 0xFF) or ((acc[off + 1].toInt() and 0xFF) shl 8)
+                        if (acc.size - off - 2 < len) break // block not fully arrived yet
+                        val block = acc.copyOfRange(off + 2, off + 2 + len)
+                        off += 2 + len
+
+                        dataSeq++
+                        if (!talking) {
+                            networkIemService.sendTalkbackStart(slot)
+                            talking = true
+                            Logger.i { "Talkback slot $slot: talk burst started" }
+                        }
+                        val pcm = AdpcmDecoder.decode(block)
+                        rateBytes += pcm.size
+                        if (pcm.isNotEmpty()) networkIemService.sendTalkbackAudio(slot, pcm)
+                    }
+                    acc = if (off > 0) acc.copyOfRange(off, acc.size) else acc
+
                     val elapsedMs = rateMark.elapsedNow().inWholeMilliseconds
                     if (elapsedMs >= 2000) {
-                        Logger.i { "Talkback slot $slot throughput: ${rateBytes * 1000 / elapsedMs} B/s (expected ~32000)" }
+                        Logger.i { "Talkback slot $slot decoded PCM: ${rateBytes * 1000 / elapsedMs} B/s (expected ~32000)" }
                         rateMark = kotlin.time.TimeSource.Monotonic.markNow()
                         rateBytes = 0L
                     }
-                    if (!talking) {
-                        networkIemService.sendTalkbackStart(slot)
-                        talking = true
-                        Logger.i { "Talkback slot $slot: talk burst started" }
-                    }
-                    val combined = if (carry.isEmpty()) chunk else carry + chunk
-                    val evenLen = combined.size - (combined.size % 2)
-                    if (evenLen > 0) networkIemService.sendTalkbackAudio(slot, combined.copyOf(evenLen))
-                    carry = if (evenLen < combined.size) combined.copyOfRange(evenLen, combined.size) else ByteArray(0)
                 }
-                Logger.i { "Talkback slot $slot channel closed after $totalBytes bytes" }
+                Logger.i { "Talkback slot $slot channel closed" }
             } catch (t: Throwable) {
-                Logger.e(t) { "Talkback slot $slot error after $totalBytes bytes" }
+                Logger.e(t) { "Talkback slot $slot error" }
             } finally {
                 idleMonitor.cancel()
                 networkIemService.sendTalkbackStop(slot)

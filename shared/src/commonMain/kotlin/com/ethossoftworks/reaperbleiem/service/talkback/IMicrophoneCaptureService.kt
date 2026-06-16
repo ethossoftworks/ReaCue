@@ -11,6 +11,7 @@ interface IMicrophoneCaptureService {
     fun capture(): Flow<ByteArray>
 }
 
-// 8 kHz mono (~128 kbps). 16 kHz/256 kbps exceeds the iOS-central BLE L2CAP throughput (confirmed by testing).
-const val TALKBACK_SAMPLE_RATE = 8000
-const val TALKBACK_FRAME_SAMPLES = 160 // 20 ms at 8 kHz
+// 16 kHz mono wideband voice. Raw PCM is 256 kbps (too much for iOS BLE), so the L2CAP link carries IMA-ADPCM
+// (~64 kbps); the macOS host decodes back to 16 kHz PCM before Reaper. See ImaAdpcm.
+const val TALKBACK_SAMPLE_RATE = 16000
+const val TALKBACK_FRAME_SAMPLES = 320 // 20 ms at 16 kHz

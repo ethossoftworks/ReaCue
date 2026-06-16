@@ -23,8 +23,8 @@ slider2:buffer_ms=150<10,200,1>Jitter Buffer (ms)
 
 @init
 TB_MAX_TALKERS = 8;
-TB_INPUT_RATE  = 8000; // must match TB_INPUT_RATE in ReaCue.eel and the client capture rate
-TB_RING_LEN    = 8000;
+TB_INPUT_RATE  = 16000; // must match TB_INPUT_RATE in ReaCue.eel (clients send ADPCM; host decodes to 16 kHz PCM)
+TB_RING_LEN    = 16000;
 TB_CTRL_BASE   = 0;
 TB_CTRL_STRIDE = 4;
 TB_CTRL_OFFSET_WRITE_INDEX = 0;

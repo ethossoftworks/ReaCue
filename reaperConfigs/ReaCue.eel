@@ -970,8 +970,8 @@ function reacue() (
      *     Samples stored as normalized floats in [-1, 1].
      */
     TB_MAX_TALKERS = 8;
-    TB_INPUT_RATE = 8000;  // 8 kHz mono; the JSFX upsamples to the project rate. Must match the client capture rate.
-    TB_RING_LEN = 8000;    // 1.0 s of jitter/elastic buffer per talker
+    TB_INPUT_RATE = 16000; // 16 kHz mono (clients send ADPCM over BLE; the host decodes to PCM before this).
+    TB_RING_LEN = 16000;   // 1.0 s of jitter/elastic buffer per talker
     TB_CTRL_BASE = 0;
     TB_CTRL_STRIDE = 4;
     TB_CTRL_OFFSET_WRITE_INDEX = 0;
