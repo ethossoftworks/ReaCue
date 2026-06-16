@@ -93,6 +93,26 @@ interface IKmpBlePeripheral {
         bufferSize: Int = 0,
         bufferOverflow: BufferOverflow = BufferOverflow.DROP_OLDEST,
     ): Flow<ByteArray>
+
+    /**
+     * Opens an L2CAP Connection-Oriented Channel to the connected peripheral on the given [psm]. L2CAP CoC is a
+     * reliable, ordered byte stream (like TCP) with far higher throughput and lower overhead than GATT notifications —
+     * used here for streaming talkback microphone audio. The [psm] is discovered out-of-band (ReaCue publishes it in
+     * the handshake characteristic payload).
+     */
+    suspend fun openL2CapChannel(psm: Int): Outcome<IKmpBleL2CapChannel, KmpBleError>
+}
+
+/**
+ * A bidirectional L2CAP CoC byte stream. Reliable and ordered. [incoming] emits chunks as they arrive (chunk
+ * boundaries are not message boundaries — the consumer must frame). [write] suspends until the bytes are queued.
+ */
+interface IKmpBleL2CapChannel {
+    val incoming: Flow<ByteArray>
+
+    suspend fun write(data: ByteArray): Outcome<Unit, KmpBleError>
+
+    fun close()
 }
 
 interface IKmpBleService {

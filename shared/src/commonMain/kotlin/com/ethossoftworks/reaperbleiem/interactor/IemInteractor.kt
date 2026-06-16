@@ -110,6 +110,17 @@ class IemInteractor(private val iemService: IIemService) :
         if (iemService is BlePeripheralIemService) iemService.sendDisconnectEvent()
     }
 
+    val isTalkbackSupported: Boolean
+        get() = (iemService as? BleCentralIemService)?.isTalkbackSupported ?: false
+
+    fun startTalkback() {
+        interactorScope.launch { (iemService as? BleCentralIemService)?.startTalkback() }
+    }
+
+    fun stopTalkback() {
+        (iemService as? BleCentralIemService)?.stopTalkback()
+    }
+
     fun setOutputVolume(trackId: Int, hardwareOutId: Int, value: Float) {
         updateHardwareOutput(trackId, hardwareOutId) { it.copy(volume = value) }
         getThrottledChannel(ThrottleKey.OutputVolume(trackId, hardwareOutId)).trySend(value)

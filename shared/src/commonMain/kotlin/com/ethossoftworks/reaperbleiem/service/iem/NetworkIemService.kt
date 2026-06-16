@@ -246,6 +246,28 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
         return IemEvent.HardwareOutputMuteUpdated(trackId = trackId, hardwareOutId = hwOutId, value = value)
     }
 
+    suspend fun sendTalkbackStart(talkerId: Int) =
+        sendFrame(TcpMessageType.TalkbackStart) {
+            writeByte(talkerId.toByte())
+        }
+
+    /**
+     * [pcm] is raw little-endian signed 16-bit mono PCM, exactly as captured/forwarded. The sample count and the
+     * header use the protocol's big-endian framing; the PCM bytes are appended verbatim and the ReaScript reads them
+     * as little-endian shorts.
+     */
+    suspend fun sendTalkbackAudio(talkerId: Int, pcm: ByteArray) =
+        sendFrame(TcpMessageType.TalkbackAudio) {
+            writeByte(talkerId.toByte())
+            writeShort((pcm.size / 2).toShort())
+            write(pcm)
+        }
+
+    suspend fun sendTalkbackStop(talkerId: Int) =
+        sendFrame(TcpMessageType.TalkbackStop) {
+            writeByte(talkerId.toByte())
+        }
+
     private suspend fun sendHeartbeat() = sendFrame(TcpMessageType.Heartbeat) {}
 
     override suspend fun refresh() = sendFrame(TcpMessageType.Refresh) {}
@@ -349,4 +371,7 @@ private enum class TcpMessageType(val value: Byte) {
     HwOutMuteChanged(0x0A),
     Refresh(0x0B),
     Heartbeat(0x0C),
+    TalkbackStart(0x0D),
+    TalkbackAudio(0x0E),
+    TalkbackStop(0x0F),
 }

@@ -1,0 +1,104 @@
+desc:ReaCue Talkback
+// ReaCue Talkback mixer
+//
+// Reads talkback audio that ReaCue.eel ingests over TCP and writes into shared
+// global memory (gmem, namespace "ReaCue"), then plays it back in real time.
+//
+// One ring buffer per talker slot. Each slot is an independent jitter-buffered
+// stream: it starts once enough audio is buffered, upsamples from the 16 kHz
+// input rate to the project sample rate via linear interpolation, and resyncs
+// if clock drift makes the buffer over/underflow. Active slots are summed.
+//
+// gmem layout MUST match ReaCue.eel.
+//   Control: TB_CTRL_BASE + slot*TB_CTRL_STRIDE + {write_index, active, generation}
+//   Ring:    TB_RING_BASE + slot*TB_RING_LEN  + (write_index % TB_RING_LEN)
+//
+// Setup: place this JSFX on a dedicated "Talkback" track and route that track
+// into the performer monitor mixes so everyone hears it.
+
+options:gmem=ReaCue
+
+slider1:gain_db=0<-24,12,0.1>Talkback Gain (dB)
+slider2:buffer_ms=150<10,200,1>Jitter Buffer (ms)
+
+@init
+TB_MAX_TALKERS = 8;
+TB_INPUT_RATE  = 8000; // must match TB_INPUT_RATE in ReaCue.eel and the client capture rate
+TB_RING_LEN    = 8000;
+TB_CTRL_BASE   = 0;
+TB_CTRL_STRIDE = 4;
+TB_CTRL_OFFSET_WRITE_INDEX = 0;
+TB_CTRL_OFFSET_ACTIVE      = 1;
+TB_CTRL_OFFSET_GENERATION  = 2;
+TB_ACTIVE_COUNT = 512; // gmem global: active talker count (0 = idle, skip per-sample work)
+TB_RING_BASE   = 1024;
+
+// Per-slot consumer state (JSFX-local memory; the read cursor must never live
+// in gmem — it is owned solely by this consumer).
+slot_read_pos = 0;                       // [0 .. TB_MAX_TALKERS)
+slot_playing  = slot_read_pos + 64;
+slot_last_gen = slot_playing  + 64;
+
+// Input samples consumed per output sample (e.g. 16000/48000 = 0.3333).
+ratio = TB_INPUT_RATE / srate;
+
+@slider
+gain = 10 ^ (gain_db / 20);
+jitter_samples = buffer_ms * TB_INPUT_RATE * 0.001; // target buffer depth, in input samples
+
+@sample
+// Idle fast-path: when no talkers are active, do a single gmem read and skip the per-sample mixing loop entirely.
+gmem[TB_ACTIVE_COUNT] > 0 ? (
+mix = 0;
+s = 0;
+loop(TB_MAX_TALKERS,
+  ctrl = TB_CTRL_BASE + s * TB_CTRL_STRIDE;
+  gen    = gmem[ctrl + TB_CTRL_OFFSET_GENERATION];
+  active = gmem[ctrl + TB_CTRL_OFFSET_ACTIVE];
+  wi     = gmem[ctrl + TB_CTRL_OFFSET_WRITE_INDEX];
+
+  // New talk burst (PTT pressed) -> re-sync to the live write head. write_index is monotonic, so jumping to wi
+  // discards any stale buffered audio and plays forward from fresh data — never replays old ring contents.
+  gen != slot_last_gen[s] ? (
+    slot_last_gen[s] = gen;
+    slot_read_pos[s] = wi;
+    slot_playing[s]  = 0;
+  );
+
+  rp = slot_read_pos[s];
+  avail = wi - rp; // input-rate samples buffered ahead of the read cursor
+
+  // Wait until the jitter buffer has filled before starting playback.
+  slot_playing[s] == 0 && active && avail >= jitter_samples ? (
+    slot_playing[s] = 1;
+  );
+
+  slot_playing[s] ? (
+    // Drift/overflow: producer outran us -> jump forward to the target depth.
+    avail > (2 * jitter_samples) ? (
+      rp = wi - jitter_samples;
+      avail = wi - rp;
+    );
+
+    avail > 1 ? (
+      ip = floor(rp);
+      frac = rp - ip;
+      ring_base = TB_RING_BASE + s * TB_RING_LEN;
+      s0 = gmem[ring_base + (ip % TB_RING_LEN)];
+      s1 = gmem[ring_base + ((ip + 1) % TB_RING_LEN)];
+      mix += s0 + (s1 - s0) * frac;
+      slot_read_pos[s] = rp + ratio;
+    ) : (
+      // Underrun: caught up to the writer. If the talker has stopped and we've
+      // drained, go idle; otherwise hold (output silence this sample).
+      active == 0 ? slot_playing[s] = 0;
+    );
+  );
+
+  s += 1;
+);
+
+mix *= gain;
+spl0 += mix;
+spl1 += mix;
+); // end idle fast-path guard

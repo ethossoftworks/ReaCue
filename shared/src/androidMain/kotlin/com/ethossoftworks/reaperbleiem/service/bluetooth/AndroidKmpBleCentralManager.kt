@@ -12,8 +12,10 @@ import android.bluetooth.BluetoothGattService
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import androidx.core.util.forEach
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.AndroidKmpBleL2CapChannel
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBleCentralManager
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBleCharacteristic
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBleL2CapChannel
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBlePeripheral
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBleService
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleConnectionPriority
@@ -140,6 +142,8 @@ private class NordicManagerProxy(private val context: Context) : BleManager(cont
     private val services: AtomicRef<List<BluetoothGattService>> = atomic(emptyList())
 
     fun getCurrentMtu() = mtu
+
+    fun getBluetoothDeviceExternal(): BluetoothDevice? = bluetoothDevice
 
     suspend fun requestMtuExternal(value: Int): Int = requestMtu(value).suspend()
 
@@ -334,6 +338,22 @@ private class AndroidKmpBlePeripheral(
         val characteristic = localCharacteristics.value[characteristic] ?: return emptyFlow()
         return characteristic.notifications(bufferSize, bufferOverflow)
     }
+
+    @SuppressLint("MissingPermission")
+    override suspend fun openL2CapChannel(psm: Int): Outcome<IKmpBleL2CapChannel, KmpBleError> =
+        withScope(scope) {
+            val device =
+                nordicManager.getBluetoothDeviceExternal()
+                    ?: return@withScope Outcome.Error(KmpBleError.Unknown("No connected device"))
+            try {
+                // Insecure channel: matches the peripheral publishing without link encryption (no bonding).
+                val socket = device.createInsecureL2capChannel(psm)
+                socket.connect()
+                Outcome.Ok(AndroidKmpBleL2CapChannel(socket))
+            } catch (t: Throwable) {
+                Outcome.Error(KmpBleError.Unknown(t))
+            }
+        }
 }
 
 private class AndroidKmpBleService(

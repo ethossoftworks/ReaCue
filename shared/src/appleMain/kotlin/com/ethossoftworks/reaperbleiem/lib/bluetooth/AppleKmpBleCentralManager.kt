@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalUuidApi::class)
+@file:OptIn(ExperimentalUuidApi::class, ExperimentalForeignApi::class)
 
 package com.ethossoftworks.reaperbleiem.lib.bluetooth
 
@@ -17,6 +17,7 @@ import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCSignatureOverride
 import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.convert
 import kotlinx.cinterop.usePinned
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -72,6 +73,7 @@ import platform.CoreBluetooth.CBCharacteristicPropertyWrite
 import platform.CoreBluetooth.CBCharacteristicPropertyWriteWithoutResponse
 import platform.CoreBluetooth.CBCharacteristicWriteWithResponse
 import platform.CoreBluetooth.CBCharacteristicWriteWithoutResponse
+import platform.CoreBluetooth.CBL2CAPChannel
 import platform.CoreBluetooth.CBManagerStatePoweredOn
 import platform.CoreBluetooth.CBPeripheral
 import platform.CoreBluetooth.CBPeripheralDelegateProtocol
@@ -486,6 +488,17 @@ private class AppleKmpBlePeripheral(
                 }
             }
             .flowIn(scope)
+
+    override suspend fun openL2CapChannel(psm: Int): Outcome<IKmpBleL2CapChannel, KmpBleError> =
+        withScope(scope) {
+            peripheral.openL2CAPChannel(psm.convert())
+            val event = events.filterIsInstance<PeripheralEvent.L2CapChannelOpened>().first()
+            val channel = event.channel
+            if (event.error != null || channel == null) {
+                return@withScope Outcome.Error(KmpBleError.Unknown(event.error ?: "L2CAP open failed"))
+            }
+            Outcome.Ok(AppleKmpBleL2CapChannel(channel))
+        }
 }
 
 private class ApplePeripheralDelegate(
@@ -550,6 +563,11 @@ private class ApplePeripheralDelegate(
     override fun peripheralIsReadyToSendWriteWithoutResponse(peripheral: CBPeripheral) {
         canSendWriteWithoutResponseFlow.value = true
     }
+
+    @ObjCSignatureOverride
+    override fun peripheral(peripheral: CBPeripheral, didOpenL2CAPChannel: CBL2CAPChannel?, error: NSError?) {
+        events.tryEmit(PeripheralEvent.L2CapChannelOpened(didOpenL2CAPChannel, error))
+    }
 }
 
 private sealed class PeripheralEvent {
@@ -564,6 +582,8 @@ private sealed class PeripheralEvent {
         PeripheralEvent()
 
     data class NotificationStateChanged(val characteristic: CBCharacteristic, val error: NSError?) : PeripheralEvent()
+
+    data class L2CapChannelOpened(val channel: CBL2CAPChannel?, val error: NSError?) : PeripheralEvent()
 }
 
 private class AppleKmpBleService(private val service: CBService, private val peripheral: AppleKmpBlePeripheral) :

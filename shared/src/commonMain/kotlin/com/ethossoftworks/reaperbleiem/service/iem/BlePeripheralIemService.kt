@@ -3,6 +3,7 @@
 package com.ethossoftworks.reaperbleiem.service.iem
 
 import co.touchlab.kermit.Logger
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBleL2CapChannel
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBlePeripheralManager
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleAdvertisementCharacteristic
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleAdvertisementData
@@ -15,6 +16,7 @@ import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralEvent
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralGattResult
 import com.ethossoftworks.reaperbleiem.service.preferences.PeripheralPreferencesService
 import com.outsidesource.oskitkmp.lib.update
+import com.outsidesource.oskitkmp.outcome.Outcome
 import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.HMAC
 import dev.whyoleg.cryptography.algorithms.SHA256
@@ -29,6 +31,7 @@ import kotlinx.atomicfu.getAndUpdate
 import kotlinx.atomicfu.update
 import kotlinx.collections.immutable.mutate
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
@@ -37,6 +40,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
@@ -63,6 +67,13 @@ class BlePeripheralIemService(
     private val secureRandom = CryptographyRandom.Default
     private val authorizedCentrals = atomic<Set<KmpBleCentralId>>(emptySet())
     private val authNonces = atomic<Map<KmpBleCentralId, ByteArray>>(emptyMap())
+
+    // Talkback: the published L2CAP PSM (exposed to centrals via the handshake), the talker slot assigned to each
+    // streaming central, and the open channels so we can close them on disconnect. Slot count must match TB_MAX_TALKERS
+    // in ReaCue.eel / the Talkback JSFX.
+    private val l2capPsm = atomic<Int?>(null)
+    private val talkbackSlots = atomic<Map<KmpBleCentralId, Int>>(emptyMap())
+    private val talkbackChannels = atomic<Map<KmpBleCentralId, IKmpBleL2CapChannel>>(emptyMap())
 
     private var hostName: String = "ReaCue"
     private var hostPasscode: String = ""
@@ -129,8 +140,12 @@ class BlePeripheralIemService(
                         KmpBlePeripheralEvent.Advertising -> isAdvertising.complete(Unit)
                         is KmpBlePeripheralEvent.CentralSubscribed ->
                             peripheralManager.requestConnectionPriority(KmpBleConnectionPriority.High, event.centralId)
-                        is KmpBlePeripheralEvent.CentralUnsubscribed ->
+                        is KmpBlePeripheralEvent.CentralUnsubscribed -> {
                             authorizedCentrals.update { it - event.centralId }
+                            talkbackChannels.value[event.centralId]?.close()
+                        }
+                        is KmpBlePeripheralEvent.L2CapChannelOpened ->
+                            onTalkbackChannelOpened(event, this@channelFlow)
                         is KmpBlePeripheralEvent.ReadRequest ->
                             when (event.characteristic) {
                                 REACUE_HANDSHAKE_CHARACTERISTIC_UUID -> onHandshakeReadRequest(event)
@@ -148,6 +163,14 @@ class BlePeripheralIemService(
         isAdvertising.await()
         Logger.i { "Advertising started" }
 
+        when (val outcome = peripheralManager.publishL2CapChannel()) {
+            is Outcome.Ok -> {
+                l2capPsm.update { outcome.value }
+                Logger.i { "Talkback L2CAP channel published on PSM ${outcome.value}" }
+            }
+            is Outcome.Error -> Logger.e { "Failed to publish talkback L2CAP channel: ${outcome.error}" }
+        }
+
         val networkJob =
             networkIemService
                 .subscribe(context)
@@ -161,6 +184,12 @@ class BlePeripheralIemService(
         awaitClose {
             authorizedCentrals.update { emptySet() }
             authNonces.update { emptyMap() }
+
+            talkbackChannels.value.values.forEach { it.close() }
+            talkbackChannels.update { emptyMap() }
+            talkbackSlots.update { emptyMap() }
+            l2capPsm.value?.let { peripheralManager.unpublishL2CapChannel(it) }
+            l2capPsm.update { null }
 
             bleChannelJob.cancel()
             advertiseJob.cancel()
@@ -183,6 +212,8 @@ class BlePeripheralIemService(
                     writeInt(BLE_PROTOCOL_VERSION)
                     write(hostId)
                     write(nonce)
+                    // Talkback L2CAP PSM (0 = talkback unavailable). Appended to the existing handshake payload.
+                    writeUShort((l2capPsm.value ?: 0).toUShort())
                 }
                 .readByteArray()
 
@@ -264,6 +295,100 @@ class BlePeripheralIemService(
         } catch (t: Throwable) {
             Logger.e { "Could not decode write request ${t.message}" }
         }
+    }
+
+    /**
+     * A central opened its persistent talkback L2CAP channel. Authorize it, assign a talker slot, and forward PCM to
+     * Reaper. The channel stays open for the whole connection; an actual "talk burst" is inferred from data flow —
+     * the first PCM after silence sends TALKBACK_START (fresh generation so the JSFX resets), and ~idle sends
+     * TALKBACK_STOP (so the JSFX goes silent and idle). Runs until the channel closes on disconnect.
+     */
+    private fun onTalkbackChannelOpened(event: KmpBlePeripheralEvent.L2CapChannelOpened, scope: CoroutineScope) {
+        if (!authorizedCentrals.value.contains(event.centralId)) {
+            event.channel.close()
+            return
+        }
+        val slot = allocateTalkbackSlot(event.centralId)
+        if (slot == null) {
+            Logger.w { "No free talkback slot for ${event.centralId}" }
+            event.channel.close()
+            return
+        }
+        talkbackChannels.update { it + (event.centralId to event.channel) }
+
+        scope.launch {
+            Logger.i { "Talkback channel opened for ${event.centralId} -> slot $slot (psm ${event.psm})" }
+            // Heuristic talk-burst detection driven purely by data flow (no extra signaling). Plain vars are fine here:
+            // worst case a STOP is delayed one tick or an extra START is sent — both harmless.
+            var dataSeq = 0
+            var talking = false
+            // Throughput measurement: expected ~32000 B/s for 16 kHz mono PCM16. A materially higher rate means the
+            // client is overproducing (capture rate mismatch), which fills the ring and grows latency.
+            var rateMark = kotlin.time.TimeSource.Monotonic.markNow()
+            var rateBytes = 0L
+
+            val idleMonitor =
+                launch {
+                    var lastSeq = -1
+                    while (isActive) {
+                        delay(TalkbackIdleTimeout)
+                        val current = dataSeq
+                        if (talking && current == lastSeq) {
+                            networkIemService.sendTalkbackStop(slot)
+                            talking = false
+                        }
+                        lastSeq = current
+                    }
+                }
+
+            var totalBytes = 0L
+            try {
+                // L2CAP is a byte stream; a 16-bit sample may straddle two reads. Carry any odd trailing byte forward
+                // so only whole samples are forwarded to Reaper.
+                var carry = ByteArray(0)
+                event.channel.incoming.collect { chunk ->
+                    dataSeq++
+                    totalBytes += chunk.size
+                    rateBytes += chunk.size
+                    val elapsedMs = rateMark.elapsedNow().inWholeMilliseconds
+                    if (elapsedMs >= 2000) {
+                        Logger.i { "Talkback slot $slot throughput: ${rateBytes * 1000 / elapsedMs} B/s (expected ~32000)" }
+                        rateMark = kotlin.time.TimeSource.Monotonic.markNow()
+                        rateBytes = 0L
+                    }
+                    if (!talking) {
+                        networkIemService.sendTalkbackStart(slot)
+                        talking = true
+                        Logger.i { "Talkback slot $slot: talk burst started" }
+                    }
+                    val combined = if (carry.isEmpty()) chunk else carry + chunk
+                    val evenLen = combined.size - (combined.size % 2)
+                    if (evenLen > 0) networkIemService.sendTalkbackAudio(slot, combined.copyOf(evenLen))
+                    carry = if (evenLen < combined.size) combined.copyOfRange(evenLen, combined.size) else ByteArray(0)
+                }
+                Logger.i { "Talkback slot $slot channel closed after $totalBytes bytes" }
+            } catch (t: Throwable) {
+                Logger.e(t) { "Talkback slot $slot error after $totalBytes bytes" }
+            } finally {
+                idleMonitor.cancel()
+                networkIemService.sendTalkbackStop(slot)
+                freeTalkbackSlot(event.centralId)
+                talkbackChannels.update { it - event.centralId }
+                event.channel.close()
+            }
+        }
+    }
+
+    private fun allocateTalkbackSlot(centralId: KmpBleCentralId): Int? {
+        talkbackSlots.value[centralId]?.let { return it }
+        val used = talkbackSlots.value.values.toSet()
+        val slot = (0 until TalkbackMaxTalkers).firstOrNull { it !in used } ?: return null
+        talkbackSlots.update { it + (centralId to slot) }
+        return slot
+    }
+
+    private fun freeTalkbackSlot(centralId: KmpBleCentralId) {
+        talkbackSlots.update { it - centralId }
     }
 
     fun sendDisconnectEvent() {
@@ -457,3 +582,9 @@ class BlePeripheralIemService(
 
 /** Header Format: Request Id (UInt16), Packets remaining (UInt16) */
 val headerSize = 4u
+
+/** Max simultaneous talkback talkers. Must match TB_MAX_TALKERS in ReaCue.eel and "ReaCue Talkback.jsfx". */
+private const val TalkbackMaxTalkers = 8
+
+/** No PCM for this long on the persistent channel => end the current talk burst (send TALKBACK_STOP). */
+private val TalkbackIdleTimeout = 300.milliseconds

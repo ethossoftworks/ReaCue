@@ -32,6 +32,8 @@ data class IemScreenViewState(
     val passcodeEntry: CompletableDeferred<String>? = null,
     val isViewPasscodeModalVisible: Boolean = false,
     val passcode: String = "",
+    val isTalkbackSupported: Boolean = false,
+    val isTalkbackActive: Boolean = false,
 )
 
 enum class NumberInputModalType {
@@ -61,7 +63,18 @@ class IemScreenViewInteractor(
             faderInfo = iemInteractor.state.faderInfo,
             serviceStatus = iemInteractor.state.serviceStatus,
             isRefreshing = iemInteractor.state.isRefreshing,
+            isTalkbackSupported = iemInteractor.isTalkbackSupported,
         )
+    }
+
+    fun onTalkbackPress() {
+        iemInteractor.startTalkback()
+        update { state -> state.copy(isTalkbackActive = true) }
+    }
+
+    fun onTalkbackRelease() {
+        iemInteractor.stopTalkback()
+        update { state -> state.copy(isTalkbackActive = false) }
     }
 
     fun onMount() {

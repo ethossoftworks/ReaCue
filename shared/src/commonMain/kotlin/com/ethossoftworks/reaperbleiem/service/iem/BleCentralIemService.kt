@@ -4,12 +4,14 @@ package com.ethossoftworks.reaperbleiem.service.iem
 
 import co.touchlab.kermit.Logger
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBleCentralManager
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBleL2CapChannel
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBlePeripheral
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleConnectionPriority
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleConnectionStatus
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleError
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleWriteMode
 import com.ethossoftworks.reaperbleiem.service.preferences.CentralPreferencesService
+import com.ethossoftworks.reaperbleiem.service.talkback.IMicrophoneCaptureService
 import com.outsidesource.oskitkmp.lib.toUShort
 import com.outsidesource.oskitkmp.lib.update
 import com.outsidesource.oskitkmp.outcome.Outcome
@@ -25,6 +27,7 @@ import kotlin.uuid.Uuid
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.currentCoroutineContext
@@ -46,9 +49,16 @@ import kotlinx.serialization.cbor.Cbor
 class BleCentralIemService(
     private val bleCentralManager: IKmpBleCentralManager,
     private val centralPreferencesService: CentralPreferencesService,
+    private val microphoneCaptureService: IMicrophoneCaptureService,
 ) : IIemService {
 
     private val peripheral = atomic<IKmpBlePeripheral?>(null)
+
+    // Talkback: PSM discovered in the handshake, the persistent L2CAP channel (opened once per connection), and the
+    // mic->channel pump job (started/stopped per push-to-talk press).
+    private val talkbackPsm = atomic(0)
+    private val talkbackChannel = atomic<IKmpBleL2CapChannel?>(null)
+    private val talkbackMicJob = atomic<Job?>(null)
     private val crypto = CryptographyProvider.Default
     private val hmac = crypto.get(HMAC)
     private val requestBuffers = atomic<Map<UShort, Buffer>>(emptyMap())
@@ -122,6 +132,8 @@ class BleCentralIemService(
 
         awaitClose {
             job.cancel()
+            talkbackMicJob.getAndSet(null)?.cancel()
+            talkbackChannel.getAndSet(null)?.close()
             launch {
                 peripheral.disconnect().unwrapOrReturn {
                     return@launch
@@ -150,6 +162,8 @@ class BleCentralIemService(
 
             val hostId = Uuid.fromByteArray(buffer.readByteArray(16)).toHexString()
             val nonce = buffer.readByteArray(16)
+            // Talkback L2CAP PSM appended by the host (big-endian UShort; 0 = talkback unavailable).
+            talkbackPsm.update { if (buffer.size >= 2) (buffer.readShort().toInt() and 0xFFFF) else 0 }
 
             val requestPasscode: suspend () -> String = {
                 val passcodeDeferred = CompletableDeferred<String>()
@@ -183,6 +197,66 @@ class BleCentralIemService(
     }
 
     fun scan() = bleCentralManager.scan().filter { it.services.contains(REACUE_SERVICE_UUID) }
+
+    val isTalkbackSupported: Boolean
+        get() = talkbackPsm.value != 0
+
+    /**
+     * Starts streaming mic audio to the peripheral. The L2CAP channel is opened lazily on first use (the connection
+     * isn't ready for a CoC immediately after connect) and then kept open and reused for subsequent presses.
+     * Idempotent while active.
+     */
+    suspend fun startTalkback() {
+        val peripheral = peripheral.value ?: return
+        if (talkbackMicJob.value != null) return
+
+        if (talkbackChannel.value == null) {
+            val psm = talkbackPsm.value
+            if (psm == 0) {
+                Logger.w { "Talkback not supported by host (no PSM)" }
+                return
+            }
+            when (val out = peripheral.openL2CapChannel(psm)) {
+                is Outcome.Ok -> {
+                    talkbackChannel.update { out.value }
+                    Logger.i { "Talkback L2CAP channel opened (psm $psm)" }
+                }
+                is Outcome.Error -> {
+                    Logger.e { "Talkback L2CAP channel open failed: ${out.error}" }
+                    return
+                }
+            }
+        }
+        val channel = talkbackChannel.value ?: return
+
+        val job =
+            peripheral.scope.launch {
+                Logger.i { "Talkback: starting mic capture" }
+                var frames = 0
+                var bytes = 0L
+                try {
+                    microphoneCaptureService.capture().collect { pcm ->
+                        frames++
+                        bytes += pcm.size
+                        val result = channel.write(pcm)
+                        if (result is Outcome.Error) {
+                            Logger.e { "Talkback: L2CAP write failed at frame $frames ($bytes bytes): ${result.error}" }
+                            return@collect
+                        }
+                        if (frames % 50 == 0) Logger.i { "Talkback: sent $frames frames / $bytes bytes" }
+                    }
+                    Logger.i { "Talkback: mic capture completed after $frames frames / $bytes bytes" }
+                } catch (t: Throwable) {
+                    Logger.e(t) { "Talkback: capture error after $frames frames / $bytes bytes" }
+                }
+            }
+        talkbackMicJob.update { job }
+    }
+
+    /** Stops the mic stream. The L2CAP channel stays open for the next press. */
+    fun stopTalkback() {
+        talkbackMicJob.getAndSet(null)?.cancel()
+    }
 
     override suspend fun refresh() {
         val payload = cbor.encodeToByteArray(IemEvent.serializer(), IemEvent.Refresh)

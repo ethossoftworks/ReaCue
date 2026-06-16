@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -18,7 +19,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.verticalScroll
@@ -45,6 +48,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -82,6 +86,7 @@ import com.outsidesource.oskitcompose.modifier.kmpOuterShadow
 import com.outsidesource.oskitcompose.popup.Modal
 import com.outsidesource.oskitcompose.popup.ModalStyles
 import com.outsidesource.oskitcompose.systemui.KmpWindowInsets
+import com.outsidesource.oskitcompose.systemui.bottom
 import com.outsidesource.oskitcompose.systemui.top
 import com.outsidesource.oskitkmp.text.KmpNumberFormatter
 import com.outsidesource.oskitkmp.text.parseFloatOrNull
@@ -359,6 +364,15 @@ fun IemScreen(
                 }
             }
         }
+
+        if (context is IemContext.Central && state.isTalkbackSupported) {
+            TalkbackButton(
+                modifier = Modifier.align(Alignment.BottomCenter),
+                isActive = state.isTalkbackActive,
+                onPress = interactor::onTalkbackPress,
+                onRelease = interactor::onTalkbackRelease,
+            )
+        }
     }
 
     NumberEntryModal(
@@ -450,6 +464,48 @@ private fun MuteButton(
             painter = painterResource(if (isMuted) Res.drawable.volume_mute else Res.drawable.volume_up),
             colorFilter = ColorFilter.tint(if (isMuted) colors.error else colors.textPrimary),
             contentDescription = null,
+        )
+    }
+}
+
+@Composable
+private fun TalkbackButton(
+    modifier: Modifier = Modifier,
+    isActive: Boolean,
+    onPress: () -> Unit,
+    onRelease: () -> Unit,
+) {
+    val colors = AppTheme.colors
+
+    Box(
+        modifier =
+            modifier
+                .windowInsetsPadding(KmpWindowInsets.bottom)
+                .size(88.dp)
+                .border(
+                    width = 1.dp,
+                    color = if (isActive) colors.accent else colors.strokePrimary,
+                    shape = CircleShape,
+                )
+                .background(brush = colors.bgControl, shape = CircleShape)
+                .background(color = if (isActive) colors.accentTint else Color.Transparent, shape = CircleShape)
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onPress = {
+                            onPress()
+                            tryAwaitRelease()
+                            onRelease()
+                        }
+                    )
+                }
+                .semantics { role = Role.Button },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(58.dp)
+                .background(color = colors.error, shape = CircleShape)
+                .background(color = if (isActive) colors.accentTint else Color.Transparent, shape = CircleShape)
         )
     }
 }
