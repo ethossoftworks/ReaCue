@@ -53,10 +53,12 @@ ReaCue requires a ReaScript to be run
 
 1. Copy `reaperConfigs/ReaCue.eel` to your REAPER resource path's `Scripts` directory 
   (typically `~/Library/Application Support/REAPER/Scripts`)
-2. Create or edit `__startup.eel` in the `Scripts` directory and add the following lines:
-   ```lua
-   @import ReaCue.eel
-   reacue();
+2. If you want ReaCue to run automatically on Reaper startup, Create or edit `__startup.eel` in the `Scripts` directory 
+  and add the following lines (replacing `[action_command_id]` with your actual command id found in the Reaper actions 
+  window:
+   ```eel
+   cmd = NamedCommandLookup("[action_command_id]");
+   cmd > 0 ? Main_OnCommand(cmd, 0);
    ```
 3. Restart REAPER
 

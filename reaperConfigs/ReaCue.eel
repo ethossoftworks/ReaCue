@@ -552,9 +552,9 @@ function handle_tcp_connection() local(connection, ptr) (
       tcp_close(connection);
     )
   ) : connection < 0 ? (
-    DEBUG > 0 ? (
-      sprintf(#debug, "Server failed to start: %i\n", connection);
-      ShowConsoleMsg(#debug);
+    has_shown_startup_error == 0 ? (
+      has_shown_startup_error = 1;
+      ShowConsoleMsg("ReaCue host failed to start\n");
     );
   );
 );
@@ -861,6 +861,7 @@ function shutdown_server() local(i, client_handle) (
 
 function reacue() (
     DEBUG = 0;
+    has_shown_startup_error = 0;
 
     /*
      * TCP Settings
