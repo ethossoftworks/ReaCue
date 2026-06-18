@@ -30,7 +30,6 @@ class PeripheralPreferencesService(private val kvStore: IKmpKvStore) {
     private val node = CompletableDeferred<IKmpKvStoreNode>()
     private val loaded = CompletableDeferred<Unit>()
     private val _settings = MutableStateFlow(PeripheralSettings())
-
     val settings: StateFlow<PeripheralSettings> = _settings.asStateFlow()
 
     private val KeyHostId = "host_id"

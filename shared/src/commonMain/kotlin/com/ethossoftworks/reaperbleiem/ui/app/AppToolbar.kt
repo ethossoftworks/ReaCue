@@ -60,7 +60,7 @@ fun AppToolbar(
         }
         AppPopoverButton(icon = Res.drawable.menu) { close ->
             additionalMenuItems(close)
-            if (Platform.current.isDesktop && state.isSettingsOptionVisible) {
+            if (state.isSettingsOptionVisible) {
                 AppDropdownItem(
                     text = stringResource(Res.string.settings),
                     onClick = {

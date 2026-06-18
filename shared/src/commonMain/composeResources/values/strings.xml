@@ -43,4 +43,6 @@
     <string name="open_source_licenses">Open Source Licenses</string>
     <string name="project_page">Project Page</string>
     <string name="microphone_permission_is_required">Microphone permission is required to use talkback.</string>
+    <string name="talkback_channel">Talkback Channel</string>
+    <string name="talkback_channel_description">Select a static channel for talkback. This should be unique for anyone using the same ReaCue host. Setting this to -1 means a unique id will be dynamically assigned. This is useful for configuring the ReaCue JSFX talkback channel parameter in Reaper to avoid "speech jamming". Valid values are -1-7</string>
 </resources>

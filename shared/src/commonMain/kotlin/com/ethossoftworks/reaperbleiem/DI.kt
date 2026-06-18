@@ -13,6 +13,7 @@ import com.ethossoftworks.reaperbleiem.service.preferences.PeripheralPreferences
 import com.ethossoftworks.reaperbleiem.ui.app.AppToolbarViewInteractor
 import com.ethossoftworks.reaperbleiem.ui.iem.IemScreenViewInteractor
 import com.ethossoftworks.reaperbleiem.ui.scan.ScanScreenViewInteractor
+import com.ethossoftworks.reaperbleiem.ui.settings.CentralSettingsScreenViewInteractor
 import com.ethossoftworks.reaperbleiem.ui.settings.PeripheralSettingsScreenViewInteractor
 import com.outsidesource.oskitkmp.capability.BluetoothCapabilityFlags
 import com.outsidesource.oskitkmp.capability.KmpCapabilities
@@ -96,6 +97,7 @@ fun commonModule() = module {
     factory { ScanScreenViewInteractor(get(), get(), get()) }
     factory { AppToolbarViewInteractor(get()) }
     factory { PeripheralSettingsScreenViewInteractor(get(), get()) }
+    factory { CentralSettingsScreenViewInteractor(get(), get()) }
 }
 
 fun mockModule() = module {}
