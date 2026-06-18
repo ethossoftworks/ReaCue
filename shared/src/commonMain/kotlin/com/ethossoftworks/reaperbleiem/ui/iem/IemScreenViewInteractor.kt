@@ -214,7 +214,9 @@ class IemScreenViewInteractor(
                     when (it) {
                         is IemEvent.StructureChanged -> {
                             val trackMatch =
-                                it.tracks.values.firstOrNull { track -> track.name == state.lastSelectedIemName }
+                                it.tracks.values.firstOrNull { track ->
+                                    track.isIem && track.name == state.lastSelectedIemName
+                                }
                             update { state -> state.copy(selectedIemId = trackMatch?.id) }
                         }
                         is IemEvent.PasscodeRequired -> update { state -> state.copy(passcodeEntry = it.passcode) }
