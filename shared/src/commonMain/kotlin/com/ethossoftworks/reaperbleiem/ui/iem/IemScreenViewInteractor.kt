@@ -3,6 +3,7 @@ package com.ethossoftworks.reaperbleiem.ui.iem
 import com.ethossoftworks.reaperbleiem.coordinator.AppCoordinator
 import com.ethossoftworks.reaperbleiem.interactor.CapabilityInteractor
 import com.ethossoftworks.reaperbleiem.interactor.IemInteractor
+import com.ethossoftworks.reaperbleiem.interactor.InfoMessageInteractor
 import com.ethossoftworks.reaperbleiem.interactor.ServiceStatus
 import com.ethossoftworks.reaperbleiem.service.iem.FaderInfo
 import com.ethossoftworks.reaperbleiem.service.iem.IemContext
@@ -10,6 +11,7 @@ import com.ethossoftworks.reaperbleiem.service.iem.IemEvent
 import com.ethossoftworks.reaperbleiem.service.iem.Track
 import com.ethossoftworks.reaperbleiem.service.preferences.PeripheralPreferencesService
 import com.outsidesource.oskitkmp.capability.CapabilityStatus
+import com.outsidesource.oskitkmp.capability.NoPermissionReason
 import com.outsidesource.oskitkmp.interactor.Interactor
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CompletableDeferred
@@ -18,6 +20,9 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.getString
+import reacue.shared.generated.resources.Res
+import reacue.shared.generated.resources.microphone_permission_is_required
 
 data class IemScreenViewState(
     val bluetoothStatus: CapabilityStatus = CapabilityStatus.Unknown,
@@ -47,6 +52,7 @@ class IemScreenViewInteractor(
     private val capabilityInteractor: CapabilityInteractor,
     private val coordinator: AppCoordinator,
     private val peripheralPreferencesService: PeripheralPreferencesService?,
+    private val infoMessageInteractor: InfoMessageInteractor,
 ) :
     Interactor<IemScreenViewState>(
         initialState = IemScreenViewState(),
@@ -68,8 +74,31 @@ class IemScreenViewInteractor(
     }
 
     fun onTalkbackPress() {
-        iemInteractor.startTalkback()
-        update { state -> state.copy(isTalkbackActive = true) }
+        interactorScope.launch {
+            when (val status = capabilityInteractor.queryMicrophonePermissions()) {
+                is CapabilityStatus.NoPermission -> {
+                    interactorScope.launch {
+                        if (status.reason == NoPermissionReason.NotRequested) {
+                            capabilityInteractor.requestMicrophonePermission()
+                            return@launch
+                        } else {
+                            infoMessageInteractor.enqueueMessage(getString(Res.string.microphone_permission_is_required))
+                        }
+                    }
+                }
+
+                CapabilityStatus.Ready -> {
+                    iemInteractor.startTalkback()
+                    update { state -> state.copy(isTalkbackActive = true) }
+                }
+
+                else -> {
+                    interactorScope.launch {
+                        infoMessageInteractor.enqueueMessage(getString(Res.string.microphone_permission_is_required))
+                    }
+                }
+            }
+        }
     }
 
     fun onTalkbackRelease() {

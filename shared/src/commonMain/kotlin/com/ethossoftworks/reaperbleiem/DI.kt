@@ -89,6 +89,7 @@ fun commonModule() = module {
             get(),
             get(),
             if (context is IemContext.Peripheral) get<PeripheralPreferencesService>() else null,
+            get(),
         )
     }
     factory { AboutViewInteractor() }

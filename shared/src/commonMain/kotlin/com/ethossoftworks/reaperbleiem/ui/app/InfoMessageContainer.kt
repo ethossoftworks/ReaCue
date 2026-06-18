@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -79,6 +80,7 @@ fun InfoMessageContainer(modifier: Modifier = Modifier, interactor: InfoMessageI
             Text(
                 text = message.text,
                 color = if (message.type == InfoMessageType.Info) colors.textPrimary else colors.error,
+                textAlign = TextAlign.Center,
             )
         }
     }

@@ -40,7 +40,7 @@ class ScanScreenViewInteractor(
 
         observeJob =
             capabilityInteractor
-                .observeCapabilityState()
+                .observeBluetoothCapabilityState()
                 .onEach { if (it == CapabilityStatus.Ready) onScan() }
                 .launchIn(interactorScope)
     }
