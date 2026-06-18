@@ -7,7 +7,6 @@ import com.ethossoftworks.reaperbleiem.service.preferences.CentralSettings
 import com.outsidesource.oskitkmp.interactor.Interactor
 import com.outsidesource.oskitkmp.outcome.runOnError
 import com.outsidesource.oskitkmp.outcome.unwrapOrReturn
-import com.outsidesource.oskitkmp.text.parseFloatOrNull
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
