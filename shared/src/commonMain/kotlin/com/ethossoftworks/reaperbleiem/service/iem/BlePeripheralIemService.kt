@@ -309,22 +309,16 @@ class BlePeripheralIemService(
             event.channel.close()
             return
         }
-        val slot = allocateTalkbackSlot(event.centralId)
-        if (slot == null) {
-            Logger.w { "No free talkback slot for ${event.centralId}" }
-            event.channel.close()
-            return
-        }
         talkbackChannels.update { it + (event.centralId to event.channel) }
 
         scope.launch {
-            Logger.i { "Talkback channel opened for ${event.centralId} -> slot $slot (psm ${event.psm})" }
-            // Heuristic talk-burst detection driven purely by data flow (no extra signaling). Plain vars are fine here:
-            // worst case a STOP is delayed one tick or an extra START is sent — both harmless.
+            Logger.i { "Talkback channel opened for ${event.centralId} (psm ${event.psm})" }
+            // Each L2CAP frame is [len u16 LE][channel u8][ADPCM block]; the channel rides in-band like talkerId in
+            // the TCP payload. -1 => auto-allocate a free slot; 0..7 => that exact slot. Resolved at each talk-burst
+            // start (data-flow driven). Plain vars are fine: worst case a STOP is one tick late.
             var dataSeq = 0
             var talking = false
-            // Throughput measurement: expected ~32000 B/s for 16 kHz mono PCM16. A materially higher rate means the
-            // client is overproducing (capture rate mismatch), which fills the ring and grows latency.
+            var slot = -1 // resolved gmem slot / talkerId for the current burst
             var rateMark = kotlin.time.TimeSource.Monotonic.markNow()
             var rateBytes = 0L
 
@@ -343,24 +337,30 @@ class BlePeripheralIemService(
                 }
 
             try {
-                // The client sends length-prefixed (u16 LE) IMA-ADPCM blocks. Accumulate the L2CAP byte stream, pull
-                // out whole blocks, decode each back to 16 kHz PCM, and forward to Reaper.
                 var acc = ByteArray(0)
                 event.channel.incoming.collect { chunk ->
                     acc += chunk
                     var off = 0
                     while (acc.size - off >= 2) {
                         val len = (acc[off].toInt() and 0xFF) or ((acc[off + 1].toInt() and 0xFF) shl 8)
-                        if (acc.size - off - 2 < len) break // block not fully arrived yet
-                        val block = acc.copyOfRange(off + 2, off + 2 + len)
+                        if (len < 1 || acc.size - off - 2 < len) break // need the channel byte + a full block
+                        val declaredChannel = acc[off + 2].toInt() // signed: -1 = auto-allocate
+                        val block = acc.copyOfRange(off + 3, off + 2 + len)
                         off += 2 + len
 
                         dataSeq++
                         if (!talking) {
+                            val resolved = allocateTalkbackSlot(event.centralId, preferred = declaredChannel)
+                            if (resolved == null) {
+                                Logger.w { "No free talkback slot for ${event.centralId}" }
+                                continue
+                            }
+                            slot = resolved
                             networkIemService.sendTalkbackStart(slot)
                             talking = true
-                            Logger.i { "Talkback slot $slot: talk burst started" }
+                            Logger.i { "Talkback burst started -> slot $slot (declared $declaredChannel)" }
                         }
+
                         val pcm = AdpcmDecoder.decode(block)
                         rateBytes += pcm.size
                         if (pcm.isNotEmpty()) networkIemService.sendTalkbackAudio(slot, pcm)
@@ -374,12 +374,12 @@ class BlePeripheralIemService(
                         rateBytes = 0L
                     }
                 }
-                Logger.i { "Talkback slot $slot channel closed" }
+                Logger.i { "Talkback channel closed for ${event.centralId}" }
             } catch (t: Throwable) {
-                Logger.e(t) { "Talkback slot $slot error" }
+                Logger.e(t) { "Talkback error for ${event.centralId}" }
             } finally {
                 idleMonitor.cancel()
-                networkIemService.sendTalkbackStop(slot)
+                if (talking) networkIemService.sendTalkbackStop(slot)
                 freeTalkbackSlot(event.centralId)
                 talkbackChannels.update { it - event.centralId }
                 event.channel.close()
@@ -387,10 +387,21 @@ class BlePeripheralIemService(
         }
     }
 
-    private fun allocateTalkbackSlot(centralId: KmpBleCentralId): Int? {
-        talkbackSlots.value[centralId]?.let { return it }
-        val used = talkbackSlots.value.values.toSet()
-        val slot = (0 until TalkbackMaxTalkers).firstOrNull { it !in used } ?: return null
+    /**
+     * Resolves the gmem slot for a talker. [preferred] is the channel declared in the L2CAP payload: 0..7 claims that
+     * exact slot (explicit — collisions between two explicit talkers are allowed by design; the UI warns against it);
+     * anything else (-1) auto-allocates — reusing this central's held slot, else the first slot not already claimed.
+     * Returns null only when auto-allocating and every slot is taken.
+     */
+    private fun allocateTalkbackSlot(centralId: KmpBleCentralId, preferred: Int = -1): Int? {
+        val slot =
+            if (preferred in 0 until TalkbackMaxTalkers) {
+                preferred
+            } else {
+                talkbackSlots.value[centralId]
+                    ?: (0 until TalkbackMaxTalkers).firstOrNull { it !in talkbackSlots.value.values.toSet() }
+                    ?: return null
+            }
         talkbackSlots.update { it + (centralId to slot) }
         return slot
     }

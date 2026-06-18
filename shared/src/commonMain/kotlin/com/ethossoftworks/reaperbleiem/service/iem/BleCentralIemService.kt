@@ -230,21 +230,27 @@ class BleCentralIemService(
         }
         val channel = talkbackChannel.value ?: return
 
+        // The desired talkback channel travels in-band as the first byte of every L2CAP frame (-1 = let the host
+        // auto-allocate a slot; 0..7 = a specific channel). Read once at press time so it's constant for this burst.
+        val talkbackChannel = centralPreferencesService.settings.value.talkbackChannel
+
         val job =
             peripheral.scope.launch {
-                Logger.i { "Talkback: starting mic capture" }
-                // Compress to IMA ADPCM (~4:1) so 16 kHz fits the BLE link; each block is length-prefixed (u16 LE) so
-                // the host can deframe whole blocks from the L2CAP byte stream. A fresh encoder per press resets state.
+                Logger.i { "Talkback: starting mic capture on channel $talkbackChannel" }
+                // Compress to IMA ADPCM (~4:1) so 16 kHz fits the BLE link. Each frame is [len u16 LE][channel u8]
+                // [ADPCM block]; len covers the channel byte + block. A fresh encoder per press resets state.
                 val encoder = AdpcmEncoder()
                 var frames = 0
                 try {
                     microphoneCaptureService.capture().collect { pcm ->
                         frames++
                         val block = encoder.encode(pcm)
-                        val framed = ByteArray(2 + block.size)
-                        framed[0] = (block.size and 0xFF).toByte()
-                        framed[1] = ((block.size shr 8) and 0xFF).toByte()
-                        block.copyInto(framed, destinationOffset = 2)
+                        val payloadLen = 1 + block.size
+                        val framed = ByteArray(2 + payloadLen)
+                        framed[0] = (payloadLen and 0xFF).toByte()
+                        framed[1] = ((payloadLen shr 8) and 0xFF).toByte()
+                        framed[2] = talkbackChannel.toByte() // signed; -1 -> 0xFF
+                        block.copyInto(framed, destinationOffset = 3)
                         val result = channel.write(framed)
                         if (result is Outcome.Error) {
                             Logger.e { "Talkback: L2CAP write failed at frame $frames: ${result.error}" }

@@ -18,9 +18,9 @@ desc:ReaCue Talkback
 
 options:gmem=ReaCue
 
-slider1:gain_db=0<-24,12,0.1>Talkback Gain (dB)
+slider1:gain_db=0<-24,12,0.1>Gain (dB)
 slider2:buffer_ms=150<10,200,1>Jitter Buffer (ms)
-slider3:talkback_channel=-1<-1,7,1>Talkback Channel (-1 = listen to all)
+slider3:talkback_channel_dropdown=-1<-1,7,1{Listen to All, 0, 1, 2, 3, 4, 5, 6, 7}>Channel Filter
 
 @init
 TB_MAX_TALKERS = 8;
@@ -46,6 +46,7 @@ ratio = TB_INPUT_RATE / srate;
 @slider
 gain = 10 ^ (gain_db / 20);
 jitter_samples = buffer_ms * TB_INPUT_RATE * 0.001; // target buffer depth, in input samples
+talkback_channel = talkback_channel_dropdown - 1;
 
 @sample
 // Idle fast-path: when no talkers are active, do a single gmem read and skip the per-sample mixing loop entirely.

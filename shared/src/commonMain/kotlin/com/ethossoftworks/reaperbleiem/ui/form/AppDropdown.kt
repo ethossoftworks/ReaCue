@@ -40,6 +40,8 @@ import reacue.shared.generated.resources.arrow_down
 @Composable
 fun AppDropdown(
     valueLabel: String,
+    label: String? = null,
+    description: String? = null,
     modifier: Modifier = Modifier,
     itemContent: @Composable ColumnScope.(dismiss: () -> Unit) -> Unit,
 ) {
@@ -47,23 +49,31 @@ fun AppDropdown(
     var expanded by remember { mutableStateOf(false) }
     val dismiss = remember { { expanded = false } }
 
-    ExposedDropdownMenuBox(modifier = modifier, expanded = expanded, onExpandedChange = { expanded = it }) {
-        AppButton(
-            modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-            label = valueLabel,
-            onClick = {},
-            iconEnd = Res.drawable.arrow_down,
-            iconSize = DpSize(12.dp, 12.dp),
-        )
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (label != null) {
+            Text(text = label, fontSize = 14.sp, color = theme.textPrimary)
+        }
+        ExposedDropdownMenuBox(modifier = Modifier, expanded = expanded, onExpandedChange = { expanded = it }) {
+            AppButton(
+                modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                label = valueLabel,
+                onClick = {},
+                iconEnd = Res.drawable.arrow_down,
+                iconSize = DpSize(12.dp, 12.dp),
+            )
 
-        ExposedDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            containerColor = theme.bgSurface,
-            shape = RoundedCornerShape(8.dp),
-            border = BorderStroke(width = 1.dp, color = theme.strokePrimary),
-            content = { itemContent(dismiss) },
-        )
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                containerColor = theme.bgSurface,
+                shape = RoundedCornerShape(8.dp),
+                border = BorderStroke(width = 1.dp, color = theme.strokePrimary),
+                content = { itemContent(dismiss) },
+            )
+        }
+        if (description != null) {
+            Text(text = description, fontSize = 12.sp, color = theme.textPrimary)
+        }
     }
 }
 

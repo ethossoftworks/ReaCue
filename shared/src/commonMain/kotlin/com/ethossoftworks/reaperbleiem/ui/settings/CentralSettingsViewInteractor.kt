@@ -16,16 +16,13 @@ import reacue.shared.generated.resources.Res
 import reacue.shared.generated.resources.settings_error
 import reacue.shared.generated.resources.settings_saved
 
-
 data class CentralSettingsState(
     val originalSettings: CentralSettings = CentralSettings(),
     val showTalkBack: Boolean = true,
-    val talkBackChannel: String = "",
+    val talkBackChannel: Int = -1,
     val isSaving: Boolean = false,
-    val isDefaultModalVisible: Boolean = false,
+    val isResetToDefaultModalVisible: Boolean = false,
 )
-
-private val intRegexReplace = Regex("""[^\-0-9]""")
 
 class CentralSettingsScreenViewInteractor(
     private val preferencesService: CentralPreferencesService,
@@ -34,7 +31,15 @@ class CentralSettingsScreenViewInteractor(
 
     fun onMount() {
         preferencesService.settings
-            .onEach { preferences -> update { state -> state.copy(originalSettings = preferences) } }
+            .onEach { preferences ->
+                update { state ->
+                    state.copy(
+                        originalSettings = preferences,
+                        talkBackChannel = preferences.talkbackChannel,
+                        showTalkBack = preferences.showTalkBack,
+                    )
+                }
+            }
             .launchIn(interactorScope)
     }
 
@@ -51,9 +56,8 @@ class CentralSettingsScreenViewInteractor(
                 preferencesService.setShowTalkback(state.showTalkBack).runOnError { hasError = true }
             }
 
-            val sanitizedTalkbackChannel = state.talkBackChannel.toIntOrNull()?.coerceIn(-1..7)
-            if (sanitizedTalkbackChannel != null) {
-                preferencesService.setTalkbackChannel(sanitizedTalkbackChannel).runOnError { hasError = true }
+            if (state.talkBackChannel != state.originalSettings.talkbackChannel) {
+                preferencesService.setTalkbackChannel(state.talkBackChannel).runOnError { hasError = true }
             }
 
             update { state -> state.copy(isSaving = false) }
@@ -66,15 +70,15 @@ class CentralSettingsScreenViewInteractor(
     }
 
     fun onResetToDefaultClick() {
-        update { state -> state.copy(isDefaultModalVisible = true) }
+        update { state -> state.copy(isResetToDefaultModalVisible = true) }
     }
 
     fun onResetToDefaultCancel() {
-        update { state -> state.copy(isDefaultModalVisible = false) }
+        update { state -> state.copy(isResetToDefaultModalVisible = false) }
     }
 
     fun onResetToDefaultConfirmClick() {
-        update { state -> state.copy(isDefaultModalVisible = false) }
+        update { state -> state.copy(isResetToDefaultModalVisible = false) }
 
         interactorScope.launch {
             preferencesService.resetToDefaults().unwrapOrReturn {
@@ -88,7 +92,7 @@ class CentralSettingsScreenViewInteractor(
             update { state ->
                 state.copy(
                     showTalkBack = true,
-                    talkBackChannel = "",
+                    talkBackChannel = -1,
                 )
             }
 
@@ -100,8 +104,7 @@ class CentralSettingsScreenViewInteractor(
         update { state -> state.copy(showTalkBack = value) }
     }
 
-    fun onTalkbackChannelChanged(value: String) {
+    fun onTalkbackChannelChanged(value: Int) {
         update { state -> state.copy(talkBackChannel = value) }
     }
 }
-

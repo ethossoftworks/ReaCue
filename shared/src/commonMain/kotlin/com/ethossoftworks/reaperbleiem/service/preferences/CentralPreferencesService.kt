@@ -81,11 +81,15 @@ class CentralPreferencesService(private val kvStore: IKmpKvStore) {
     }
 
     suspend fun setShowTalkback(value: Boolean): Outcome<Unit, Any> {
-        return node.await().putBoolean(KeyShowTalkback, value)
+        val result = node.await().putBoolean(KeyShowTalkback, value)
+        _settings.value = _settings.value.copy(showTalkBack = value)
+        return result
     }
 
     suspend fun setTalkbackChannel(value: Int): Outcome<Unit, Any> {
-        return node.await().putInt(KeyTalkbackChannel, value)
+        val result = node.await().putInt(KeyTalkbackChannel, value)
+        _settings.value = _settings.value.copy(talkbackChannel = value)
+        return result
     }
 
     private fun passcodeKey(peripheralId: String): String = "passcode-$peripheralId"
