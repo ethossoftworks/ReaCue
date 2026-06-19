@@ -1,13 +1,8 @@
 package com.ethossoftworks.reaperbleiem.service.talkback
 
 /**
- * IMA ADPCM codec for talkback. Compresses 16-bit mono PCM ~4:1 (16 kHz / 256 kbps -> ~64 kbps) so full 16 kHz audio
- * fits the iOS-central BLE L2CAP link (which can't sustain raw 256 kbps).
- *
- * The phone encodes; the macOS host decodes back to PCM before forwarding to the eel — so the eel/JSFX pipeline is
- * unchanged. Each encoded block is self-contained: its [ADPCM_HEADER_SIZE]-byte header stores the encoder's
- * predictor/step state at the start of the block, so the decoder re-syncs on every block. That makes blocks robust
- * across talk-burst boundaries (a fresh PTT press starts a new encoder) with no explicit reset signaling.
+ * IMA ADPCM codec for simple audio compression. Compresses 16-bit mono PCM ~4:1 (16 kHz / 256 kbps -> ~64 kbps)
+ * so full 16 kHz audio fits the iOS-central BLE L2CAP link (which can't sustain raw 256 kbps).
  *
  * Block layout (little-endian): sampleCount (u16), predictor (i16), stepIndex (u8), reserved (u8), then
  * ceil(sampleCount / 2) bytes of 4-bit codes (low nibble first).
@@ -25,7 +20,6 @@ private val STEP_TABLE =
 
 private val INDEX_TABLE = intArrayOf(-1, -1, -1, -1, 2, 4, 6, 8, -1, -1, -1, -1, 2, 4, 6, 8)
 
-/** Stateful across frames (so the predictor stays smooth); each emitted block captures the start state in its header. */
 class AdpcmEncoder {
     private var predictor = 0
     private var stepIndex = 0
