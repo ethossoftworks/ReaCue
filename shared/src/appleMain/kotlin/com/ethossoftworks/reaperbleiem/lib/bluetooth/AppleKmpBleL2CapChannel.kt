@@ -8,9 +8,7 @@ import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
-import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.convert
-import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.usePinned
 import kotlinx.coroutines.channels.BufferOverflow
@@ -18,6 +16,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import platform.CoreBluetooth.CBL2CAPChannel
+import platform.CoreFoundation.CFRunLoopWakeUp
 import platform.Foundation.NSDate
 import platform.Foundation.NSDefaultRunLoopMode
 import platform.Foundation.NSInputStream
@@ -35,20 +34,18 @@ import platform.Foundation.NSThread
 import platform.Foundation.dateWithTimeIntervalSinceNow
 import platform.Foundation.runMode
 import platform.darwin.NSObject
-import platform.posix.memcpy
-import platform.posix.uint8_tVar
 
 /**
  * Wraps a CoreBluetooth [CBL2CAPChannel]'s NSInputStream/NSOutputStream as an [IKmpBleL2CapChannel].
  *
- * NSStream is not thread-safe and must be driven from the thread it is scheduled on. We dedicate one [NSThread]: its
- * run loop is pumped in short bursts so the input stream's delegate delivers reads, and between bursts we drain a
- * lock-free outbound queue (so [write] can be called from any coroutine and the bytes are flushed within a few ms).
- * Every NSStream call therefore happens on this one thread. This mirrors Apple's documented L2CAP stream handling.
- *
- * The same wiring serves both the peripheral and central sides — only how the channel is obtained differs.
+ * NSStream is not thread-safe and is event-driven (not blocking, unlike Android's BluetoothSocket): it must be driven
+ * from the thread its run loop is scheduled on. We dedicate one [NSThread] whose run loop the streams are scheduled on,
+ * so the delegate delivers reads (and "space available") on that thread. The loop runs in 5 ms slices and flushes the
+ * outbound queue each slice; [write]/[close] also [CFRunLoopWakeUp] to flush/exit sooner. Every NSStream call therefore
+ * happens on this one thread.
  */
 private const val MAX_INBOX_BYTES = 4800
+private const val READ_BUFFER_SIZE = 4096
 
 internal class AppleKmpBleL2CapChannel(
     // Stored (not just a constructor param) so the CBL2CAPChannel is retained for the wrapper's lifetime. It owns the
@@ -56,13 +53,12 @@ internal class AppleKmpBleL2CapChannel(
     private val channel: CBL2CAPChannel
 ) : IKmpBleL2CapChannel {
 
-    // A Channel (not SharedFlow) so the flow COMPLETES when the channel closes
+    // A Channel (not SharedFlow) so the flow COMPLETES when the channel closes.
     private val incomingChannel = Channel<ByteArray>(capacity = 256, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     override val incoming: Flow<ByteArray> = incomingChannel.receiveAsFlow()
 
     private val input: NSInputStream? = channel.inputStream
     private val output: NSOutputStream? = channel.outputStream
-    private val readBufferSize = 4096
 
     private val running = atomic(true)
     private val inbox = atomic<List<ByteArray>>(emptyList())
@@ -110,15 +106,14 @@ internal class AppleKmpBleL2CapChannel(
 
     private fun drainInput() {
         val stream = input ?: return
-        memScoped {
-            val buffer = allocArray<uint8_tVar>(readBufferSize)
-            while (stream.hasBytesAvailable) {
-                val read = stream.read(buffer, readBufferSize.convert()).toInt()
-                if (read <= 0) break
-                val bytes = ByteArray(read)
-                bytes.usePinned { pinned -> memcpy(pinned.addressOf(0), buffer, read.convert()) }
-                incomingChannel.trySend(bytes)
-            }
+        val buffer = ByteArray(READ_BUFFER_SIZE)
+        while (stream.hasBytesAvailable) {
+            val read =
+                buffer.usePinned { pinned ->
+                    stream.read(pinned.addressOf(0).reinterpret(), READ_BUFFER_SIZE.convert()).toInt()
+                }
+            if (read <= 0) break
+            incomingChannel.trySend(buffer.copyOf(read))
         }
     }
 
