@@ -4,7 +4,6 @@ package com.ethossoftworks.reaperbleiem.lib.bluetooth
 
 import com.outsidesource.oskitkmp.outcome.Outcome
 import kotlinx.atomicfu.atomic
-import kotlinx.atomicfu.update
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.convert
@@ -40,11 +39,11 @@ import platform.darwin.NSObject
  * Wraps a CoreBluetooth [CBL2CAPChannel]'s NSInputStream/NSOutputStream as an [IKmpBleL2CapChannel].
  *
  * NSStream is not thread-safe and is event-driven (not blocking, unlike Android's BluetoothSocket): it must be driven
- * from the thread its run loop is scheduled on. We dedicate one [NSThread] whose run loop the streams are scheduled on.
- * The thread blocks in [CFRunLoopRun], dispatching the delegate callbacks and the flush blocks that [write] schedules
- * via [CFRunLoopPerformBlock] + [CFRunLoopWakeUp], until [close] calls [CFRunLoopStop].
+ * from the thread its run loop is scheduled on. We dedicate one [NSThread] that blocks in [CFRunLoopRun], dispatching
+ * the delegate callbacks (reads / space-available) and the pump blocks that [write] schedules via
+ * [CFRunLoopPerformBlock] + [CFRunLoopWakeUp], until [close] calls [CFRunLoopStop].
  */
-private const val MAX_BUFFERED_BYTES = 64 * 1024
+private const val OUTBOUND_CAPACITY = 1024
 private const val READ_BUFFER_SIZE = 4096
 
 internal class AppleKmpBleL2CapChannel(
@@ -61,9 +60,8 @@ internal class AppleKmpBleL2CapChannel(
     private val output: NSOutputStream? = channel.outputStream
 
     private val running = atomic(true)
-    private val outbox = atomic<List<ByteArray>>(emptyList())
     private val runLoopRef = atomic<CFRunLoopRef?>(null)
-    private val spaceAvailable = Channel<Unit>(Channel.CONFLATED)
+    private val outbound = Channel<ByteArray>(capacity = OUTBOUND_CAPACITY, onBufferOverflow = BufferOverflow.SUSPEND)
 
     private val delegate =
         object : NSObject(), NSStreamDelegateProtocol {
@@ -119,13 +117,13 @@ internal class AppleKmpBleL2CapChannel(
 
     override suspend fun write(data: ByteArray): Outcome<Unit, KmpBleError> {
         if (output == null || !running.value) return Outcome.Error(KmpBleError.Unknown("L2CAP channel closed"))
-        while (running.value && bufferedBytes() >= MAX_BUFFERED_BYTES) {
-            spaceAvailable.receive()
+        return try {
+            outbound.send(data)
+            scheduleOnRunLoop { flushOutbound() }
+            Outcome.Ok(Unit)
+        } catch (t: Throwable) {
+            Outcome.Error(KmpBleError.Unknown("L2CAP channel closed"))
         }
-        if (!running.value) return Outcome.Error(KmpBleError.Unknown("L2CAP channel closed"))
-        outbox.update { it + data }
-        scheduleOnRunLoop { flushOutbound() }
-        return Outcome.Ok(Unit)
     }
 
     private inline fun scheduleOnRunLoop(crossinline block: () -> Unit) {
@@ -136,38 +134,27 @@ internal class AppleKmpBleL2CapChannel(
 
     private fun flushOutbound() {
         val stream = output ?: return
-        val batch = outbox.getAndSet(emptyList())
-        var i = 0
-        while (i < batch.size) {
-            val chunk = batch[i]
+
+        while (running.value) {
+            val chunk = outbound.tryReceive().getOrNull() ?: break
             var offset = 0
-            while (offset < chunk.size && stream.hasSpaceAvailable) {
-                val written = chunk.usePinned { pinned ->
-                    stream.write((pinned.addressOf(offset)).reinterpret(), (chunk.size - offset).convert()).toInt()
-                }
+
+            while (offset < chunk.size) {
+                if (!stream.hasSpaceAvailable) continue
+                val written =
+                    chunk.usePinned { pinned ->
+                        stream.write(pinned.addressOf(offset).reinterpret(), (chunk.size - offset).convert()).toInt()
+                    }
                 if (written <= 0) break
                 offset += written
             }
-            if (offset < chunk.size) {
-                // Output buffer is full. Re-queue this chunk's unwritten tail plus every remaining chunk IN ORDER at
-                // the front of the inbox so the byte stream stays sequential.
-                val pending = ArrayList<ByteArray>(batch.size - i)
-                pending.add(if (offset == 0) chunk else chunk.copyOfRange(offset, chunk.size))
-                for (j in i + 1 until batch.size) pending.add(batch[j])
-                outbox.update { pending + it }
-                break
-            }
-            i++
         }
-        if (bufferedBytes() < MAX_BUFFERED_BYTES) spaceAvailable.trySend(Unit)
     }
-
-    private fun bufferedBytes(): Int = outbox.value.sumOf { it.size }
 
     override fun close() {
         if (!running.getAndSet(false)) return
         incomingChannel.close()
-        spaceAvailable.trySend(Unit)
+        outbound.close()
         runLoopRef.value?.let { CFRunLoopStop(it) }
     }
 }
