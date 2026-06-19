@@ -55,9 +55,6 @@ class BleCentralIemService(
 ) : IIemService {
 
     private val peripheral = atomic<IKmpBlePeripheral?>(null)
-
-    // Talkback: PSM discovered in the handshake, the persistent L2CAP channel (opened once per connection), and the
-    // mic->channel pump job (started/stopped per push-to-talk press).
     private val talkbackPsm = atomic(0)
     private val talkbackChannel = atomic<IKmpBleL2CapChannel?>(null)
     private val talkbackMicJob = atomic<Job?>(null)
@@ -202,11 +199,6 @@ class BleCentralIemService(
     val isTalkbackChannelOpen: Boolean
         get() = talkbackPsm.value != 0
 
-    /**
-     * Starts streaming mic audio to the peripheral. The L2CAP channel is opened lazily on first use (the connection
-     * isn't ready for a CoC immediately after connect) and then kept open and reused for subsequent presses.
-     * Idempotent while active.
-     */
     suspend fun startTalkback() {
         val peripheral = peripheral.value ?: return
         if (talkbackMicJob.value != null) return
@@ -217,26 +209,21 @@ class BleCentralIemService(
                 Logger.w { "Talkback not supported by host (no PSM)" }
                 return
             }
-            when (val out = peripheral.openL2CapChannel(psm)) {
-                is Outcome.Ok -> {
-                    talkbackChannel.update { out.value }
-                    Logger.i { "Talkback L2CAP channel opened (psm $psm)" }
-                }
-                is Outcome.Error -> {
-                    Logger.e { "Talkback L2CAP channel open failed: ${out.error}" }
-                    return
-                }
+            val channel = peripheral.openL2CapChannel(psm).unwrapOrReturn {
+                Logger.e { "Talkback L2CAP channel open failed: ${it.error}" }
+                return
             }
+            talkbackChannel.update { channel }
         }
         val channel = talkbackChannel.value ?: return
 
         // The desired talkback channel travels in-band as the first byte of every L2CAP frame (-1 = let the host
         // auto-allocate a slot; 0..7 = a specific channel). Read once at press time so it's constant for this burst.
-        val talkbackChannel = centralPreferencesService.settings.value.talkbackChannel
+        val talkbackChannelSlot = centralPreferencesService.settings.value.talkbackChannel
 
         val job =
             peripheral.scope.launch {
-                Logger.i { "Talkback: starting mic capture on channel $talkbackChannel" }
+                Logger.i { "Talkback: starting mic capture on channel $talkbackChannelSlot" }
                 // Compress to IMA ADPCM (~4:1) so 16 kHz fits the BLE link. Each frame is [len u16 LE][channel u8]
                 // [ADPCM block]; len covers the channel byte + block. A fresh encoder per press resets state.
                 val encoder = AdpcmEncoder()
@@ -249,7 +236,7 @@ class BleCentralIemService(
                         val framed = ByteArray(2 + payloadLen)
                         framed[0] = (payloadLen and 0xFF).toByte()
                         framed[1] = ((payloadLen shr 8) and 0xFF).toByte()
-                        framed[2] = talkbackChannel.toByte() // signed; -1 -> 0xFF
+                        framed[2] = talkbackChannelSlot.toByte() // signed; -1 -> 0xFF
                         block.copyInto(framed, destinationOffset = 3)
                         val result = channel.write(framed)
                         if (result is Outcome.Error) {
@@ -265,7 +252,6 @@ class BleCentralIemService(
         talkbackMicJob.update { job }
     }
 
-    /** Stops the mic stream. The L2CAP channel stays open for the next press. */
     fun stopTalkback() {
         talkbackMicJob.getAndSet(null)?.cancel()
     }

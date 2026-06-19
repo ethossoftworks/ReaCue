@@ -68,10 +68,6 @@ class BlePeripheralIemService(
     private val secureRandom = CryptographyRandom.Default
     private val authorizedCentrals = atomic<Set<KmpBleCentralId>>(emptySet())
     private val authNonces = atomic<Map<KmpBleCentralId, ByteArray>>(emptyMap())
-
-    // Talkback: the published L2CAP PSM (exposed to centrals via the handshake), the talker slot assigned to each
-    // streaming central, and the open channels so we can close them on disconnect. Slot count must match TB_MAX_TALKERS
-    // in ReaCue.eel / the Talkback JSFX.
     private val l2capPsm = atomic<Int?>(null)
     private val talkbackSlots = atomic<Map<KmpBleCentralId, Int>>(emptyMap())
     private val talkbackChannels = atomic<Map<KmpBleCentralId, IKmpBleL2CapChannel>>(emptyMap())
@@ -213,7 +209,6 @@ class BlePeripheralIemService(
                     writeInt(BLE_PROTOCOL_VERSION)
                     write(hostId)
                     write(nonce)
-                    // Talkback L2CAP PSM (0 = talkback unavailable). Appended to the existing handshake payload.
                     writeUShort((l2capPsm.value ?: 0).toUShort())
                 }
                 .readByteArray()
@@ -298,12 +293,6 @@ class BlePeripheralIemService(
         }
     }
 
-    /**
-     * A central opened its persistent talkback L2CAP channel. Authorize it, assign a talker slot, and forward PCM to
-     * Reaper. The channel stays open for the whole connection; an actual "talk burst" is inferred from data flow —
-     * the first PCM after silence sends TALKBACK_START (fresh generation so the JSFX resets), and ~idle sends
-     * TALKBACK_STOP (so the JSFX goes silent and idle). Runs until the channel closes on disconnect.
-     */
     private fun onTalkbackChannelOpened(event: KmpBlePeripheralEvent.L2CapChannelOpened, scope: CoroutineScope) {
         if (!authorizedCentrals.value.contains(event.centralId)) {
             event.channel.close()
@@ -313,26 +302,20 @@ class BlePeripheralIemService(
 
         scope.launch {
             Logger.i { "Talkback channel opened for ${event.centralId} (psm ${event.psm})" }
-            // Each L2CAP frame is [len u16 LE][channel u8][ADPCM block]; the channel rides in-band like talkerId in
-            // the TCP payload. -1 => auto-allocate a free slot; 0..7 => that exact slot. Resolved at each talk-burst
-            // start (data-flow driven). Plain vars are fine: worst case a STOP is one tick late.
-            var dataSeq = 0
-            var talking = false
-            var slot = -1 // resolved gmem slot / talkerId for the current burst
-            var rateMark = kotlin.time.TimeSource.Monotonic.markNow()
-            var rateBytes = 0L
+            // Each L2CAP frame is [length u16 LE][talkerChannel u8][ADPCM block]; -1 => auto-allocate a free slot;
+            // 0..7 => that exact slot. Resolved at each talk-burst.
+            var slot = -1
+            var sawData = false
 
             val idleMonitor =
                 launch {
-                    var lastSeq = -1
                     while (isActive) {
                         delay(TalkbackIdleTimeout)
-                        val current = dataSeq
-                        if (talking && current == lastSeq) {
+                        if (slot != -1 && !sawData) {
                             networkIemService.sendTalkbackStop(slot)
-                            talking = false
+                            slot = -1
                         }
-                        lastSeq = current
+                        sawData = false
                     }
                 }
 
@@ -348,8 +331,8 @@ class BlePeripheralIemService(
                         val block = acc.copyOfRange(off + 3, off + 2 + len)
                         off += 2 + len
 
-                        dataSeq++
-                        if (!talking) {
+                        sawData = true
+                        if (slot == -1) {
                             val resolved = allocateTalkbackSlot(event.centralId, preferred = declaredChannel)
                             if (resolved == null) {
                                 Logger.w { "No free talkback slot for ${event.centralId}" }
@@ -357,29 +340,19 @@ class BlePeripheralIemService(
                             }
                             slot = resolved
                             networkIemService.sendTalkbackStart(slot)
-                            talking = true
-                            Logger.i { "Talkback burst started -> slot $slot (declared $declaredChannel)" }
                         }
 
                         val pcm = AdpcmDecoder.decode(block)
-                        rateBytes += pcm.size
                         if (pcm.isNotEmpty()) networkIemService.sendTalkbackAudio(slot, pcm)
                     }
                     acc = if (off > 0) acc.copyOfRange(off, acc.size) else acc
-
-                    val elapsedMs = rateMark.elapsedNow().inWholeMilliseconds
-                    if (elapsedMs >= 2000) {
-                        Logger.i { "Talkback slot $slot decoded PCM: ${rateBytes * 1000 / elapsedMs} B/s (expected ~32000)" }
-                        rateMark = kotlin.time.TimeSource.Monotonic.markNow()
-                        rateBytes = 0L
-                    }
                 }
                 Logger.i { "Talkback channel closed for ${event.centralId}" }
             } catch (t: Throwable) {
                 Logger.e(t) { "Talkback error for ${event.centralId}" }
             } finally {
                 idleMonitor.cancel()
-                if (talking) networkIemService.sendTalkbackStop(slot)
+                if (slot != -1) networkIemService.sendTalkbackStop(slot)
                 freeTalkbackSlot(event.centralId)
                 talkbackChannels.update { it - event.centralId }
                 event.channel.close()
@@ -388,7 +361,7 @@ class BlePeripheralIemService(
     }
 
     /**
-     * Resolves the gmem slot for a talker. [preferred] is the channel declared in the L2CAP payload: 0..7 claims that
+     * Resolves the slot for a talker. [preferred] is the channel declared in the L2CAP payload: 0..7 claims that
      * exact slot (explicit — collisions between two explicit talkers are allowed by design; the UI warns against it);
      * anything else (-1) auto-allocates — reusing this central's held slot, else the first slot not already claimed.
      * Returns null only when auto-allocating and every slot is taken.

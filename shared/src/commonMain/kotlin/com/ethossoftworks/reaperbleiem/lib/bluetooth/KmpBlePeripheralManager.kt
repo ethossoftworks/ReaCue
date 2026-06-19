@@ -29,7 +29,7 @@ interface IKmpBlePeripheralManager {
     /**
      * Publishes an L2CAP Connection-Oriented Channel and returns the dynamically assigned PSM. Centrals open a data
      * stream to this PSM (see [IKmpBleL2CapChannel]); each opened channel is surfaced as a
-     * [KmpBlePeripheralEvent.L2CapChannelOpened] during [advertise]. Used for receiving talkback audio.
+     * [KmpBlePeripheralEvent.L2CapChannelOpened] during [advertise].
      */
     suspend fun publishL2CapChannel(): Outcome<Int, KmpBleError>
 
