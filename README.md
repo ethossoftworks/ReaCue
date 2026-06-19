@@ -3,7 +3,7 @@
 </div>
 
 # <div align="center">ReaCue<br><a href="https://github.com/ethossoftworks/ReaCue/releases/latest"><img src="https://img.shields.io/github/v/release/ethossoftworks/ReaCue"><a/></div>
-ReaCue is a personal in-ear monitor (IEM) mixing app for [REAPER](https://www.reaper.fm/) that uses Bluetooth Low Energy 
+ReaCue is a personal in-ear monitor (IEM) mixing and talkback app for [REAPER](https://www.reaper.fm/) that uses Bluetooth Low Energy 
 instead of Wi-Fi. A macOS host app connects to REAPER and communicates over BLE to Android and iOS clients so band 
 members can adjust their own monitor mixes from their phones.
 
@@ -31,6 +31,7 @@ REAPER <—TCP—> macOS Host <—BLE—> Android/iOS Client
 ```
 
 ## Features
+- Talkback - Use your phone's microphone to talk to other IEMs
 - Automatic monitor track detection (tracks with hardware outs and receives, but no sends)
 - Per-track monitor mix control with volume, pan, and mute controls
 - Output volume control for each monitor track's hardware output
@@ -53,27 +54,46 @@ ReaCue requires a ReaScript to be run
 
 1. Copy `reaperConfigs/ReaCue.eel` to your REAPER resource path's `Scripts` directory 
   (typically `~/Library/Application Support/REAPER/Scripts`)
-2. If you want ReaCue to run automatically on Reaper startup, Create or edit `__startup.eel` in the `Scripts` directory 
+2. (Optional) If you want ReaCue to run automatically on Reaper startup, Create or edit `__startup.eel` in the `Scripts` directory 
   and add the following lines (replacing `[action_command_id]` with your actual command id found in the Reaper actions 
   window:
    ```eel
    cmd = NamedCommandLookup("[action_command_id]");
    cmd > 0 ? Main_OnCommand(cmd, 0);
    ```
-3. Restart REAPER
+3. (Optional) If you want to use the Talkback feature, copy `reaperConfigs/ReaCue Talkback.jsfx` to your resource path's
+  `Effects` directory.
+4. Restart REAPER
 
 **Note:** it is possible to change the TCP port ReaCue serves by editing ReaCue.eel and modifying the TCP_PORT variable.
 
 **Note:** for security reasons, the ReaCue TCP port is only available on localhost. The host application listens to
 the TCP port and advertises BLE for all clients.
 
-### REAPER Track Setup
+### REAPER Track/IEM Setup
 
-For a track to appear as a selectable monitor in ReaCue, it must have both **receives** (sends from other tracks into it) and at least one **hardware output**. A typical setup:
+For a track to appear as a selectable monitor in ReaCue, it must have both **receives** (sends from other tracks into it) 
+and at least one **hardware output**. A typical setup:
 
 1. Create a monitor track for each band member
 2. Add sends from each source track (vocals, guitar, drums, etc.) to the monitor track
-3. Route the monitor track to a hardware output on your audio interface
+3. Route the monitor track to a hardware output on your audio interface 
+
+### Talkback Setup
+If you want to use the talkback feature you can set it up in one of three ways:
+#### Per IEM FX (Recommended))
+Add an FX instance of `ReaCue Talkback` to each monitor track. Each band member should select a unique
+talkback channel in their app settings and change the `Channel Filter` option in `ReaCue Talkback` to match. Using the
+`Channel Filter` option prevents speech jamming yourself when you're trying to talk due to the natural latency of BLE
+and audio capture.
+
+#### Per IEM Track Receive
+Add a separate talkback Track for each IEM and configure it to send only to the correct IEM track. Follow the rest of 
+steps from above to avoid speech jamming.
+
+#### Global Talkback (Not recommended)
+Create a single "Talkback" track, add a `ReaCue Talkback` FX to it, and send it to all monitor tracks. Using this method
+there is no way to filter out your own voice to avoid speech jamming. However, this is the simplest method.
 
 ## Getting Started
 1. Make sure the REAPER Setup instructions have been followed
