@@ -43,6 +43,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
+import kotlinx.io.readUShort
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
 
@@ -163,8 +164,7 @@ class BleCentralIemService(
 
             val hostId = Uuid.fromByteArray(buffer.readByteArray(16)).toHexString()
             val nonce = buffer.readByteArray(16)
-            // Talkback L2CAP PSM appended by the host (big-endian UShort; 0 = talkback unavailable).
-            talkbackPsm.update { if (buffer.size >= 2) (buffer.readShort().toInt() and 0xFFFF) else 0 }
+            talkbackPsm.update { buffer.readUShort().toInt() }
 
             val requestPasscode: suspend () -> String = {
                 val passcodeDeferred = CompletableDeferred<String>()
@@ -199,7 +199,7 @@ class BleCentralIemService(
 
     fun scan() = bleCentralManager.scan().filter { it.services.contains(REACUE_SERVICE_UUID) }
 
-    val isTalkbackSupported: Boolean
+    val isTalkbackChannelOpen: Boolean
         get() = talkbackPsm.value != 0
 
     /**

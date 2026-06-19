@@ -95,10 +95,7 @@ interface IKmpBlePeripheral {
     ): Flow<ByteArray>
 
     /**
-     * Opens an L2CAP Connection-Oriented Channel to the connected peripheral on the given [psm]. L2CAP CoC is a
-     * reliable, ordered byte stream (like TCP) with far higher throughput and lower overhead than GATT notifications —
-     * used here for streaming talkback microphone audio. The [psm] is discovered out-of-band (ReaCue publishes it in
-     * the handshake characteristic payload).
+     * Opens an L2CAP Connection-Oriented Channel to the connected peripheral on the given [psm].
      */
     suspend fun openL2CapChannel(psm: Int): Outcome<IKmpBleL2CapChannel, KmpBleError>
 }

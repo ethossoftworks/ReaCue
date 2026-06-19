@@ -22,6 +22,7 @@ import platform.Foundation.NSDate
 import platform.Foundation.NSDefaultRunLoopMode
 import platform.Foundation.NSInputStream
 import platform.Foundation.NSOutputStream
+import platform.Foundation.NSQualityOfServiceUserInteractive
 import platform.Foundation.NSRunLoop
 import platform.Foundation.NSStream
 import platform.Foundation.NSStreamDelegateProtocol
@@ -30,7 +31,6 @@ import platform.Foundation.NSStreamEventEndEncountered
 import platform.Foundation.NSStreamEventErrorOccurred
 import platform.Foundation.NSStreamEventHasBytesAvailable
 import platform.Foundation.NSStreamEventHasSpaceAvailable
-import platform.Foundation.NSQualityOfServiceUserInteractive
 import platform.Foundation.NSThread
 import platform.Foundation.dateWithTimeIntervalSinceNow
 import platform.Foundation.runMode
@@ -41,24 +41,22 @@ import platform.posix.uint8_tVar
 /**
  * Wraps a CoreBluetooth [CBL2CAPChannel]'s NSInputStream/NSOutputStream as an [IKmpBleL2CapChannel].
  *
- * NSStream is not thread-safe and must be driven from the thread it is scheduled on. We dedicate one [NSThread]:
- * its run loop is pumped in short bursts so the input stream's delegate delivers reads, and between bursts we drain
- * a lock-free outbound queue (so [write] can be called from any coroutine and the bytes are flushed within a few ms).
+ * NSStream is not thread-safe and must be driven from the thread it is scheduled on. We dedicate one [NSThread]: its
+ * run loop is pumped in short bursts so the input stream's delegate delivers reads, and between bursts we drain a
+ * lock-free outbound queue (so [write] can be called from any coroutine and the bytes are flushed within a few ms).
  * Every NSStream call therefore happens on this one thread. This mirrors Apple's documented L2CAP stream handling.
  *
  * The same wiring serves both the peripheral and central sides — only how the channel is obtained differs.
  */
-// ~150 ms of 16 kHz mono PCM16 (32 KB/s). Bounds talkback send latency if transmission falls behind capture.
 private const val MAX_INBOX_BYTES = 4800
 
 internal class AppleKmpBleL2CapChannel(
     // Stored (not just a constructor param) so the CBL2CAPChannel is retained for the wrapper's lifetime. It owns the
     // L2CAP connection and its streams; if it deallocates, the connection tears down (remote sees "Broken pipe").
-    private val channel: CBL2CAPChannel,
+    private val channel: CBL2CAPChannel
 ) : IKmpBleL2CapChannel {
 
-    // A Channel (not SharedFlow) so the flow COMPLETES when the channel closes — that completion is what lets the
-    // peripheral aggregator send TALKBACK_STOP and release the talker slot.
+    // A Channel (not SharedFlow) so the flow COMPLETES when the channel closes
     private val incomingChannel = Channel<ByteArray>(capacity = 256, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     override val incoming: Flow<ByteArray> = incomingChannel.receiveAsFlow()
 
@@ -67,7 +65,6 @@ internal class AppleKmpBleL2CapChannel(
     private val readBufferSize = 4096
 
     private val running = atomic(true)
-    // Inbox appended by writer coroutines, drained on the run-loop thread.
     private val inbox = atomic<List<ByteArray>>(emptyList())
 
     private val delegate =
@@ -107,8 +104,6 @@ internal class AppleKmpBleL2CapChannel(
         }
 
     init {
-        // High QoS so the stream-pump thread isn't starved by the real-time audio thread (which would make L2CAP
-        // sends bursty and audio stutter on the receiving end).
         thread.qualityOfService = NSQualityOfServiceUserInteractive
         thread.start()
     }
@@ -135,16 +130,15 @@ internal class AppleKmpBleL2CapChannel(
             val chunk = batch[i]
             var offset = 0
             while (offset < chunk.size && stream.hasSpaceAvailable) {
-                val written =
-                    chunk.usePinned { pinned ->
-                        stream.write((pinned.addressOf(offset)).reinterpret(), (chunk.size - offset).convert()).toInt()
-                    }
+                val written = chunk.usePinned { pinned ->
+                    stream.write((pinned.addressOf(offset)).reinterpret(), (chunk.size - offset).convert()).toInt()
+                }
                 if (written <= 0) break
                 offset += written
             }
             if (offset < chunk.size) {
                 // Output buffer is full. Re-queue this chunk's unwritten tail plus every remaining chunk IN ORDER at
-                // the front of the inbox so the byte stream stays sequential (reordering here corrupts the audio).
+                // the front of the inbox so the byte stream stays sequential.
                 val pending = ArrayList<ByteArray>(batch.size - i)
                 pending.add(if (offset == 0) chunk else chunk.copyOfRange(offset, chunk.size))
                 for (j in i + 1 until batch.size) pending.add(batch[j])
@@ -162,7 +156,6 @@ internal class AppleKmpBleL2CapChannel(
             var queue = current + data
             var total = queue.sumOf { it.size }
             // Cap the send backlog so latency can't grow without bound if transmission falls behind production.
-            // Dropping the oldest stale audio keeps talkback real-time (a brief skip beats an ever-growing delay).
             while (total > MAX_INBOX_BYTES && queue.size > 1) {
                 total -= queue.first().size
                 queue = queue.drop(1)
@@ -170,7 +163,8 @@ internal class AppleKmpBleL2CapChannel(
             }
             queue
         }
-        if (dropped) Logger.w { "Talkback L2CAP backlog over ${MAX_INBOX_BYTES}B — dropped stale audio to stay real-time" }
+        if (dropped)
+            Logger.w { "Talkback L2CAP backlog over ${MAX_INBOX_BYTES}B — dropped stale audio to stay real-time" }
         return Outcome.Ok(Unit)
     }
 

@@ -12,13 +12,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-/**
- * Wraps an Android L2CAP CoC [BluetoothSocket] as an [IKmpBleL2CapChannel]. Reads run on a blocking IO loop surfaced
- * as [incoming]; [write] serializes onto IO. Used by the central (phone) to stream talkback mic audio to the host.
- */
-internal class AndroidKmpBleL2CapChannel(
-    private val socket: BluetoothSocket,
-) : IKmpBleL2CapChannel {
+internal class AndroidKmpBleL2CapChannel(private val socket: BluetoothSocket) : IKmpBleL2CapChannel {
 
     private val output = socket.outputStream
     private val writeMutex = Mutex()

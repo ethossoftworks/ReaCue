@@ -35,7 +35,8 @@ class AndroidMicrophoneCaptureService : IMicrophoneCaptureService {
                 val record =
                     AudioRecord(
                         // VOICE_RECOGNITION: low-latency path with minimal DSP. VOICE_COMMUNICATION's AEC/NS/AGC
-                        // chain adds significant latency and isn't needed for talkback (the phone never hears the IEMs).
+                        // chain adds significant latency and isn't needed for talkback (the phone never hears the
+                        // IEMs).
                         MediaRecorder.AudioSource.VOICE_RECOGNITION,
                         TALKBACK_SAMPLE_RATE,
                         AudioFormat.CHANNEL_IN_MONO,

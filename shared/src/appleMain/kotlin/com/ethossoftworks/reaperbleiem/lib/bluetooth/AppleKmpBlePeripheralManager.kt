@@ -299,8 +299,6 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
     override suspend fun publishL2CapChannel(): Outcome<Int, KmpBleError> {
         awaitPeripheralManagerPoweredOn() ?: return Outcome.Error(KmpBleError.PlatformHandlerNotReady)
         while (l2capPublishEvents.tryReceive().isSuccess) {} // drain any stale result
-        // No link encryption: ReaCue is unbonded by design (HMAC handshake instead of pairing). Each opened channel
-        // is authorized against the handshake-authenticated central before any audio is forwarded.
         peripheralManager.publishL2CAPChannelWithEncryption(false)
         return l2capPublishEvents.receive()
     }

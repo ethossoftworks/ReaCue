@@ -110,8 +110,8 @@ class IemInteractor(private val iemService: IIemService) :
         if (iemService is BlePeripheralIemService) iemService.sendDisconnectEvent()
     }
 
-    val isTalkbackSupported: Boolean
-        get() = (iemService as? BleCentralIemService)?.isTalkbackSupported ?: false
+    val isTalkbackChannelOpen: Boolean
+        get() = (iemService as? BleCentralIemService)?.isTalkbackChannelOpen ?: false
 
     fun startTalkback() {
         interactorScope.launch { (iemService as? BleCentralIemService)?.startTalkback() }

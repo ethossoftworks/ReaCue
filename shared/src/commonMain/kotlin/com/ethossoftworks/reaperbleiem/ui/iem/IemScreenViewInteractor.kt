@@ -72,7 +72,7 @@ class IemScreenViewInteractor(
             serviceStatus = iemInteractor.state.serviceStatus,
             isRefreshing = iemInteractor.state.isRefreshing,
             showTalkbackButton =
-                iemInteractor.isTalkbackSupported && centralPreferencesService?.settings?.value?.showTalkBack == true,
+                iemInteractor.isTalkbackChannelOpen && centralPreferencesService?.settings?.value?.showTalkBack == true,
         )
     }
 
