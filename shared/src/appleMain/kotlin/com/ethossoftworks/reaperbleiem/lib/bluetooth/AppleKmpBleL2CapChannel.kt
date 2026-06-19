@@ -16,8 +16,12 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import platform.CoreBluetooth.CBL2CAPChannel
+import platform.CoreFoundation.CFRunLoopPerformBlock
+import platform.CoreFoundation.CFRunLoopRef
+import platform.CoreFoundation.CFRunLoopRun
+import platform.CoreFoundation.CFRunLoopStop
 import platform.CoreFoundation.CFRunLoopWakeUp
-import platform.Foundation.NSDate
+import platform.CoreFoundation.kCFRunLoopDefaultMode
 import platform.Foundation.NSDefaultRunLoopMode
 import platform.Foundation.NSInputStream
 import platform.Foundation.NSOutputStream
@@ -31,18 +35,15 @@ import platform.Foundation.NSStreamEventErrorOccurred
 import platform.Foundation.NSStreamEventHasBytesAvailable
 import platform.Foundation.NSStreamEventHasSpaceAvailable
 import platform.Foundation.NSThread
-import platform.Foundation.dateWithTimeIntervalSinceNow
-import platform.Foundation.runMode
 import platform.darwin.NSObject
 
 /**
  * Wraps a CoreBluetooth [CBL2CAPChannel]'s NSInputStream/NSOutputStream as an [IKmpBleL2CapChannel].
  *
  * NSStream is not thread-safe and is event-driven (not blocking, unlike Android's BluetoothSocket): it must be driven
- * from the thread its run loop is scheduled on. We dedicate one [NSThread] whose run loop the streams are scheduled on,
- * so the delegate delivers reads (and "space available") on that thread. The loop runs in 5 ms slices and flushes the
- * outbound queue each slice; [write]/[close] also [CFRunLoopWakeUp] to flush/exit sooner. Every NSStream call therefore
- * happens on this one thread.
+ * from the thread its run loop is scheduled on. We dedicate one [NSThread] whose run loop the streams are scheduled on.
+ * The thread blocks in [CFRunLoopRun], dispatching the delegate callbacks and the flush blocks that [write] schedules
+ * via [CFRunLoopPerformBlock] + [CFRunLoopWakeUp], until [close] calls [CFRunLoopStop].
  */
 private const val MAX_INBOX_BYTES = 4800
 private const val READ_BUFFER_SIZE = 4096
@@ -62,6 +63,7 @@ internal class AppleKmpBleL2CapChannel(
 
     private val running = atomic(true)
     private val inbox = atomic<List<ByteArray>>(emptyList())
+    private val runLoopRef = atomic<CFRunLoopRef?>(null)
 
     private val delegate =
         object : NSObject(), NSStreamDelegateProtocol {
@@ -78,6 +80,7 @@ internal class AppleKmpBleL2CapChannel(
         object : NSThread() {
             override fun main() {
                 val runLoop = NSRunLoop.currentRunLoop
+                runLoopRef.value = runLoop.getCFRunLoop()
                 input?.setDelegate(delegate)
                 input?.scheduleInRunLoop(runLoop, forMode = NSDefaultRunLoopMode)
                 output?.setDelegate(delegate)
@@ -85,17 +88,14 @@ internal class AppleKmpBleL2CapChannel(
                 input?.open()
                 output?.open()
 
-                // Pump the run loop in 5 ms slices so input reads are delivered via the delegate, then flush any
-                // queued outbound bytes (same thread, so NSStream access stays serialized).
-                while (running.value && !isCancelled()) {
-                    runLoop.runMode(NSDefaultRunLoopMode, beforeDate = NSDate.dateWithTimeIntervalSinceNow(0.005))
-                    flushOutbound()
-                }
+                flushOutbound()
+                CFRunLoopRun()
 
                 input?.close()
                 output?.close()
                 input?.setDelegate(null)
                 output?.setDelegate(null)
+                runLoopRef.value = null
             }
         }
 
@@ -144,6 +144,12 @@ internal class AppleKmpBleL2CapChannel(
         }
     }
 
+    private inline fun scheduleOnRunLoop(crossinline block: () -> Unit) {
+        val runLoop = runLoopRef.value ?: return
+        CFRunLoopPerformBlock(runLoop, kCFRunLoopDefaultMode) { block() }
+        CFRunLoopWakeUp(runLoop)
+    }
+
     override suspend fun write(data: ByteArray): Outcome<Unit, KmpBleError> {
         if (output == null || !running.value) return Outcome.Error(KmpBleError.Unknown("L2CAP channel closed"))
         var dropped = false
@@ -158,14 +164,14 @@ internal class AppleKmpBleL2CapChannel(
             }
             queue
         }
-        if (dropped)
-            Logger.w { "Talkback L2CAP backlog over ${MAX_INBOX_BYTES}B — dropped stale audio to stay real-time" }
+        if (dropped) Logger.w { "L2CAP backlog over ${MAX_INBOX_BYTES}B — dropped stale  to stay real-time" }
+        scheduleOnRunLoop { flushOutbound() }
         return Outcome.Ok(Unit)
     }
 
     override fun close() {
         if (!running.getAndSet(false)) return
         incomingChannel.close()
-        if (!thread.isCancelled()) thread.cancel()
+        runLoopRef.value?.let { CFRunLoopStop(it) }
     }
 }
