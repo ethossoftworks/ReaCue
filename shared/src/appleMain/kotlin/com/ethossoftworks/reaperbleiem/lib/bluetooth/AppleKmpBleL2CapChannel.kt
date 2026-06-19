@@ -58,10 +58,11 @@ internal class AppleKmpBleL2CapChannel(
 
     private val input: NSInputStream? = channel.inputStream
     private val output: NSOutputStream? = channel.outputStream
-
     private val running = atomic(true)
     private val runLoopRef = atomic<CFRunLoopRef?>(null)
     private val outbound = Channel<ByteArray>(capacity = OUTBOUND_CAPACITY, onBufferOverflow = BufferOverflow.SUSPEND)
+    private var pendingPartialWrite: ByteArray? = null
+    private var pendingPartialWriteOffset = 0
 
     private val delegate =
         object : NSObject(), NSStreamDelegateProtocol {
@@ -136,17 +137,25 @@ internal class AppleKmpBleL2CapChannel(
         val stream = output ?: return
 
         while (running.value) {
-            val chunk = outbound.tryReceive().getOrNull() ?: break
-            var offset = 0
+            val chunk = pendingPartialWrite ?: outbound.tryReceive().getOrNull() ?: break
+            var offset = pendingPartialWriteOffset
+            pendingPartialWrite = null
+            pendingPartialWriteOffset = 0
 
-            while (offset < chunk.size) {
-                if (!stream.hasSpaceAvailable) continue
+            while (offset < chunk.size && stream.hasSpaceAvailable) {
                 val written =
                     chunk.usePinned { pinned ->
                         stream.write(pinned.addressOf(offset).reinterpret(), (chunk.size - offset).convert()).toInt()
                     }
                 if (written <= 0) break
                 offset += written
+            }
+
+            // Out of space mid-chunk. Return to the run loop so it can deliver HasSpaceAvailable
+            if (offset < chunk.size) {
+                pendingPartialWrite = chunk
+                pendingPartialWriteOffset = offset
+                break
             }
         }
     }
