@@ -17,7 +17,7 @@ options:gmem=ReaCue
 
 slider1:gain_db=0<-24,12,0.1>Gain (dB)
 slider2:buffer_ms=150<10,200,1>Jitter Buffer (ms)
-slider3:talkback_channel_dropdown=-1<-1,7,1{Listen to All, 0, 1, 2, 3, 4, 5, 6, 7}>Channel Filter
+slider3:talkback_channel_dropdown=0<0,8,1{Listen to All, 0, 1, 2, 3, 4, 5, 6, 7}>Channel Filter
 
 @init
 MAX_TALKERS = 8;
