@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -24,6 +25,7 @@ import com.ethossoftworks.reaperbleiem.ui.form.AppButton
 import com.ethossoftworks.reaperbleiem.ui.form.AppButtonType
 import com.ethossoftworks.reaperbleiem.ui.form.AppDropdown
 import com.ethossoftworks.reaperbleiem.ui.form.AppDropdownItem
+import com.ethossoftworks.reaperbleiem.ui.form.AppSwitch
 import com.ethossoftworks.reaperbleiem.ui.theme.AppTheme
 import com.ethossoftworks.reaperbleiem.ui.theme.appModalSurface
 import com.outsidesource.oskitcompose.interactor.collectAsState
@@ -42,6 +44,7 @@ import reacue.shared.generated.resources.dynamic_channel
 import reacue.shared.generated.resources.reset_to_default
 import reacue.shared.generated.resources.saving
 import reacue.shared.generated.resources.settings
+import reacue.shared.generated.resources.enable_talkback
 import reacue.shared.generated.resources.static_channel
 import reacue.shared.generated.resources.talkback_channel
 import reacue.shared.generated.resources.talkback_channel_description
@@ -81,37 +84,46 @@ fun CentralSettingsScreen(interactor: CentralSettingsScreenViewInteractor = reme
                     .padding(PaddingValues(AppTheme.dimensions.screenPadding)),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-            AppDropdown(
-                label = stringResource(Res.string.talkback_channel),
-                valueLabel =
-                    if (state.talkBackChannel == -1) {
-                        stringResource(Res.string.dynamic_channel)
-                    } else {
-                        stringResource(Res.string.static_channel, state.talkBackChannel)
-                    },
-                description = stringResource(Res.string.talkback_channel_description),
-            ) {
-                AppDropdownItem(
-                    text = stringResource(Res.string.dynamic_channel),
-                    onClick = {
-                        interactor.onTalkbackChannelChanged(-1)
-                        it()
-                    },
-                )
-                for (i in 0..7) {
+            AppSwitch(
+                modifier = Modifier.fillMaxWidth(),
+                label = stringResource(Res.string.enable_talkback),
+                checked = state.showTalkBack,
+                onChange = interactor::onShowTalkbackChange,
+            )
+
+            if (state.showTalkBack) {
+                AppDropdown(
+                    label = stringResource(Res.string.talkback_channel),
+                    valueLabel =
+                        if (state.talkBackChannel == -1) {
+                            stringResource(Res.string.dynamic_channel)
+                        } else {
+                            stringResource(Res.string.static_channel, state.talkBackChannel)
+                        },
+                    description = stringResource(Res.string.talkback_channel_description),
+                ) {
                     AppDropdownItem(
-                        text = stringResource(Res.string.static_channel, i),
+                        text = stringResource(Res.string.dynamic_channel),
                         onClick = {
-                            interactor.onTalkbackChannelChanged(i)
+                            interactor.onTalkbackChannelChanged(-1)
                             it()
                         },
                     )
+                    for (i in 0..7) {
+                        AppDropdownItem(
+                            text = stringResource(Res.string.static_channel, i),
+                            onClick = {
+                                interactor.onTalkbackChannelChanged(i)
+                                it()
+                            },
+                        )
+                    }
                 }
             }
 
             AppButton(
                 modifier = Modifier.align(Alignment.End),
-                label = stringResource(if (state.isSaving) Res.string.saving else Res.string.apply),
+                label = stringResource(Res.string.apply),
                 onClick = interactor::onApplyClick,
                 enabled = !state.isSaving,
             )

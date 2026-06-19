@@ -47,4 +47,5 @@
     <string name="talkback_channel_description">Select a dynamic or static channel for talkback. Static channels should be unique for anyone using the same ReaCue host. Setting this to Dynamic means a unique id will be dynamically assigned. Static channels are useful for configuring the ReaCue JSFX talkback channel filter parameter in Reaper to avoid "speech jamming".</string>
     <string name="dynamic_channel">Dynamic</string>
     <string name="static_channel">%1$d</string>
+    <string name="enable_talkback">Enable Talkback</string>
 </resources>

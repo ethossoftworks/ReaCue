@@ -9,6 +9,7 @@ import com.ethossoftworks.reaperbleiem.service.iem.FaderInfo
 import com.ethossoftworks.reaperbleiem.service.iem.IemContext
 import com.ethossoftworks.reaperbleiem.service.iem.IemEvent
 import com.ethossoftworks.reaperbleiem.service.iem.Track
+import com.ethossoftworks.reaperbleiem.service.preferences.CentralPreferencesService
 import com.ethossoftworks.reaperbleiem.service.preferences.PeripheralPreferencesService
 import com.outsidesource.oskitkmp.capability.CapabilityStatus
 import com.outsidesource.oskitkmp.capability.NoPermissionReason
@@ -37,7 +38,7 @@ data class IemScreenViewState(
     val passcodeEntry: CompletableDeferred<String>? = null,
     val isViewPasscodeModalVisible: Boolean = false,
     val passcode: String = "",
-    val isTalkbackSupported: Boolean = false,
+    val showTalkbackButton: Boolean = true,
     val isTalkbackActive: Boolean = false,
 )
 
@@ -52,6 +53,7 @@ class IemScreenViewInteractor(
     private val capabilityInteractor: CapabilityInteractor,
     private val coordinator: AppCoordinator,
     private val peripheralPreferencesService: PeripheralPreferencesService?,
+    private val centralPreferencesService: CentralPreferencesService?,
     private val infoMessageInteractor: InfoMessageInteractor,
 ) :
     Interactor<IemScreenViewState>(
@@ -69,8 +71,18 @@ class IemScreenViewInteractor(
             faderInfo = iemInteractor.state.faderInfo,
             serviceStatus = iemInteractor.state.serviceStatus,
             isRefreshing = iemInteractor.state.isRefreshing,
-            isTalkbackSupported = iemInteractor.isTalkbackSupported,
+            showTalkbackButton =
+                iemInteractor.isTalkbackSupported && centralPreferencesService?.settings?.value?.showTalkBack == true,
         )
+    }
+
+    fun onMount() {
+        interactorScope.launch { start() }
+    }
+
+    fun onUnmount() {
+        if (iemContext is IemContext.Peripheral) iemInteractor.sendDisconnectEvent()
+        subscriptionJob.value?.cancel()
     }
 
     fun onTalkbackPress() {
@@ -82,7 +94,9 @@ class IemScreenViewInteractor(
                             capabilityInteractor.requestMicrophonePermission()
                             return@launch
                         } else {
-                            infoMessageInteractor.enqueueMessage(getString(Res.string.microphone_permission_is_required))
+                            infoMessageInteractor.enqueueMessage(
+                                getString(Res.string.microphone_permission_is_required)
+                            )
                         }
                     }
                 }
@@ -104,15 +118,6 @@ class IemScreenViewInteractor(
     fun onTalkbackRelease() {
         iemInteractor.stopTalkback()
         update { state -> state.copy(isTalkbackActive = false) }
-    }
-
-    fun onMount() {
-        interactorScope.launch { start() }
-    }
-
-    fun onUnmount() {
-        if (iemContext is IemContext.Peripheral) iemInteractor.sendDisconnectEvent()
-        subscriptionJob.value?.cancel()
     }
 
     fun onIemSelect(id: Int) {

@@ -64,7 +64,6 @@ import com.ethossoftworks.reaperbleiem.service.iem.IemContext
 import com.ethossoftworks.reaperbleiem.ui.app.AppToolbar
 import com.ethossoftworks.reaperbleiem.ui.app.Screen
 import com.ethossoftworks.reaperbleiem.ui.form.AppButton
-import com.ethossoftworks.reaperbleiem.ui.form.AppButtonType
 import com.ethossoftworks.reaperbleiem.ui.form.AppDropdown
 import com.ethossoftworks.reaperbleiem.ui.form.AppDropdownItem
 import com.ethossoftworks.reaperbleiem.ui.form.AppLoadingIndicator
@@ -101,6 +100,7 @@ import reacue.shared.generated.resources.connect
 import reacue.shared.generated.resources.connecting
 import reacue.shared.generated.resources.disconnected_from_peripheral
 import reacue.shared.generated.resources.disconnected_from_reaper
+import reacue.shared.generated.resources.microphone
 import reacue.shared.generated.resources.mix
 import reacue.shared.generated.resources.mix_project
 import reacue.shared.generated.resources.no_monitors
@@ -274,7 +274,10 @@ fun IemScreen(
                 modifier =
                     Modifier.weight(1f)
                         .verticalScroll(rememberScrollState())
-                        .padding(bottom = dimensions.screenPadding + 88.dp),
+                        .padding(
+                            bottom =
+                                dimensions.screenPadding + if (state.showTalkbackButton) TalkbackButtonSize else 0.dp
+                        ),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 val ticks = rememberTicks(state.faderInfo)
@@ -319,7 +322,7 @@ fun IemScreen(
                                 ) {
                                     MuteButton(
                                         isMuted = receive.value.isMuted,
-                                        onToggle = { interactor.onReceiveMuteToggle(track.id, receive.key) }
+                                        onToggle = { interactor.onReceiveMuteToggle(track.id, receive.key) },
                                     )
                                     Label()
                                 }
@@ -365,7 +368,7 @@ fun IemScreen(
             }
         }
 
-        if (context is IemContext.Central && state.isTalkbackSupported) {
+        if (context is IemContext.Central && state.showTalkbackButton) {
             TalkbackButton(
                 modifier = Modifier.align(Alignment.BottomCenter),
                 isActive = state.isTalkbackActive,
@@ -434,29 +437,30 @@ private fun MuteButton(
     val ripple = ripple(color = if (isMuted) colors.error else colors.accent)
 
     Box(
-        modifier = Modifier.size(28.dp)
-            .clickable(
-                onClick = onToggle,
-                interactionSource = interactionSource,
-                indication = ripple,
-            )
-            .semantics { role = Role.Button }
-            .border(width = 1.dp, color = if (isMuted) colors.error else colors.strokePrimary, shape = shape)
-            .kmpOuterShadow(blur = 8.dp, shape = shape, color = Color.Black.copy(alpha = 0.25f))
-            .background(brush = colors.bgControl, shape = shape)
-            .background(
-                color = if (isMuted) colors.errorTint else Color.Transparent,
-                shape = shape,
-            )
-            .background(
-                color =
-                    if (isHovered) {
-                        if (isMuted) colors.errorTint20 else colors.accentTint
-                    } else {
-                        Color.Transparent
-                    },
-                shape = shape,
-            ),
+        modifier =
+            Modifier.size(28.dp)
+                .clickable(
+                    onClick = onToggle,
+                    interactionSource = interactionSource,
+                    indication = ripple,
+                )
+                .semantics { role = Role.Button }
+                .border(width = 1.dp, color = if (isMuted) colors.error else colors.strokePrimary, shape = shape)
+                .kmpOuterShadow(blur = 8.dp, shape = shape, color = Color.Black.copy(alpha = 0.25f))
+                .background(brush = colors.bgControl, shape = shape)
+                .background(
+                    color = if (isMuted) colors.errorTint else Color.Transparent,
+                    shape = shape,
+                )
+                .background(
+                    color =
+                        if (isHovered) {
+                            if (isMuted) colors.errorTint20 else colors.accentTint
+                        } else {
+                            Color.Transparent
+                        },
+                    shape = shape,
+                ),
         contentAlignment = Alignment.Center,
     ) {
         Image(
@@ -467,6 +471,8 @@ private fun MuteButton(
         )
     }
 }
+
+private val TalkbackButtonSize = 80.dp
 
 @Composable
 private fun TalkbackButton(
@@ -481,7 +487,7 @@ private fun TalkbackButton(
         modifier =
             modifier
                 .windowInsetsPadding(KmpWindowInsets.bottom)
-                .size(88.dp)
+                .size(TalkbackButtonSize)
                 .border(
                     width = 1.dp,
                     color = if (isActive) colors.accent else colors.strokePrimary,
@@ -501,11 +507,11 @@ private fun TalkbackButton(
                 .semantics { role = Role.Button },
         contentAlignment = Alignment.Center,
     ) {
-        Box(
-            modifier = Modifier
-                .size(58.dp)
-                .background(color = colors.error, shape = CircleShape)
-                .background(color = if (isActive) colors.accentTint else Color.Transparent, shape = CircleShape)
+        Image(
+            modifier = Modifier.size(36.dp),
+            painter = painterResource(Res.drawable.microphone),
+            contentDescription = null,
+            colorFilter = ColorFilter.tint(colors.textPrimary),
         )
     }
 }
