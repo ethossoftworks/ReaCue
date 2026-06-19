@@ -2,7 +2,6 @@
 
 package com.ethossoftworks.reaperbleiem.lib.bluetooth
 
-import co.touchlab.kermit.Logger
 import com.outsidesource.oskitkmp.outcome.Outcome
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
@@ -45,7 +44,7 @@ import platform.darwin.NSObject
  * The thread blocks in [CFRunLoopRun], dispatching the delegate callbacks and the flush blocks that [write] schedules
  * via [CFRunLoopPerformBlock] + [CFRunLoopWakeUp], until [close] calls [CFRunLoopStop].
  */
-private const val MAX_INBOX_BYTES = 4800
+private const val MAX_BUFFERED_BYTES = 64 * 1024
 private const val READ_BUFFER_SIZE = 4096
 
 internal class AppleKmpBleL2CapChannel(
@@ -62,8 +61,9 @@ internal class AppleKmpBleL2CapChannel(
     private val output: NSOutputStream? = channel.outputStream
 
     private val running = atomic(true)
-    private val inbox = atomic<List<ByteArray>>(emptyList())
+    private val outbox = atomic<List<ByteArray>>(emptyList())
     private val runLoopRef = atomic<CFRunLoopRef?>(null)
+    private val spaceAvailable = Channel<Unit>(Channel.CONFLATED)
 
     private val delegate =
         object : NSObject(), NSStreamDelegateProtocol {
@@ -117,9 +117,26 @@ internal class AppleKmpBleL2CapChannel(
         }
     }
 
+    override suspend fun write(data: ByteArray): Outcome<Unit, KmpBleError> {
+        if (output == null || !running.value) return Outcome.Error(KmpBleError.Unknown("L2CAP channel closed"))
+        while (running.value && bufferedBytes() >= MAX_BUFFERED_BYTES) {
+            spaceAvailable.receive()
+        }
+        if (!running.value) return Outcome.Error(KmpBleError.Unknown("L2CAP channel closed"))
+        outbox.update { it + data }
+        scheduleOnRunLoop { flushOutbound() }
+        return Outcome.Ok(Unit)
+    }
+
+    private inline fun scheduleOnRunLoop(crossinline block: () -> Unit) {
+        val runLoop = runLoopRef.value ?: return
+        CFRunLoopPerformBlock(runLoop, kCFRunLoopDefaultMode) { block() }
+        CFRunLoopWakeUp(runLoop)
+    }
+
     private fun flushOutbound() {
         val stream = output ?: return
-        val batch = inbox.getAndSet(emptyList())
+        val batch = outbox.getAndSet(emptyList())
         var i = 0
         while (i < batch.size) {
             val chunk = batch[i]
@@ -137,41 +154,20 @@ internal class AppleKmpBleL2CapChannel(
                 val pending = ArrayList<ByteArray>(batch.size - i)
                 pending.add(if (offset == 0) chunk else chunk.copyOfRange(offset, chunk.size))
                 for (j in i + 1 until batch.size) pending.add(batch[j])
-                inbox.update { pending + it }
-                return
+                outbox.update { pending + it }
+                break
             }
             i++
         }
+        if (bufferedBytes() < MAX_BUFFERED_BYTES) spaceAvailable.trySend(Unit)
     }
 
-    private inline fun scheduleOnRunLoop(crossinline block: () -> Unit) {
-        val runLoop = runLoopRef.value ?: return
-        CFRunLoopPerformBlock(runLoop, kCFRunLoopDefaultMode) { block() }
-        CFRunLoopWakeUp(runLoop)
-    }
-
-    override suspend fun write(data: ByteArray): Outcome<Unit, KmpBleError> {
-        if (output == null || !running.value) return Outcome.Error(KmpBleError.Unknown("L2CAP channel closed"))
-        var dropped = false
-        inbox.update { current ->
-            var queue = current + data
-            var total = queue.sumOf { it.size }
-            // Cap the send backlog so latency can't grow without bound if transmission falls behind production.
-            while (total > MAX_INBOX_BYTES && queue.size > 1) {
-                total -= queue.first().size
-                queue = queue.drop(1)
-                dropped = true
-            }
-            queue
-        }
-        if (dropped) Logger.w { "L2CAP backlog over ${MAX_INBOX_BYTES}B — dropped stale  to stay real-time" }
-        scheduleOnRunLoop { flushOutbound() }
-        return Outcome.Ok(Unit)
-    }
+    private fun bufferedBytes(): Int = outbox.value.sumOf { it.size }
 
     override fun close() {
         if (!running.getAndSet(false)) return
         incomingChannel.close()
+        spaceAvailable.trySend(Unit)
         runLoopRef.value?.let { CFRunLoopStop(it) }
     }
 }
