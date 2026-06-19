@@ -1,8 +1,13 @@
-@file:OptIn(ExperimentalUuidApi::class)
+@file:OptIn(ExperimentalUuidApi::class, ExperimentalForeignApi::class)
 
 package com.ethossoftworks.reaperbleiem.lib.bluetooth
 
 import com.outsidesource.oskitkmp.lib.update
+import com.outsidesource.oskitkmp.outcome.Outcome
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.convert
+import platform.CoreBluetooth.CBL2CAPChannel
+import platform.CoreBluetooth.CBL2CAPPSM
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -84,6 +89,7 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
     private val localCentralSubscriptions: AtomicRef<Map<Uuid, Set<KmpBleCentralId>>> = atomic(emptyMap())
     private val localRequests: AtomicRef<Map<Int, CBATTRequest>> = atomic(emptyMap())
     private val _state: MutableStateFlow<CBManagerState> = MutableStateFlow(CBManagerStateUnknown)
+    private val l2capPublishEvents = Channel<Outcome<Int, KmpBleError>>(Channel.CONFLATED)
 
     private val peripheralDelegate =
         PeripheralManagerDelegate(
@@ -94,6 +100,7 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
             serviceAddedEvents = serviceAddedEvents,
             state = _state,
             peripheralManagerIsReadyToUpdateSubscribers = peripheralManagerIsReadyToUpdateSubscribers,
+            l2capPublishEvents = l2capPublishEvents,
         )
 
     private val peripheralManager: CBPeripheralManager by lazy {
@@ -289,6 +296,17 @@ class AppleKmpBlePeripheralManager(cbPeripheralManagerFactory: (() -> CBPeripher
         )
     }
 
+    override suspend fun publishL2CapChannel(): Outcome<Int, KmpBleError> {
+        awaitPeripheralManagerPoweredOn() ?: return Outcome.Error(KmpBleError.PlatformHandlerNotReady)
+        while (l2capPublishEvents.tryReceive().isSuccess) {} // drain any stale result
+        peripheralManager.publishL2CAPChannelWithEncryption(false)
+        return l2capPublishEvents.receive()
+    }
+
+    override fun unpublishL2CapChannel(psm: Int) {
+        peripheralManager.unpublishL2CAPChannel(psm.convert())
+    }
+
     /** Helpers */
     private suspend fun awaitPeripheralManagerPoweredOn(): Unit? {
         if (peripheralManager.state == CBManagerStatePoweredOn) return Unit
@@ -309,8 +327,39 @@ private class PeripheralManagerDelegate(
     private val serviceAddedEvents: Channel<ServiceAddedEvent>,
     private val state: MutableStateFlow<CBManagerState>,
     private val peripheralManagerIsReadyToUpdateSubscribers: Channel<Unit>,
+    private val l2capPublishEvents: Channel<Outcome<Int, KmpBleError>>,
 ) : CBPeripheralManagerDelegateProtocol, NSObject() {
     private val requestIdCounter = atomic(0)
+
+    override fun peripheralManager(
+        peripheral: CBPeripheralManager,
+        didPublishL2CAPChannel: CBL2CAPPSM,
+        error: NSError?,
+    ) {
+        l2capPublishEvents.trySend(
+            if (error != null) {
+                Outcome.Error(KmpBleError.Unknown(error))
+            } else {
+                Outcome.Ok(didPublishL2CAPChannel.toInt())
+            }
+        )
+    }
+
+    override fun peripheralManager(
+        peripheral: CBPeripheralManager,
+        didOpenL2CAPChannel: CBL2CAPChannel?,
+        error: NSError?,
+    ) {
+        val channel = didOpenL2CAPChannel ?: return
+        val centralId = channel.peer?.identifier?.UUIDString() ?: return
+        events.tryEmit(
+            KmpBlePeripheralEvent.L2CapChannelOpened(
+                centralId = centralId,
+                psm = channel.PSM.toInt(),
+                channel = AppleKmpBleL2CapChannel(channel),
+            )
+        )
+    }
 
     override fun peripheralManagerDidUpdateState(peripheral: CBPeripheralManager) {
         state.value = peripheral.state

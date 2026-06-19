@@ -1,5 +1,8 @@
 // ReaCue
 
+// Shared global memory for talkback audio. Must match `options:gmem=ReaCue` in "ReaCue Talkback.jsfx".
+//@gmem=ReaCue
+
 function linear_to_normalized(vol) local(db, slider_val) (
   db = vol <= 0.00001 ? -150 : 20 * (log(vol) / log(10));
   slider_val = DB2SLIDER(db);
@@ -23,7 +26,6 @@ function close_tcp_client(client_index) local(client_handle) (
     0[MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + client_index] = 0;
     strcpy(MEM_BASE + MEM_BASE_OFFSET_TCP_RECV_BUFFER + client_index, "");
     0[MEM_BASE + MEM_BASE_OFFSET_TCP_RECV_BUFFER + client_index] = 0;
-    0[MEM_BASE + MEM_BASE_OFFSET_TCP_READ_OFFSET + client_index] = 0;
   );
 );
 
@@ -547,10 +549,82 @@ function handle_tcp_connection() local(connection, ptr) (
       tcp_close(connection);
     )
   ) : connection < 0 ? (
-    DEBUG > 0 ? (
-      sprintf(#debug, "Server failed to start: %i\n", connection);
-      ShowConsoleMsg(#debug);
+    has_shown_startup_error == 0 ? (
+      has_shown_startup_error = 1;
+      ShowConsoleMsg("ReaCue host failed to start\n");
     );
+  );
+);
+
+/*
+ * Talkback Start
+ * Payload
+ * byte - Talker ID
+ * Bumps the generation counter (so the JSFX re-syncs its read cursor to the live write
+ * head for the new talk burst) and marks the slot active. write_index is left
+ * monotonic on purpose: resetting it would race the audio-thread reader (it
+ * could see the new generation but a stale write_index and replay old audio).
+ */
+function handle_talkback_start(message) local(talker_id, slot, was_active) (
+  talker_id = str_getchar(message, TCP_HEADER_SIZE, 'cu');
+  talker_id >= 0 && talker_id < TB_MAX_TALKERS ? (
+    slot = MEM_TB_BASE + (talker_id * MEM_TB_BASE_STRIDE);
+    was_active = gmem[slot + MEM_TB_BASE_OFFSET_ACTIVE];
+    gmem[slot + MEM_TB_BASE_OFFSET_COUNTER] = gmem[slot + MEM_TB_BASE_OFFSET_COUNTER] + 1;
+    gmem[slot + MEM_TB_BASE_OFFSET_ACTIVE] = 1;
+    was_active == 0 ? gmem[MEM_TB_ACTIVE_COUNT] = gmem[MEM_TB_ACTIVE_COUNT] + 1;
+  );
+);
+
+/*
+ * Talkback Stop
+ * Payload
+ * byte - Talker ID
+ * Marks the slot inactive; the JSFX drains any remaining buffered samples then goes silent.
+ */
+function handle_talkback_stop(message) local(slot, talker_id, was_active) (
+  talker_id = str_getchar(message, TCP_HEADER_SIZE, 'cu');
+  talker_id >= 0 && talker_id < TB_MAX_TALKERS ? (
+    slot = MEM_TB_BASE + (talker_id * MEM_TB_BASE_STRIDE);
+    was_active = gmem[slot + MEM_TB_BASE_OFFSET_ACTIVE];
+    gmem[slot + MEM_TB_BASE_OFFSET_ACTIVE] = 0;
+    was_active != 0 ? (
+      gmem[MEM_TB_ACTIVE_COUNT] = gmem[MEM_TB_ACTIVE_COUNT] - 1;
+      gmem[MEM_TB_ACTIVE_COUNT] < 0 ? gmem[MEM_TB_ACTIVE_COUNT] = 0;
+    );
+  );
+);
+
+/*
+ * Talkback Audio 
+ * Payload
+ * byte - Talker ID
+ * ushort - Sample Count
+ * int16[] - pcm (LE).
+ * Writes normalized samples into the slot's ring, then publishes the advanced write_index. The index is published 
+ * AFTER the samples are in place so the JSFX (single consumer) never reads ahead of written data.
+ */
+function handle_talkback_audio(message) local(talker_id, slot, sample_count, offset, ring_base, write_index, sample) (
+  offset = TCP_HEADER_SIZE;
+  talker_id = str_getchar(message, offset, 'cu');
+  offset += 1;
+
+  talker_id >= 0 && talker_id < TB_MAX_TALKERS ? (
+    sample_count = str_getchar(message, offset, 'Su');
+    offset += 2;
+
+    slot = MEM_TB_BASE + (talker_id * MEM_TB_BASE_STRIDE);
+    ring_base = MEM_TB_RING + (talker_id * TB_RING_LEN);
+    write_index = gmem[slot + MEM_TB_BASE_OFFSET_WRITE_INDEX];
+
+    loop(sample_count,
+      sample = str_getchar(message, offset, 's'); // signed 16-bit
+      offset += 2;
+      gmem[ring_base + (write_index % TB_RING_LEN)] = sample / 32768; // turn int back into float
+      write_index += 1;
+    );
+
+    gmem[slot + MEM_TB_BASE_OFFSET_WRITE_INDEX] = write_index;
   );
 );
 
@@ -637,6 +711,12 @@ function handle_tcp_message(client_index, message, message_type, payload_size) l
     receive_count = 0[MEM_TRACK + (MEM_TRACK_STRIDE * track_index) + MEM_TRACK_OFFSET_RECV_COUNT];
     0[MEM_SEND + (MEM_SEND_TRACK_STRIDE * track_index) + (MEM_SEND_STRIDE * (receive_count + send_index)) + MEM_SEND_OFFSET_MUTE] = mute;
     SetTrackSendInfo_Value(GetTrack(0, track_index), 1, send_index, "B_MUTE", mute);
+  ) : message_type == MESSAGE_TYPE_TALKBACK_START ? (
+    handle_talkback_start(message);
+  ) : message_type == MESSAGE_TYPE_TALKBACK_AUDIO ? (
+    handle_talkback_audio(message);
+  ) : message_type == MESSAGE_TYPE_TALKBACK_STOP ? (
+    handle_talkback_stop(message);
   ) : message_type == MESSAGE_TYPE_HEARTBEAT ? (
     0;
   ) : (
@@ -646,8 +726,12 @@ function handle_tcp_message(client_index, message, message_type, payload_size) l
     );
   );
 
-  // Re-broadcast change events to the other clients. Ignore Refresh and Heartbeat messages.
-  message_type != MESSAGE_TYPE_REFRESH && message_type != MESSAGE_TYPE_HEARTBEAT ? (
+  // Re-broadcast change events to the other clients. Ignore Refresh, Heartbeat,
+  // and talkback messages (talkback is peripheral->Reaper only; re-broadcasting
+  // would echo audio back out to every other phone).
+  message_type != MESSAGE_TYPE_REFRESH && message_type != MESSAGE_TYPE_HEARTBEAT &&
+    message_type != MESSAGE_TYPE_TALKBACK_START && message_type != MESSAGE_TYPE_TALKBACK_AUDIO &&
+    message_type != MESSAGE_TYPE_TALKBACK_STOP ? (
     i = 0;
     send_list_index = 0;
     loop(TCP_MAX_CLIENTS,
@@ -665,73 +749,78 @@ function handle_tcp_message(client_index, message, message_type, payload_size) l
   );
 );
 
-function handle_tcp_receive() local(i, client_handle, bytes_read, read_buffer, payload_size, draining, guard, msg_size, read_offset_ptr, read_offset, buffer_len, unread_bytes) (
+function handle_tcp_receive() local(i, client_handle, bytes_read, read_buffer, payload_size, draining, guard, msg_size, read_offset, buffer_len, unread_bytes, socket_draining, recv_iters) (
   i = 0;
   loop(TCP_MAX_CLIENTS,
     client_handle = 0[MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + i];
     client_handle > 0 ? (
-      bytes_read = tcp_recv(client_handle, #recv_buffer, TCP_RECV_BUFFER_SIZE);
+      read_buffer = MEM_BASE + MEM_BASE_OFFSET_TCP_RECV_BUFFER + i;
 
-      bytes_read == 0 ? (
-        close_tcp_client(i);
-      ) : bytes_read > 0 ? (
-        0[MEM_BASE + MEM_BASE_OFFSET_TCP_LAST_SEEN + i] = time_precise();
-        read_buffer = MEM_BASE + MEM_BASE_OFFSET_TCP_RECV_BUFFER + i;
-        read_offset_ptr = MEM_BASE + MEM_BASE_OFFSET_TCP_READ_OFFSETS + i;
-        read_offset = 0[read_offset_ptr];
+      // Read and PARSE in lockstep: drain complete frames after every recv so the receive buffer never accumulates a
+      // backlog. EEL strings are capped at 65536 bytes, so batching many recvs before parsing (at the 2-talker data
+      // rate) overflowed strcat and desynced the stream. tcp_recv returns >0 with data, <0 when nothing is available,
+      // and 0 when the peer has closed.
+      socket_draining = 1;
+      recv_iters = 0;
+      while (socket_draining && recv_iters < TCP_RECV_MAX_ITERS) (
+        bytes_read = tcp_recv(client_handle, #recv_buffer, TCP_RECV_BUFFER_SIZE);
 
-        str_setlen(#recv_buffer, bytes_read);
-        strcat(read_buffer, #recv_buffer);
+        bytes_read == 0 ? (
+          close_tcp_client(i);
+          socket_draining = 0;
+        ) : bytes_read > 0 ? (
+          0[MEM_BASE + MEM_BASE_OFFSET_TCP_LAST_SEEN + i] = time_precise();
+          str_setlen(#recv_buffer, bytes_read);
+          strcat(read_buffer, #recv_buffer);
+          recv_iters += 1;
 
-        draining = 1;
-        guard = 0;
-        buffer_len = strlen(read_buffer);
+          read_offset = 0; // buffer is compacted to the front each pass, so parsing always starts at 0
+          draining = 1;
+          guard = 0;
+          buffer_len = strlen(read_buffer);
 
-        while (draining && guard < 100) ( // iteration cap if the buffer gets stuck for some reason
-          draining = 0;
-          guard += 1;
-          unread_bytes = buffer_len - read_offset;
+          while (draining && guard < 1000) ( // iteration cap if the buffer gets stuck for some reason
+            draining = 0;
+            guard += 1;
+            unread_bytes = buffer_len - read_offset;
 
-          unread_bytes >= TCP_HEADER_SIZE ? (
-            str_getchar(read_buffer, read_offset + TCP_HEADER_SCHEMA_VERSION_OFFSET, 'cu') != TCP_SCHEMA_VERSION ? (
-              DEBUG > 0 ? ShowConsoleMsg("Schema version mismatch - closing client\n");
-              close_tcp_client(i);
-            ) : (
-              payload_size = str_getchar(read_buffer, read_offset + TCP_HEADER_PAYLOAD_SIZE_OFFSET, 'Iu');
-              msg_size = TCP_HEADER_SIZE + payload_size;
-
-              payload_size > TCP_MAX_PAYLOAD_SIZE ? (
-                DEBUG > 0 ? ShowConsoleMsg("Invalid payload size - closing client\n");
+            unread_bytes >= TCP_HEADER_SIZE ? (
+              str_getchar(read_buffer, read_offset + TCP_HEADER_SCHEMA_VERSION_OFFSET, 'cu') != TCP_SCHEMA_VERSION ? (
+                DEBUG > 0 ? ShowConsoleMsg("Schema version mismatch - closing client\n");
                 close_tcp_client(i);
-              ) : unread_bytes >= msg_size ? (
+                socket_draining = 0;
+              ) : (
+                payload_size = str_getchar(read_buffer, read_offset + TCP_HEADER_PAYLOAD_SIZE_OFFSET, 'Iu');
+                msg_size = TCP_HEADER_SIZE + payload_size;
 
-                // Full remaining message in received bytes. Grab just the remaining part of this message.
-                strcpy_substr(#msg_packet, read_buffer, read_offset, msg_size);
-                handle_tcp_message(i, #msg_packet, str_getchar(#msg_packet, TCP_HEADER_MESSAGE_TYPE_OFFSET, 'cu'), payload_size);
-
-                // Advance the sliding window pointer instead of copying/shifting the buffer
-                read_offset += msg_size;
-                draining = 1;
+                payload_size > TCP_MAX_PAYLOAD_SIZE ? (
+                  DEBUG > 0 ? ShowConsoleMsg("Invalid payload size - closing client\n");
+                  close_tcp_client(i);
+                  socket_draining = 0;
+                ) : unread_bytes >= msg_size ? (
+                  strcpy_substr(#msg_packet, read_buffer, read_offset, msg_size);
+                  handle_tcp_message(i, #msg_packet, str_getchar(#msg_packet, TCP_HEADER_MESSAGE_TYPE_OFFSET, 'cu'), payload_size);
+                  read_offset += msg_size;
+                  draining = 1;
+                );
               );
             );
           );
-        );
 
-        // The loop is done handling fully framed messages. Update or compact the buffer.
-        read_offset == buffer_len ? (
-          // Full message read with nothing left
-          strcpy(read_buffer, "");
-          0[read_offset_ptr] = 0;
-        ) : read_offset > 4096 ? (
-          // Defensive threshold: If the pointer is getting far out and a partial packet is left,
-          // shift the leftover bytes back to the beginning just once to prevent runaway memory size.
-          strcpy_from(read_buffer, read_buffer, read_offset);
-          0[read_offset_ptr] = 0;
-          DEBUG > 0 ? ShowConsoleMsg("Compacting buffer to front\n");
+          // Compact the (small) leftover to the front every pass so read_buffer stays well under the 65536 string cap.
+          socket_draining > 0 ? (
+            read_offset == buffer_len ? (
+              strcpy(read_buffer, "");
+            ) : read_offset > 0 ? (
+              strcpy_from(read_buffer, read_buffer, read_offset);
+            );
+
+            // Read less than a full buffer => socket is drained for now; stop this pass.
+            bytes_read < TCP_RECV_BUFFER_SIZE ? socket_draining = 0;
+          );
         ) : (
-          0[read_offset_ptr] = read_offset;
+          socket_draining = 0; // nothing more available right now
         );
-
       );
     );
     i += 1;
@@ -770,6 +859,7 @@ function shutdown_server() local(i, client_handle) (
 
 function reacue() (
     DEBUG = 0;
+    has_shown_startup_error = 0;
 
     /*
      * TCP Settings
@@ -777,7 +867,8 @@ function reacue() (
     TCP_PORT = 9007;
     TCP_MAX_CLIENTS = 10;
     TCP_MAX_PAYLOAD_SIZE = 65536;
-    TCP_RECV_BUFFER_SIZE = 4096;
+    TCP_RECV_BUFFER_SIZE = 8192; // Larger than control-only needs; talkback audio is bursty
+    TCP_RECV_MAX_ITERS = 64;     // Cap recv() calls per client per loop while draining the socket
     TCP_SCHEMA_VERSION = 0;
     TCP_CLIENT_TIMEOUT = 6.0; // seconds;
 
@@ -806,6 +897,9 @@ function reacue() (
     MESSAGE_TYPE_HWOUT_MUTE_CHANGED = 10;
     MESSAGE_TYPE_REFRESH = 11;
     MESSAGE_TYPE_HEARTBEAT = 12;
+    MESSAGE_TYPE_TALKBACK_START = 13;
+    MESSAGE_TYPE_TALKBACK_AUDIO = 14;
+    MESSAGE_TYPE_TALKBACK_STOP = 15;
 
     /*
      * Memory arena for TCP:
@@ -814,7 +908,6 @@ function reacue() (
     MEM_BASE_OFFSET_TCP_CLIENTS = 10;
     MEM_BASE_OFFSET_TCP_SEND_LIST = 20;
     MEM_BASE_OFFSET_TCP_RECV_BUFFER = 30;
-    MEM_BASE_OFFSET_TCP_READ_OFFSETS = 40;
     MEM_BASE_OFFSET_TCP_LAST_SEEN = 50;
 
     /*
@@ -859,6 +952,27 @@ function reacue() (
      */
     MEM_TRACK_STRINGS = 10000;
     MEM_TRACK_STRINGS_STRIDE = 10;
+
+    /*
+     * Talkback shared memory (gmem, namespace "ReaCue"). These constants MUST
+     * match "ReaCue Talkback.jsfx". Layout:
+     *   Control block: per-slot stride MEM_TB_BASE_STRIDE, base MEM_TB_BASE
+     *     +0 write_index  (total samples written; ring index = write_index % TB_RING_LEN)
+     *     +1 active       (1 while PTT held, 0 after STOP)
+     *     +2 counter   (bumped on START so the JSFX resets its read cursor)
+     *   Ring data: MEM_TB_RING + slot*TB_RING_LEN + (write_index % TB_RING_LEN)
+     *     Samples stored as normalized floats in [-1, 1].
+     */
+    TB_MAX_TALKERS = 8;
+    TB_INPUT_RATE = 16000; // 16 kHz mono (clients send ADPCM over BLE; the host decodes to PCM before this).
+    TB_RING_LEN = 16000; // 1.0 s of jitter/elastic buffer per talker
+    MEM_TB_BASE = 0;
+    MEM_TB_BASE_STRIDE = 4;
+    MEM_TB_BASE_OFFSET_WRITE_INDEX = 0;
+    MEM_TB_BASE_OFFSET_ACTIVE = 1;
+    MEM_TB_BASE_OFFSET_COUNTER = 2;
+    MEM_TB_ACTIVE_COUNT = 512; // gmem global: number of currently-active talkers (lets the JSFX idle cheaply)
+    MEM_TB_RING = 1024;
 
     atexit("shutdown_server();");
     reacue_loop();

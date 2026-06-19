@@ -4,12 +4,15 @@ package com.ethossoftworks.reaperbleiem.service.iem
 
 import co.touchlab.kermit.Logger
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBleCentralManager
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBleL2CapChannel
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBlePeripheral
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleConnectionPriority
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleConnectionStatus
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleError
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleWriteMode
 import com.ethossoftworks.reaperbleiem.service.preferences.CentralPreferencesService
+import com.ethossoftworks.reaperbleiem.service.talkback.AdpcmEncoder
+import com.ethossoftworks.reaperbleiem.service.talkback.IMicrophoneCaptureService
 import com.outsidesource.oskitkmp.lib.toUShort
 import com.outsidesource.oskitkmp.lib.update
 import com.outsidesource.oskitkmp.outcome.Outcome
@@ -25,6 +28,7 @@ import kotlin.uuid.Uuid
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.currentCoroutineContext
@@ -39,6 +43,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
+import kotlinx.io.readUShort
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
 
@@ -46,9 +51,13 @@ import kotlinx.serialization.cbor.Cbor
 class BleCentralIemService(
     private val bleCentralManager: IKmpBleCentralManager,
     private val centralPreferencesService: CentralPreferencesService,
+    private val microphoneCaptureService: IMicrophoneCaptureService,
 ) : IIemService {
 
     private val peripheral = atomic<IKmpBlePeripheral?>(null)
+    private val talkbackPsm = atomic(0)
+    private val talkbackChannel = atomic<IKmpBleL2CapChannel?>(null)
+    private val talkbackMicJob = atomic<Job?>(null)
     private val crypto = CryptographyProvider.Default
     private val hmac = crypto.get(HMAC)
     private val requestBuffers = atomic<Map<UShort, Buffer>>(emptyMap())
@@ -122,6 +131,8 @@ class BleCentralIemService(
 
         awaitClose {
             job.cancel()
+            talkbackMicJob.getAndSet(null)?.cancel()
+            talkbackChannel.getAndSet(null)?.close()
             launch {
                 peripheral.disconnect().unwrapOrReturn {
                     return@launch
@@ -150,6 +161,7 @@ class BleCentralIemService(
 
             val hostId = Uuid.fromByteArray(buffer.readByteArray(16)).toHexString()
             val nonce = buffer.readByteArray(16)
+            talkbackPsm.update { buffer.readUShort().toInt() }
 
             val requestPasscode: suspend () -> String = {
                 val passcodeDeferred = CompletableDeferred<String>()
@@ -183,6 +195,66 @@ class BleCentralIemService(
     }
 
     fun scan() = bleCentralManager.scan().filter { it.services.contains(REACUE_SERVICE_UUID) }
+
+    val isTalkbackChannelOpen: Boolean
+        get() = talkbackPsm.value != 0
+
+    suspend fun startTalkback() {
+        val peripheral = peripheral.value ?: return
+        if (talkbackMicJob.value != null) return
+
+        if (talkbackChannel.value == null) {
+            val psm = talkbackPsm.value
+            if (psm == 0) {
+                Logger.w { "Talkback not supported by host (no PSM)" }
+                return
+            }
+            val channel = peripheral.openL2CapChannel(psm).unwrapOrReturn {
+                Logger.e { "Talkback L2CAP channel open failed: ${it.error}" }
+                return
+            }
+            talkbackChannel.update { channel }
+        }
+        val channel = talkbackChannel.value ?: return
+
+        // The desired talkback channel travels in-band as the first byte of every L2CAP frame (-1 = let the host
+        // auto-allocate a slot; 0..7 = a specific channel). Read once at press time so it's constant for this burst.
+        val talkbackChannelSlot = centralPreferencesService.settings.value.talkbackChannel
+
+        val job =
+            peripheral.scope.launch {
+                Logger.i { "Talkback: starting mic capture on channel $talkbackChannelSlot" }
+                // Compress to IMA ADPCM (~4:1) so 16 kHz fits the BLE link. Each frame is [len u16 LE][channel u8]
+                // [ADPCM block]; len covers the channel byte + block. A fresh encoder per press resets state.
+                val encoder = AdpcmEncoder()
+                var frames = 0
+                try {
+                    microphoneCaptureService.capture().collect { pcm ->
+                        frames++
+                        val block = encoder.encode(pcm)
+                        val payloadLen = 1 + block.size
+                        val framed = ByteArray(2 + payloadLen)
+                        framed[0] = (payloadLen and 0xFF).toByte()
+                        framed[1] = ((payloadLen shr 8) and 0xFF).toByte()
+                        framed[2] = talkbackChannelSlot.toByte() // signed; -1 -> 0xFF
+                        block.copyInto(framed, destinationOffset = 3)
+                        val result = channel.write(framed)
+                        if (result is Outcome.Error) {
+                            Logger.e { "Talkback: L2CAP write failed at frame $frames: ${result.error}" }
+                            return@collect
+                        }
+                    }
+                    Logger.i { "Talkback: mic capture completed after $frames frames" }
+                } catch (t: Throwable) {
+                    Logger.e(t) { "Talkback: capture error after $frames frames" }
+                }
+            }
+        talkbackMicJob.update { job }
+    }
+
+    fun stopTalkback() {
+        talkbackMicJob.getAndSet(null)?.cancel()
+    }
 
     override suspend fun refresh() {
         val payload = cbor.encodeToByteArray(IemEvent.serializer(), IemEvent.Refresh)

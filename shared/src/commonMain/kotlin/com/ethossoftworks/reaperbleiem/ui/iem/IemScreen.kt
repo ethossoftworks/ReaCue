@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -18,7 +19,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.verticalScroll
@@ -45,6 +48,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -60,7 +64,6 @@ import com.ethossoftworks.reaperbleiem.service.iem.IemContext
 import com.ethossoftworks.reaperbleiem.ui.app.AppToolbar
 import com.ethossoftworks.reaperbleiem.ui.app.Screen
 import com.ethossoftworks.reaperbleiem.ui.form.AppButton
-import com.ethossoftworks.reaperbleiem.ui.form.AppButtonType
 import com.ethossoftworks.reaperbleiem.ui.form.AppDropdown
 import com.ethossoftworks.reaperbleiem.ui.form.AppDropdownItem
 import com.ethossoftworks.reaperbleiem.ui.form.AppLoadingIndicator
@@ -82,6 +85,7 @@ import com.outsidesource.oskitcompose.modifier.kmpOuterShadow
 import com.outsidesource.oskitcompose.popup.Modal
 import com.outsidesource.oskitcompose.popup.ModalStyles
 import com.outsidesource.oskitcompose.systemui.KmpWindowInsets
+import com.outsidesource.oskitcompose.systemui.bottom
 import com.outsidesource.oskitcompose.systemui.top
 import com.outsidesource.oskitkmp.text.KmpNumberFormatter
 import com.outsidesource.oskitkmp.text.parseFloatOrNull
@@ -96,6 +100,7 @@ import reacue.shared.generated.resources.connect
 import reacue.shared.generated.resources.connecting
 import reacue.shared.generated.resources.disconnected_from_peripheral
 import reacue.shared.generated.resources.disconnected_from_reaper
+import reacue.shared.generated.resources.microphone
 import reacue.shared.generated.resources.mix
 import reacue.shared.generated.resources.mix_project
 import reacue.shared.generated.resources.no_monitors
@@ -269,7 +274,10 @@ fun IemScreen(
                 modifier =
                     Modifier.weight(1f)
                         .verticalScroll(rememberScrollState())
-                        .padding(bottom = dimensions.screenPadding),
+                        .padding(
+                            bottom =
+                                dimensions.screenPadding + if (state.showTalkbackButton) TalkbackButtonSize else 0.dp
+                        ),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 val ticks = rememberTicks(state.faderInfo)
@@ -314,7 +322,7 @@ fun IemScreen(
                                 ) {
                                     MuteButton(
                                         isMuted = receive.value.isMuted,
-                                        onToggle = { interactor.onReceiveMuteToggle(track.id, receive.key) }
+                                        onToggle = { interactor.onReceiveMuteToggle(track.id, receive.key) },
                                     )
                                     Label()
                                 }
@@ -358,6 +366,15 @@ fun IemScreen(
                     }
                 }
             }
+        }
+
+        if (context is IemContext.Central && state.showTalkbackButton) {
+            TalkbackButton(
+                modifier = Modifier.align(Alignment.BottomCenter),
+                isActive = state.isTalkbackActive,
+                onPress = interactor::onTalkbackPress,
+                onRelease = interactor::onTalkbackRelease,
+            )
         }
     }
 
@@ -420,29 +437,30 @@ private fun MuteButton(
     val ripple = ripple(color = if (isMuted) colors.error else colors.accent)
 
     Box(
-        modifier = Modifier.size(28.dp)
-            .clickable(
-                onClick = onToggle,
-                interactionSource = interactionSource,
-                indication = ripple,
-            )
-            .semantics { role = Role.Button }
-            .border(width = 1.dp, color = if (isMuted) colors.error else colors.strokePrimary, shape = shape)
-            .kmpOuterShadow(blur = 8.dp, shape = shape, color = Color.Black.copy(alpha = 0.25f))
-            .background(brush = colors.bgControl, shape = shape)
-            .background(
-                color = if (isMuted) colors.errorTint else Color.Transparent,
-                shape = shape,
-            )
-            .background(
-                color =
-                    if (isHovered) {
-                        if (isMuted) colors.errorTint20 else colors.accentTint
-                    } else {
-                        Color.Transparent
-                    },
-                shape = shape,
-            ),
+        modifier =
+            Modifier.size(28.dp)
+                .clickable(
+                    onClick = onToggle,
+                    interactionSource = interactionSource,
+                    indication = ripple,
+                )
+                .semantics { role = Role.Button }
+                .border(width = 1.dp, color = if (isMuted) colors.error else colors.strokePrimary, shape = shape)
+                .kmpOuterShadow(blur = 8.dp, shape = shape, color = Color.Black.copy(alpha = 0.25f))
+                .background(brush = colors.bgControl, shape = shape)
+                .background(
+                    color = if (isMuted) colors.errorTint else Color.Transparent,
+                    shape = shape,
+                )
+                .background(
+                    color =
+                        if (isHovered) {
+                            if (isMuted) colors.errorTint20 else colors.accentTint
+                        } else {
+                            Color.Transparent
+                        },
+                    shape = shape,
+                ),
         contentAlignment = Alignment.Center,
     ) {
         Image(
@@ -450,6 +468,50 @@ private fun MuteButton(
             painter = painterResource(if (isMuted) Res.drawable.volume_mute else Res.drawable.volume_up),
             colorFilter = ColorFilter.tint(if (isMuted) colors.error else colors.textPrimary),
             contentDescription = null,
+        )
+    }
+}
+
+private val TalkbackButtonSize = 80.dp
+
+@Composable
+private fun TalkbackButton(
+    modifier: Modifier = Modifier,
+    isActive: Boolean,
+    onPress: () -> Unit,
+    onRelease: () -> Unit,
+) {
+    val colors = AppTheme.colors
+
+    Box(
+        modifier =
+            modifier
+                .windowInsetsPadding(KmpWindowInsets.bottom)
+                .size(TalkbackButtonSize)
+                .border(
+                    width = 1.dp,
+                    color = if (isActive) colors.accent else colors.strokePrimary,
+                    shape = CircleShape,
+                )
+                .background(brush = colors.bgControl, shape = CircleShape)
+                .background(color = if (isActive) colors.accentTint else Color.Transparent, shape = CircleShape)
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onPress = {
+                            onPress()
+                            tryAwaitRelease()
+                            onRelease()
+                        }
+                    )
+                }
+                .semantics { role = Role.Button },
+        contentAlignment = Alignment.Center,
+    ) {
+        Image(
+            modifier = Modifier.size(36.dp),
+            painter = painterResource(Res.drawable.microphone),
+            contentDescription = null,
+            colorFilter = ColorFilter.tint(colors.textPrimary),
         )
     }
 }

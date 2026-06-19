@@ -60,6 +60,7 @@ import reacue.shared.generated.resources.close
 @Composable
 fun AppTextField(
     label: String? = null,
+    description: String? = null,
     value: String,
     onChange: (String) -> Unit,
     iconStart: (@Composable () -> Unit)? = null,
@@ -148,6 +149,9 @@ fun AppTextField(
                 }
             },
         )
+        if (description != null) {
+            Text(text = description, fontSize = 12.sp, color = theme.textPrimary)
+        }
     }
 }
 

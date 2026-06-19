@@ -1,0 +1,104 @@
+desc:ReaCue Talkback
+// ReaCue Talkback
+//
+// Plays talkback audio that ReaCue.eel ingests over TCP and writes into shared
+// global memory (gmem, namespace "ReaCue").
+//
+// One ring buffer per talker slot. Each slot is an independent jitter-buffered
+// stream: it starts once enough audio is buffered, upsamples from the 16 kHz
+// input rate to the project sample rate via linear interead_positionolation, and resyncs
+// if clock drift makes the buffer over/underflow. Active slots are summed.
+//
+// gmem layout MUST match ReaCue.eel.
+//   Control: MEM_BASE + slot*MEM_STRIDE + {write_index, active, counter}
+//   Ring:    MEM_RING + slot*RING_LEN  + (write_index % RING_LEN)
+
+options:gmem=ReaCue
+
+slider1:gain_db=0<-24,12,0.1>Gain (dB)
+slider2:buffer_ms=150<10,200,1>Jitter Buffer (ms)
+slider3:talkback_channel_dropdown=0<0,8,1{Listen to All, 0, 1, 2, 3, 4, 5, 6, 7}>Channel Filter
+
+@init
+MAX_TALKERS = 8;
+INPUT_RATE = 16000; // must match INPUT_RATE in ReaCue.eel (clients send ADPCM; host decodes to 16 kHz PCM)
+RING_LEN = 16000;
+MEM_BASE = 0;
+MEM_BASE_STRIDE = 4;
+MEM_BASE_OFFSET_WRITE_INDEX = 0;
+MEM_BASE_OFFSET_ACTIVE = 1;
+MEM_BASE_OFFSET_COUNTER = 2;
+MEM_ACTIVE_COUNT = 512; // gmem global: active talker count (0 = idle, skip per-sample work)
+MEM_RING = 1024;
+
+// Per-slot consumer state (JSFX-local memory; the read cursor must never live in gmem — it is owned solely by this consumer).
+slot_read_pos = 0; // [0 .. MAX_TALKERS)
+slot_playing = slot_read_pos + 64;
+slot_last_counter = slot_playing + 64;
+
+// Input samples consumed per output sample (e.g. 16000/48000 = 0.3333).
+ratio = INPUT_RATE / srate;
+
+@slider
+gain = 10 ^ (gain_db / 20);
+jitter_samples = buffer_ms * INPUT_RATE * 0.001; // target buffer depth, in input samples
+talkback_channel = talkback_channel_dropdown - 1;
+
+@sample
+gmem[MEM_ACTIVE_COUNT] > 0 ? (
+  mix = 0;
+  i = 0;
+  loop(MAX_TALKERS,
+    // Only sum audio if channel is set to -1 or the channel is not the selected channel. This prevents speech jamming.
+    talkback_channel == -1 || talkback_channel != i ? (
+      base_slot = MEM_BASE + i * MEM_BASE_STRIDE;
+      write_index = gmem[base_slot + MEM_BASE_OFFSET_WRITE_INDEX];
+      active = gmem[base_slot + MEM_BASE_OFFSET_ACTIVE];
+      counter = gmem[base_slot + MEM_BASE_OFFSET_COUNTER];
+
+      // New talk burst (PTT pressed) -> re-sync to the live write head. write_index is monotonic, so jumping to write_index
+      // discards any stale buffered audio and plays forward from fresh data — never replays old ring contents.
+      counter != slot_last_counter[i] ? (
+        slot_last_counter[i] = counter;
+        slot_read_pos[i] = write_index;
+        slot_playing[i] = 0;
+      );
+
+      read_position = slot_read_pos[i];
+      available = write_index - read_position; // input-rate samples buffered ahead of the read cursor
+
+      // Wait until the jitter buffer has filled before starting playback.
+      slot_playing[i] == 0 && active && available >= jitter_samples ? (
+        slot_playing[i] = 1;
+      );
+
+      slot_playing[i] ? (
+        // Drift/overflow: producer outran us -> jump forward to the target depth.
+        available > (2 * jitter_samples) ? (
+          read_position = write_index - jitter_samples;
+          available = write_index - read_position;
+        );
+
+        available > 1 ? (
+          read_position_int = floor(read_position);
+          frac = read_position - read_position_int;
+          ring_base = MEM_RING + i * RING_LEN;
+          s0 = gmem[ring_base + (read_position_int % RING_LEN)];
+          s1 = gmem[ring_base + ((read_position_int + 1) % RING_LEN)];
+          mix += s0 + (s1 - s0) * frac;
+          slot_read_pos[i] = read_position + ratio;
+        ) : (
+          // Underrun: caught up to the writer. If the talker has stopped and we've
+          // drained, go idle; otherwise hold (output silence this sample).
+          active == 0 ? slot_playing[i] = 0;
+        );
+      );
+    );
+
+    i += 1;
+  );
+
+  mix *= gain;
+  spl0 += mix;
+  spl1 += mix;
+);

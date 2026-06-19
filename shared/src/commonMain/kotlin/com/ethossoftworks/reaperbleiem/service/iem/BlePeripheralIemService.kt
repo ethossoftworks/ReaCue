@@ -3,6 +3,7 @@
 package com.ethossoftworks.reaperbleiem.service.iem
 
 import co.touchlab.kermit.Logger
+import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBleL2CapChannel
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.IKmpBlePeripheralManager
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleAdvertisementCharacteristic
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleAdvertisementData
@@ -14,7 +15,9 @@ import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBleGattProperty
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralEvent
 import com.ethossoftworks.reaperbleiem.lib.bluetooth.KmpBlePeripheralGattResult
 import com.ethossoftworks.reaperbleiem.service.preferences.PeripheralPreferencesService
+import com.ethossoftworks.reaperbleiem.service.talkback.AdpcmDecoder
 import com.outsidesource.oskitkmp.lib.update
+import com.outsidesource.oskitkmp.outcome.Outcome
 import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.HMAC
 import dev.whyoleg.cryptography.algorithms.SHA256
@@ -29,6 +32,7 @@ import kotlinx.atomicfu.getAndUpdate
 import kotlinx.atomicfu.update
 import kotlinx.collections.immutable.mutate
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
@@ -37,6 +41,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
@@ -63,6 +68,9 @@ class BlePeripheralIemService(
     private val secureRandom = CryptographyRandom.Default
     private val authorizedCentrals = atomic<Set<KmpBleCentralId>>(emptySet())
     private val authNonces = atomic<Map<KmpBleCentralId, ByteArray>>(emptyMap())
+    private val l2capPsm = atomic<Int?>(null)
+    private val talkbackSlots = atomic<Map<KmpBleCentralId, Int>>(emptyMap())
+    private val talkbackChannels = atomic<Map<KmpBleCentralId, IKmpBleL2CapChannel>>(emptyMap())
 
     private var hostName: String = "ReaCue"
     private var hostPasscode: String = ""
@@ -129,8 +137,12 @@ class BlePeripheralIemService(
                         KmpBlePeripheralEvent.Advertising -> isAdvertising.complete(Unit)
                         is KmpBlePeripheralEvent.CentralSubscribed ->
                             peripheralManager.requestConnectionPriority(KmpBleConnectionPriority.High, event.centralId)
-                        is KmpBlePeripheralEvent.CentralUnsubscribed ->
+                        is KmpBlePeripheralEvent.CentralUnsubscribed -> {
                             authorizedCentrals.update { it - event.centralId }
+                            talkbackChannels.value[event.centralId]?.close()
+                        }
+                        is KmpBlePeripheralEvent.L2CapChannelOpened ->
+                            onTalkbackChannelOpened(event, this@channelFlow)
                         is KmpBlePeripheralEvent.ReadRequest ->
                             when (event.characteristic) {
                                 REACUE_HANDSHAKE_CHARACTERISTIC_UUID -> onHandshakeReadRequest(event)
@@ -148,6 +160,14 @@ class BlePeripheralIemService(
         isAdvertising.await()
         Logger.i { "Advertising started" }
 
+        when (val outcome = peripheralManager.publishL2CapChannel()) {
+            is Outcome.Ok -> {
+                l2capPsm.update { outcome.value }
+                Logger.i { "Talkback L2CAP channel published on PSM ${outcome.value}" }
+            }
+            is Outcome.Error -> Logger.e { "Failed to publish talkback L2CAP channel: ${outcome.error}" }
+        }
+
         val networkJob =
             networkIemService
                 .subscribe(context)
@@ -161,6 +181,12 @@ class BlePeripheralIemService(
         awaitClose {
             authorizedCentrals.update { emptySet() }
             authNonces.update { emptyMap() }
+
+            talkbackChannels.value.values.forEach { it.close() }
+            talkbackChannels.update { emptyMap() }
+            talkbackSlots.update { emptyMap() }
+            l2capPsm.value?.let { peripheralManager.unpublishL2CapChannel(it) }
+            l2capPsm.update { null }
 
             bleChannelJob.cancel()
             advertiseJob.cancel()
@@ -183,6 +209,7 @@ class BlePeripheralIemService(
                     writeInt(BLE_PROTOCOL_VERSION)
                     write(hostId)
                     write(nonce)
+                    writeUShort((l2capPsm.value ?: 0).toUShort())
                 }
                 .readByteArray()
 
@@ -264,6 +291,96 @@ class BlePeripheralIemService(
         } catch (t: Throwable) {
             Logger.e { "Could not decode write request ${t.message}" }
         }
+    }
+
+    private fun onTalkbackChannelOpened(event: KmpBlePeripheralEvent.L2CapChannelOpened, scope: CoroutineScope) {
+        if (!authorizedCentrals.value.contains(event.centralId)) {
+            event.channel.close()
+            return
+        }
+        talkbackChannels.update { it + (event.centralId to event.channel) }
+
+        scope.launch {
+            Logger.i { "Talkback channel opened for ${event.centralId} (psm ${event.psm})" }
+            // Each L2CAP frame is [length u16 LE][talkerChannel u8][ADPCM block]; -1 => auto-allocate a free slot;
+            // 0..7 => that exact slot. Resolved at each talk-burst.
+            var slot = -1
+            var sawData = false
+
+            val idleMonitor =
+                launch {
+                    while (isActive) {
+                        delay(TalkbackIdleTimeout)
+                        if (slot != -1 && !sawData) {
+                            networkIemService.sendTalkbackStop(slot)
+                            slot = -1
+                        }
+                        sawData = false
+                    }
+                }
+
+            try {
+                var acc = ByteArray(0)
+                event.channel.incoming.collect { chunk ->
+                    acc += chunk
+                    var off = 0
+                    while (acc.size - off >= 2) {
+                        val len = (acc[off].toInt() and 0xFF) or ((acc[off + 1].toInt() and 0xFF) shl 8)
+                        if (len < 1 || acc.size - off - 2 < len) break // need the channel byte + a full block
+                        val declaredChannel = acc[off + 2].toInt() // signed: -1 = auto-allocate
+                        val block = acc.copyOfRange(off + 3, off + 2 + len)
+                        off += 2 + len
+
+                        sawData = true
+                        if (slot == -1) {
+                            val resolved = allocateTalkbackSlot(event.centralId, preferred = declaredChannel)
+                            if (resolved == null) {
+                                Logger.w { "No free talkback slot for ${event.centralId}" }
+                                continue
+                            }
+                            slot = resolved
+                            networkIemService.sendTalkbackStart(slot)
+                        }
+
+                        val pcm = AdpcmDecoder.decode(block)
+                        if (pcm.isNotEmpty()) networkIemService.sendTalkbackAudio(slot, pcm)
+                    }
+                    acc = if (off > 0) acc.copyOfRange(off, acc.size) else acc
+                }
+                Logger.i { "Talkback channel closed for ${event.centralId}" }
+            } catch (t: Throwable) {
+                Logger.e(t) { "Talkback error for ${event.centralId}" }
+            } finally {
+                idleMonitor.cancel()
+                if (slot != -1) networkIemService.sendTalkbackStop(slot)
+                freeTalkbackSlot(event.centralId)
+                talkbackChannels.update { it - event.centralId }
+                event.channel.close()
+            }
+        }
+    }
+
+    /**
+     * Resolves the slot for a talker. [preferred] is the channel declared in the L2CAP payload: 0..7 claims that
+     * exact slot (explicit — collisions between two explicit talkers are allowed by design; the UI warns against it);
+     * anything else (-1) auto-allocates — reusing this central's held slot, else the first slot not already claimed.
+     * Returns null only when auto-allocating and every slot is taken.
+     */
+    private fun allocateTalkbackSlot(centralId: KmpBleCentralId, preferred: Int = -1): Int? {
+        val slot =
+            if (preferred in 0 until TalkbackMaxTalkers) {
+                preferred
+            } else {
+                talkbackSlots.value[centralId]
+                    ?: (0 until TalkbackMaxTalkers).firstOrNull { it !in talkbackSlots.value.values.toSet() }
+                    ?: return null
+            }
+        talkbackSlots.update { it + (centralId to slot) }
+        return slot
+    }
+
+    private fun freeTalkbackSlot(centralId: KmpBleCentralId) {
+        talkbackSlots.update { it - centralId }
     }
 
     fun sendDisconnectEvent() {
@@ -457,3 +574,9 @@ class BlePeripheralIemService(
 
 /** Header Format: Request Id (UInt16), Packets remaining (UInt16) */
 val headerSize = 4u
+
+/** Max simultaneous talkback talkers. Must match TB_MAX_TALKERS in ReaCue.eel and "ReaCue Talkback.jsfx". */
+private const val TalkbackMaxTalkers = 8
+
+/** No PCM for this long on the persistent channel => end the current talk burst (send TALKBACK_STOP). */
+private val TalkbackIdleTimeout = 300.milliseconds

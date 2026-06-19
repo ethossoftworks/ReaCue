@@ -2,6 +2,7 @@
 
 package com.ethossoftworks.reaperbleiem.lib.bluetooth
 
+import com.outsidesource.oskitkmp.outcome.Outcome
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
@@ -24,6 +25,15 @@ interface IKmpBlePeripheralManager {
         result: KmpBlePeripheralGattResult = KmpBlePeripheralGattResult.Success,
         value: ByteArray = byteArrayOf(),
     )
+
+    /**
+     * Publishes an L2CAP Connection-Oriented Channel and returns the dynamically assigned PSM. Centrals open a data
+     * stream to this PSM (see [IKmpBleL2CapChannel]); each opened channel is surfaced as a
+     * [KmpBlePeripheralEvent.L2CapChannelOpened] during [advertise].
+     */
+    suspend fun publishL2CapChannel(): Outcome<Int, KmpBleError>
+
+    fun unpublishL2CapChannel(psm: Int)
 }
 
 typealias KmpBleCentralId = String
@@ -91,5 +101,11 @@ sealed class KmpBlePeripheralEvent {
         val requestId: Int,
         val offset: Int,
         val data: ByteArray,
+    ) : KmpBlePeripheralEvent()
+
+    data class L2CapChannelOpened(
+        val centralId: KmpBleCentralId,
+        val psm: Int,
+        val channel: IKmpBleL2CapChannel,
     ) : KmpBlePeripheralEvent()
 }

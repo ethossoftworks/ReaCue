@@ -10,29 +10,23 @@ import io.ktor.network.sockets.Socket
 import io.ktor.network.sockets.aSocket
 import io.ktor.network.sockets.openReadChannel
 import io.ktor.network.sockets.openWriteChannel
-import io.ktor.utils.io.ByteWriteChannel
 import io.ktor.utils.io.CancellationException
 import io.ktor.utils.io.readByte
 import io.ktor.utils.io.readByteArray
 import io.ktor.utils.io.readInt
-import io.ktor.utils.io.writeByte
-import io.ktor.utils.io.writeFloat
 import io.ktor.utils.io.writeFully
-import io.ktor.utils.io.writeInt
-import io.ktor.utils.io.writeShort
 import kotlin.experimental.and
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
 import kotlinx.collections.immutable.persistentMapOf
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
 import kotlinx.io.writeFloat
@@ -45,8 +39,7 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
     private val tcpIp = "127.0.0.1"
     private val selectorManager = SelectorManager(KmpDispatchers.IO)
     private val tcpSocket = atomic<Socket?>(null)
-    private val writeChannel = atomic<ByteWriteChannel?>(null)
-    private val writeMutex = Mutex()
+    private val outgoingMessageChannel = atomic<Channel<ByteArray>?>(null)
 
     override fun subscribe(context: IemContext): Flow<IemEvent> = callbackFlow {
         try {
@@ -92,7 +85,20 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
                 }
             }
 
-            writeChannel.update { socket.openWriteChannel(autoFlush = true) }
+            val outgoingMessages = Channel<ByteArray>(Channel.UNLIMITED)
+            outgoingMessageChannel.update { outgoingMessages }
+            val writeChannel = socket.openWriteChannel(autoFlush = true)
+
+            // Single writer: drains messages from the queue to the socket, in order, on one coroutine.
+            launch {
+                try {
+                    for (frame in outgoingMessages) writeChannel.writeFully(frame)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (t: Throwable) {
+                    Logger.e("NetworkIemService writer", t)
+                }
+            }
 
             launch {
                 while (isActive) {
@@ -246,92 +252,113 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
         return IemEvent.HardwareOutputMuteUpdated(trackId = trackId, hardwareOutId = hwOutId, value = value)
     }
 
-    private suspend fun sendHeartbeat() = sendFrame(TcpMessageType.Heartbeat) {}
+    fun sendTalkbackStart(talkerId: Int) =
+        sendMessage(TcpMessageType.TalkbackStart) {
+            writeByte(talkerId.toByte())
+        }
 
-    override suspend fun refresh() = sendFrame(TcpMessageType.Refresh) {}
+    /**
+     * [pcm] is raw little-endian signed 16-bit mono PCM, exactly as captured/forwarded. The sample count and the
+     * header use the protocol's big-endian framing; the PCM bytes are appended verbatim and the ReaScript reads them
+     * as little-endian shorts.
+     */
+    fun sendTalkbackAudio(talkerId: Int, pcm: ByteArray) =
+        sendMessage(TcpMessageType.TalkbackAudio) {
+            writeByte(talkerId.toByte())
+            writeShort((pcm.size / 2).toShort())
+            write(pcm)
+        }
+
+    fun sendTalkbackStop(talkerId: Int) =
+        sendMessage(TcpMessageType.TalkbackStop) {
+            writeByte(talkerId.toByte())
+        }
+
+    private fun sendHeartbeat() = sendMessage(TcpMessageType.Heartbeat) {}
+
+    override suspend fun refresh() = sendMessage(TcpMessageType.Refresh) {}
 
     override suspend fun setTrackVolume(trackId: Int, value: Float) =
-        sendFrame(TcpMessageType.TrackVolChanged) {
+        sendMessage(TcpMessageType.TrackVolChanged) {
             writeShort(trackId.toShort())
             writeFloat(value)
         }
 
     override suspend fun setTrackPan(trackId: Int, value: Float) =
-        sendFrame(TcpMessageType.TrackPanChanged) {
+        sendMessage(TcpMessageType.TrackPanChanged) {
             writeShort(trackId.toShort())
             writeFloat(value)
         }
 
     override suspend fun setTrackMute(trackId: Int, value: Boolean) =
-        sendFrame(TcpMessageType.TrackMuteChanged) {
+        sendMessage(TcpMessageType.TrackMuteChanged) {
             writeShort(trackId.toShort())
             writeByte(if (value) 1 else 0)
         }
 
     override suspend fun setReceiveVolume(trackId: Int, receiveId: Int, value: Float) =
-        sendFrame(TcpMessageType.ReceiveVolChanged) {
+        sendMessage(TcpMessageType.ReceiveVolChanged) {
             writeShort(trackId.toShort())
             writeShort(receiveId.toShort())
             writeFloat(value)
         }
 
     override suspend fun setReceivePan(trackId: Int, receiveId: Int, value: Float) =
-        sendFrame(TcpMessageType.ReceivePanChanged) {
+        sendMessage(TcpMessageType.ReceivePanChanged) {
             writeShort(trackId.toShort())
             writeShort(receiveId.toShort())
             writeFloat(value)
         }
 
     override suspend fun setReceiveMute(trackId: Int, receiveId: Int, value: Boolean) =
-        sendFrame(TcpMessageType.ReceiveMuteChanged) {
+        sendMessage(TcpMessageType.ReceiveMuteChanged) {
             writeShort(trackId.toShort())
             writeShort(receiveId.toShort())
             writeByte(if (value) 1 else 0)
         }
 
     override suspend fun setOutputVolume(trackId: Int, hardwareOutId: Int, value: Float) =
-        sendFrame(TcpMessageType.HwOutVolChanged) {
+        sendMessage(TcpMessageType.HwOutVolChanged) {
             writeShort(trackId.toShort())
             writeShort(hardwareOutId.toShort())
             writeFloat(value)
         }
 
     override suspend fun setOutputPan(trackId: Int, hardwareOutId: Int, value: Float) =
-        sendFrame(TcpMessageType.HwOutPanChanged) {
+        sendMessage(TcpMessageType.HwOutPanChanged) {
             writeShort(trackId.toShort())
             writeShort(hardwareOutId.toShort())
             writeFloat(value)
         }
 
     override suspend fun setOutputMute(trackId: Int, hardwareOutId: Int, value: Boolean) =
-        sendFrame(TcpMessageType.HwOutMuteChanged) {
+        sendMessage(TcpMessageType.HwOutMuteChanged) {
             writeShort(trackId.toShort())
             writeShort(hardwareOutId.toShort())
             writeByte(if (value) 1 else 0)
         }
 
-    private suspend inline fun sendFrame(
+    private fun sendMessage(
         type: TcpMessageType,
-        block: suspend Buffer.() -> Unit,
+        block: Buffer.() -> Unit,
     ) {
-        val channel = writeChannel.value ?: return
-        val bytes = Buffer().apply { block() }
-        try {
-            writeMutex.withLock {
-                channel.writeByte(SupportedSchemaVersion)
-                channel.writeByte(type.value)
-                channel.writeInt(bytes.size.toInt())
-                channel.writeFully(bytes.readByteArray())
-            }
-        } catch (e: Exception) {
-            Logger.e { "NetworkIemService - $e" }
-        }
+        val channel = outgoingMessageChannel.value ?: return
+        val payload = Buffer().apply(block).readByteArray()
+        val frame =
+            Buffer()
+                .apply {
+                    writeByte(SupportedSchemaVersion)
+                    writeByte(type.value)
+                    writeInt(payload.size)
+                    write(payload)
+                }
+                .readByteArray()
+        channel.trySend(frame)
     }
 
     private fun closeSocket() {
-        tcpSocket.value?.close()
-        tcpSocket.update { null }
-        writeChannel.update { null }
+        outgoingMessageChannel.getAndSet(null)?.close()
+        tcpSocket.getAndSet(null)?.close()
     }
 }
 
@@ -349,4 +376,7 @@ private enum class TcpMessageType(val value: Byte) {
     HwOutMuteChanged(0x0A),
     Refresh(0x0B),
     Heartbeat(0x0C),
+    TalkbackStart(0x0D),
+    TalkbackAudio(0x0E),
+    TalkbackStop(0x0F),
 }
