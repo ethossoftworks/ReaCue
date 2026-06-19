@@ -143,7 +143,9 @@ Or open the project in Android Studio and run the `androidApp` configuration.
 
 ## Roadmap
 1. Presets - Storing values for tracks based on name for later recall
-2. Talkback - Allow using the phone microphone to talk to other band members with IEMs in
+2. Playback control - Play/Pause with next/previous marker jumping. List all markers with names for quick song switching.
+3. EQ
+4. Full track mixer
 
 ## License
 
