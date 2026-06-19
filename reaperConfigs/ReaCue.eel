@@ -26,7 +26,6 @@ function close_tcp_client(client_index) local(client_handle) (
     0[MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + client_index] = 0;
     strcpy(MEM_BASE + MEM_BASE_OFFSET_TCP_RECV_BUFFER + client_index, "");
     0[MEM_BASE + MEM_BASE_OFFSET_TCP_RECV_BUFFER + client_index] = 0;
-    0[MEM_BASE + MEM_BASE_OFFSET_TCP_READ_OFFSET + client_index] = 0;
   );
 );
 
@@ -750,13 +749,12 @@ function handle_tcp_message(client_index, message, message_type, payload_size) l
   );
 );
 
-function handle_tcp_receive() local(i, client_handle, bytes_read, read_buffer, payload_size, draining, guard, msg_size, read_offset_ptr, read_offset, buffer_len, unread_bytes, socket_draining, recv_iters) (
+function handle_tcp_receive() local(i, client_handle, bytes_read, read_buffer, payload_size, draining, guard, msg_size, read_offset, buffer_len, unread_bytes, socket_draining, recv_iters) (
   i = 0;
   loop(TCP_MAX_CLIENTS,
     client_handle = 0[MEM_BASE + MEM_BASE_OFFSET_TCP_CLIENTS + i];
     client_handle > 0 ? (
       read_buffer = MEM_BASE + MEM_BASE_OFFSET_TCP_RECV_BUFFER + i;
-      read_offset_ptr = MEM_BASE + MEM_BASE_OFFSET_TCP_READ_OFFSETS + i;
 
       // Read and PARSE in lockstep: drain complete frames after every recv so the receive buffer never accumulates a
       // backlog. EEL strings are capped at 65536 bytes, so batching many recvs before parsing (at the 2-talker data
@@ -776,7 +774,7 @@ function handle_tcp_receive() local(i, client_handle, bytes_read, read_buffer, p
           strcat(read_buffer, #recv_buffer);
           recv_iters += 1;
 
-          read_offset = 0[read_offset_ptr];
+          read_offset = 0; // buffer is compacted to the front each pass, so parsing always starts at 0
           draining = 1;
           guard = 0;
           buffer_len = strlen(read_buffer);
@@ -813,12 +811,8 @@ function handle_tcp_receive() local(i, client_handle, bytes_read, read_buffer, p
           socket_draining > 0 ? (
             read_offset == buffer_len ? (
               strcpy(read_buffer, "");
-              0[read_offset_ptr] = 0;
             ) : read_offset > 0 ? (
               strcpy_from(read_buffer, read_buffer, read_offset);
-              0[read_offset_ptr] = 0;
-            ) : (
-              0[read_offset_ptr] = read_offset;
             );
 
             // Read less than a full buffer => socket is drained for now; stop this pass.
@@ -914,7 +908,6 @@ function reacue() (
     MEM_BASE_OFFSET_TCP_CLIENTS = 10;
     MEM_BASE_OFFSET_TCP_SEND_LIST = 20;
     MEM_BASE_OFFSET_TCP_RECV_BUFFER = 30;
-    MEM_BASE_OFFSET_TCP_READ_OFFSETS = 40;
     MEM_BASE_OFFSET_TCP_LAST_SEEN = 50;
 
     /*
