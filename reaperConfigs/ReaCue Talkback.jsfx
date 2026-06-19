@@ -10,7 +10,7 @@ desc:ReaCue Talkback
 // if clock drift makes the buffer over/underflow. Active slots are summed.
 //
 // gmem layout MUST match ReaCue.eel.
-//   Control: MEM_BASE + slot*MEM_STRIDE + {write_index, active, generation}
+//   Control: MEM_BASE + slot*MEM_STRIDE + {write_index, active, counter}
 //   Ring:    MEM_RING + slot*RING_LEN  + (write_index % RING_LEN)
 
 options:gmem=ReaCue
@@ -27,7 +27,7 @@ MEM_BASE = 0;
 MEM_BASE_STRIDE = 4;
 MEM_BASE_OFFSET_WRITE_INDEX = 0;
 MEM_BASE_OFFSET_ACTIVE = 1;
-MEM_BASE_OFFSET_GENERATION = 2;
+MEM_BASE_OFFSET_COUNTER = 2;
 MEM_ACTIVE_COUNT = 512; // gmem global: active talker count (0 = idle, skip per-sample work)
 MEM_RING = 1024;
 
@@ -54,7 +54,7 @@ gmem[MEM_ACTIVE_COUNT] > 0 ? (
       base_slot = MEM_BASE + i * MEM_BASE_STRIDE;
       write_index = gmem[base_slot + MEM_BASE_OFFSET_WRITE_INDEX];
       active = gmem[base_slot + MEM_BASE_OFFSET_ACTIVE];
-      counter = gmem[base_slot + MEM_BASE_OFFSET_GENERATION];
+      counter = gmem[base_slot + MEM_BASE_OFFSET_COUNTER];
 
       // New talk burst (PTT pressed) -> re-sync to the live write head. write_index is monotonic, so jumping to write_index
       // discards any stale buffered audio and plays forward from fresh data — never replays old ring contents.

@@ -1,8 +1,6 @@
 // ReaCue
 
-// Shared global memory for talkback audio. Must match `options:gmem=ReaCue`
-// in "ReaCue Talkback.jsfx". This is separate from the script-private `0[...]`
-// arena used for TCP/track state below.
+// Shared global memory for talkback audio. Must match `options:gmem=ReaCue` in "ReaCue Talkback.jsfx".
 //@gmem=ReaCue
 
 function linear_to_normalized(vol) local(db, slider_val) (
@@ -560,68 +558,74 @@ function handle_tcp_connection() local(connection, ptr) (
 );
 
 /*
- * Talkback START. Payload: byte talkerId (== slot).
- * Bumps the generation (so the JSFX re-syncs its read cursor to the live write
+ * Talkback Start
+ * Payload
+ * byte - Talker ID
+ * Bumps the generation counter (so the JSFX re-syncs its read cursor to the live write
  * head for the new talk burst) and marks the slot active. write_index is left
  * monotonic on purpose: resetting it would race the audio-thread reader (it
  * could see the new generation but a stale write_index and replay old audio).
  */
-function handle_talkback_start(message) local(slot, ctrl, was_active) (
-  slot = str_getchar(message, TCP_HEADER_SIZE, 'cu');
-  slot >= 0 && slot < TB_MAX_TALKERS ? (
-    ctrl = TB_CTRL_BASE + (slot * TB_CTRL_STRIDE);
-    was_active = gmem[ctrl + TB_CTRL_OFFSET_ACTIVE];
-    gmem[ctrl + TB_CTRL_OFFSET_GENERATION] = gmem[ctrl + TB_CTRL_OFFSET_GENERATION] + 1;
-    gmem[ctrl + TB_CTRL_OFFSET_ACTIVE] = 1;
-    was_active == 0 ? gmem[TB_ACTIVE_COUNT] = gmem[TB_ACTIVE_COUNT] + 1;
+function handle_talkback_start(message) local(talker_id, slot, was_active) (
+  talker_id = str_getchar(message, TCP_HEADER_SIZE, 'cu');
+  talker_id >= 0 && talker_id < TB_MAX_TALKERS ? (
+    slot = MEM_TB_BASE + (talker_id * MEM_TB_BASE_STRIDE);
+    was_active = gmem[slot + MEM_TB_BASE_OFFSET_ACTIVE];
+    gmem[slot + MEM_TB_BASE_OFFSET_COUNTER] = gmem[slot + MEM_TB_BASE_OFFSET_COUNTER] + 1;
+    gmem[slot + MEM_TB_BASE_OFFSET_ACTIVE] = 1;
+    was_active == 0 ? gmem[MEM_TB_ACTIVE_COUNT] = gmem[MEM_TB_ACTIVE_COUNT] + 1;
   );
 );
 
 /*
- * Talkback STOP. Payload: byte talkerId (== slot).
- * Marks the slot inactive; the JSFX drains any remaining buffered samples
- * then goes silent.
+ * Talkback Stop
+ * Payload
+ * byte - Talker ID
+ * Marks the slot inactive; the JSFX drains any remaining buffered samples then goes silent.
  */
-function handle_talkback_stop(message) local(slot, ctrl, was_active) (
-  slot = str_getchar(message, TCP_HEADER_SIZE, 'cu');
-  slot >= 0 && slot < TB_MAX_TALKERS ? (
-    ctrl = TB_CTRL_BASE + (slot * TB_CTRL_STRIDE);
-    was_active = gmem[ctrl + TB_CTRL_OFFSET_ACTIVE];
-    gmem[ctrl + TB_CTRL_OFFSET_ACTIVE] = 0;
+function handle_talkback_stop(message) local(slot, talker_id, was_active) (
+  talker_id = str_getchar(message, TCP_HEADER_SIZE, 'cu');
+  talker_id >= 0 && talker_id < TB_MAX_TALKERS ? (
+    slot = MEM_TB_BASE + (talker_id * MEM_TB_BASE_STRIDE);
+    was_active = gmem[slot + MEM_TB_BASE_OFFSET_ACTIVE];
+    gmem[slot + MEM_TB_BASE_OFFSET_ACTIVE] = 0;
     was_active != 0 ? (
-      gmem[TB_ACTIVE_COUNT] = gmem[TB_ACTIVE_COUNT] - 1;
-      gmem[TB_ACTIVE_COUNT] < 0 ? gmem[TB_ACTIVE_COUNT] = 0;
+      gmem[MEM_TB_ACTIVE_COUNT] = gmem[MEM_TB_ACTIVE_COUNT] - 1;
+      gmem[MEM_TB_ACTIVE_COUNT] < 0 ? gmem[MEM_TB_ACTIVE_COUNT] = 0;
     );
   );
 );
 
 /*
- * Talkback AUDIO. Payload: byte talkerId, ushort sampleCount, int16[] pcm (LE).
- * Writes normalized samples into the slot's ring, then publishes the advanced
- * write_index. The index is published AFTER the samples are in place so the
- * JSFX (single consumer) never reads ahead of written data.
+ * Talkback Audio 
+ * Payload
+ * byte - Talker ID
+ * ushort - Sample Count
+ * int16[] - pcm (LE).
+ * Writes normalized samples into the slot's ring, then publishes the advanced write_index. The index is published 
+ * AFTER the samples are in place so the JSFX (single consumer) never reads ahead of written data.
  */
-function handle_talkback_audio(message) local(slot, ctrl, sample_count, offset, ring_base, write_index, sample) (
+function handle_talkback_audio(message) local(talker_id, slot, sample_count, offset, ring_base, write_index, sample) (
   offset = TCP_HEADER_SIZE;
-  slot = str_getchar(message, offset, 'cu');
+  talker_id = str_getchar(message, offset, 'cu');
   offset += 1;
 
-  slot >= 0 && slot < TB_MAX_TALKERS ? (
+  talker_id >= 0 && talker_id < TB_MAX_TALKERS ? (
     sample_count = str_getchar(message, offset, 'Su');
     offset += 2;
 
-    ctrl = TB_CTRL_BASE + (slot * TB_CTRL_STRIDE);
-    ring_base = TB_RING_BASE + (slot * TB_RING_LEN);
-    write_index = gmem[ctrl + TB_CTRL_OFFSET_WRITE_INDEX];
+    slot = MEM_TB_BASE + (talker_id * MEM_TB_BASE_STRIDE);
+    ring_base = MEM_TB_RING + (talker_id * TB_RING_LEN);
+    write_index = gmem[slot + MEM_TB_BASE_OFFSET_WRITE_INDEX];
 
     loop(sample_count,
       sample = str_getchar(message, offset, 's'); // signed 16-bit
       offset += 2;
-      gmem[ring_base + (write_index % TB_RING_LEN)] = sample / 32768;
+      gmem[ring_base + (write_index % TB_RING_LEN)] = sample / 32768; // turn int back into float
       write_index += 1;
     );
 
-    gmem[ctrl + TB_CTRL_OFFSET_WRITE_INDEX] = write_index;
+    gmem[slot + MEM_TB_BASE_OFFSET_WRITE_INDEX] = write_index;
   );
 );
 
@@ -959,23 +963,23 @@ function reacue() (
     /*
      * Talkback shared memory (gmem, namespace "ReaCue"). These constants MUST
      * match "ReaCue Talkback.jsfx". Layout:
-     *   Control block: per-slot stride TB_CTRL_STRIDE, base TB_CTRL_BASE
+     *   Control block: per-slot stride MEM_TB_BASE_STRIDE, base MEM_TB_BASE
      *     +0 write_index  (total samples written; ring index = write_index % TB_RING_LEN)
      *     +1 active       (1 while PTT held, 0 after STOP)
-     *     +2 generation   (bumped on START so the JSFX resets its read cursor)
-     *   Ring data: TB_RING_BASE + slot*TB_RING_LEN + (write_index % TB_RING_LEN)
+     *     +2 counter   (bumped on START so the JSFX resets its read cursor)
+     *   Ring data: MEM_TB_RING + slot*TB_RING_LEN + (write_index % TB_RING_LEN)
      *     Samples stored as normalized floats in [-1, 1].
      */
     TB_MAX_TALKERS = 8;
     TB_INPUT_RATE = 16000; // 16 kHz mono (clients send ADPCM over BLE; the host decodes to PCM before this).
-    TB_RING_LEN = 16000;   // 1.0 s of jitter/elastic buffer per talker
-    TB_CTRL_BASE = 0;
-    TB_CTRL_STRIDE = 4;
-    TB_CTRL_OFFSET_WRITE_INDEX = 0;
-    TB_CTRL_OFFSET_ACTIVE = 1;
-    TB_CTRL_OFFSET_GENERATION = 2;
-    TB_ACTIVE_COUNT = 512; // gmem global: number of currently-active talkers (lets the JSFX idle cheaply)
-    TB_RING_BASE = 1024;
+    TB_RING_LEN = 16000; // 1.0 s of jitter/elastic buffer per talker
+    MEM_TB_BASE = 0;
+    MEM_TB_BASE_STRIDE = 4;
+    MEM_TB_BASE_OFFSET_WRITE_INDEX = 0;
+    MEM_TB_BASE_OFFSET_ACTIVE = 1;
+    MEM_TB_BASE_OFFSET_COUNTER = 2;
+    MEM_TB_ACTIVE_COUNT = 512; // gmem global: number of currently-active talkers (lets the JSFX idle cheaply)
+    MEM_TB_RING = 1024;
 
     atexit("shutdown_server();");
     reacue_loop();
