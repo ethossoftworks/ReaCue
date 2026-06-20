@@ -12,6 +12,7 @@
 		30BA3A382F95C87F003AB98C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 30BA3A2E2F95C87F003AB98C /* Assets.xcassets */; };
 		30BA3A392F95C87F003AB98C /* iOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30BA3A312F95C87F003AB98C /* iOSApp.swift */; };
 		30BA3A3A2F95C87F003AB98C /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30BA3A2F2F95C87F003AB98C /* ContentView.swift */; };
+		30D883CB2FE651AC004AA39F /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 30D883CA2FE651AC004AA39F /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -21,7 +22,8 @@
 		30BA3A302F95C87F003AB98C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		30BA3A312F95C87F003AB98C /* iOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iOSApp.swift; sourceTree = "<group>"; };
 		30BA3A322F95C87F003AB98C /* Launch Screen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = "Launch Screen.storyboard"; sourceTree = "<group>"; };
-		30BA3A3B2F95D1BC003AB98C /* ReaCue.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "ReaCue.entitlements"; sourceTree = "<group>"; };
+		30BA3A3B2F95D1BC003AB98C /* ReaCue.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ReaCue.entitlements; sourceTree = "<group>"; };
+		30D883CA2FE651AC004AA39F /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		7555FF7B242A565900829871 /* ReaCue.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ReaCue.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AB3632DC29227652001CCB65 /* Config.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -55,6 +57,7 @@
 				30BA3A312F95C87F003AB98C /* iOSApp.swift */,
 				30BA3A322F95C87F003AB98C /* Launch Screen.storyboard */,
 				30BA3A3B2F95D1BC003AB98C /* ReaCue.entitlements */,
+				30D883CA2FE651AC004AA39F /* PrivacyInfo.xcprivacy */,
 			);
 			path = ReaCue;
 			sourceTree = "<group>";
@@ -146,6 +149,7 @@
 			files = (
 				30BA3A352F95C87F003AB98C /* Preview Assets.xcassets in Resources */,
 				30BA3A372F95C87F003AB98C /* Launch Screen.storyboard in Resources */,
+				30D883CB2FE651AC004AA39F /* PrivacyInfo.xcprivacy in Resources */,
 				30BA3A382F95C87F003AB98C /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -238,7 +242,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -295,7 +299,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
@@ -321,7 +325,7 @@
 					"$(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)",
 				);
 				INFOPLIST_FILE = ReaCue/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.3;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -355,7 +359,7 @@
 					"$(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)\n$(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)",
 				);
 				INFOPLIST_FILE = ReaCue/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.3;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
