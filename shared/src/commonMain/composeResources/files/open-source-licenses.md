@@ -59,23 +59,23 @@ VERSION: 1.5.0
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.compose.animation:animation
-URL: <https://developer.android.com/jetpack/androidx/releases/compose-animation#1.11.1>
-VERSION: 1.11.1
+URL: <https://developer.android.com/jetpack/androidx/releases/compose-animation#1.11.2>
+VERSION: 1.11.2
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.compose.animation:animation-core
-URL: <https://developer.android.com/jetpack/androidx/releases/compose-animation#1.11.1>
-VERSION: 1.11.1
+URL: <https://developer.android.com/jetpack/androidx/releases/compose-animation#1.11.2>
+VERSION: 1.11.2
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.compose.foundation:foundation
-URL: <https://developer.android.com/jetpack/androidx/releases/compose-foundation#1.11.1>
-VERSION: 1.11.1
+URL: <https://developer.android.com/jetpack/androidx/releases/compose-foundation#1.11.2>
+VERSION: 1.11.2
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.compose.foundation:foundation-layout
-URL: <https://developer.android.com/jetpack/androidx/releases/compose-foundation#1.11.1>
-VERSION: 1.11.1
+URL: <https://developer.android.com/jetpack/androidx/releases/compose-foundation#1.11.2>
+VERSION: 1.11.2
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.compose.material3:material3
@@ -84,8 +84,8 @@ VERSION: 1.5.0-alpha17
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.compose.material:material
-URL: <https://developer.android.com/jetpack/androidx/releases/compose-material#1.11.1>
-VERSION: 1.11.1
+URL: <https://developer.android.com/jetpack/androidx/releases/compose-material#1.11.2>
+VERSION: 1.11.2
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.compose.material:material-icons-core
@@ -94,73 +94,73 @@ VERSION: 1.7.6
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.compose.material:material-ripple
-URL: <https://developer.android.com/jetpack/androidx/releases/compose-material#1.11.1>
-VERSION: 1.11.1
+URL: <https://developer.android.com/jetpack/androidx/releases/compose-material#1.11.2>
+VERSION: 1.11.2
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.compose.runtime:runtime
-URL: <https://developer.android.com/jetpack/androidx/releases/compose-runtime#1.11.1>
-VERSION: 1.11.1
+URL: <https://developer.android.com/jetpack/androidx/releases/compose-runtime#1.11.2>
+VERSION: 1.11.2
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.compose.runtime:runtime-annotation
-URL: <https://developer.android.com/jetpack/androidx/releases/compose-runtime#1.11.1>
-VERSION: 1.11.1
+URL: <https://developer.android.com/jetpack/androidx/releases/compose-runtime#1.11.2>
+VERSION: 1.11.2
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.compose.runtime:runtime-retain
-URL: <https://developer.android.com/jetpack/androidx/releases/compose-runtime#1.11.1>
-VERSION: 1.11.1
+URL: <https://developer.android.com/jetpack/androidx/releases/compose-runtime#1.11.2>
+VERSION: 1.11.2
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.compose.runtime:runtime-saveable
-URL: <https://developer.android.com/jetpack/androidx/releases/compose-runtime#1.11.1>
-VERSION: 1.11.1
+URL: <https://developer.android.com/jetpack/androidx/releases/compose-runtime#1.11.2>
+VERSION: 1.11.2
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.compose.ui:ui
-URL: <https://developer.android.com/jetpack/androidx/releases/compose-ui#1.11.1>
-VERSION: 1.11.1
+URL: <https://developer.android.com/jetpack/androidx/releases/compose-ui#1.11.2>
+VERSION: 1.11.2
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.compose.ui:ui-geometry
-URL: <https://developer.android.com/jetpack/androidx/releases/compose-ui#1.11.1>
-VERSION: 1.11.1
+URL: <https://developer.android.com/jetpack/androidx/releases/compose-ui#1.11.2>
+VERSION: 1.11.2
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.compose.ui:ui-graphics
-URL: <https://developer.android.com/jetpack/androidx/releases/compose-ui#1.11.1>
-VERSION: 1.11.1
+URL: <https://developer.android.com/jetpack/androidx/releases/compose-ui#1.11.2>
+VERSION: 1.11.2
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.compose.ui:ui-text
-URL: <https://developer.android.com/jetpack/androidx/releases/compose-ui#1.11.1>
-VERSION: 1.11.1
+URL: <https://developer.android.com/jetpack/androidx/releases/compose-ui#1.11.2>
+VERSION: 1.11.2
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.compose.ui:ui-tooling
-URL: <https://developer.android.com/jetpack/androidx/releases/compose-ui#1.11.1>
-VERSION: 1.11.1
+URL: <https://developer.android.com/jetpack/androidx/releases/compose-ui#1.11.2>
+VERSION: 1.11.2
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.compose.ui:ui-tooling-data
-URL: <https://developer.android.com/jetpack/androidx/releases/compose-ui#1.11.1>
-VERSION: 1.11.1
+URL: <https://developer.android.com/jetpack/androidx/releases/compose-ui#1.11.2>
+VERSION: 1.11.2
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.compose.ui:ui-tooling-preview
-URL: <https://developer.android.com/jetpack/androidx/releases/compose-ui#1.11.1>
-VERSION: 1.11.1
+URL: <https://developer.android.com/jetpack/androidx/releases/compose-ui#1.11.2>
+VERSION: 1.11.2
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.compose.ui:ui-unit
-URL: <https://developer.android.com/jetpack/androidx/releases/compose-ui#1.11.1>
-VERSION: 1.11.1
+URL: <https://developer.android.com/jetpack/androidx/releases/compose-ui#1.11.2>
+VERSION: 1.11.2
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.compose.ui:ui-util
-URL: <https://developer.android.com/jetpack/androidx/releases/compose-ui#1.11.1>
-VERSION: 1.11.1
+URL: <https://developer.android.com/jetpack/androidx/releases/compose-ui#1.11.2>
+VERSION: 1.11.2
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.concurrent:concurrent-futures
@@ -324,13 +324,13 @@ VERSION: 1.0.0
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.navigationevent:navigationevent
-URL: <https://developer.android.com/jetpack/androidx/releases/navigationevent#1.1.1>
-VERSION: 1.1.1
+URL: <https://developer.android.com/jetpack/androidx/releases/navigationevent#1.1.2>
+VERSION: 1.1.2
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.navigationevent:navigationevent-compose
-URL: <https://developer.android.com/jetpack/androidx/releases/navigationevent#1.1.1>
-VERSION: 1.1.1
+URL: <https://developer.android.com/jetpack/androidx/releases/navigationevent#1.1.2>
+VERSION: 1.1.2
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.print:print
@@ -364,13 +364,13 @@ VERSION: 1.4.0
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.sqlite:sqlite
-URL: <https://developer.android.com/jetpack/androidx/releases/sqlite#2.5.2>
-VERSION: 2.5.2
+URL: <https://developer.android.com/jetpack/androidx/releases/sqlite#2.6.2>
+VERSION: 2.6.2
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.sqlite:sqlite-framework
-URL: <https://developer.android.com/jetpack/androidx/releases/sqlite#2.5.2>
-VERSION: 2.5.2
+URL: <https://developer.android.com/jetpack/androidx/releases/sqlite#2.6.2>
+VERSION: 2.6.2
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: androidx.startup:startup-runtime
@@ -420,17 +420,17 @@ LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/lice
 
 NAME: app.cash.sqldelight:android-driver
 URL: <https://github.com/sqldelight/sqldelight/>
-VERSION: 2.2.1
+VERSION: 2.3.2
 LICENSE: Apache-2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: app.cash.sqldelight:native-driver
 URL: <https://github.com/sqldelight/sqldelight/>
-VERSION: 2.2.1
+VERSION: 2.3.2
 LICENSE: Apache-2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: app.cash.sqldelight:runtime
 URL: <https://github.com/sqldelight/sqldelight/>
-VERSION: 2.2.1
+VERSION: 2.3.2
 LICENSE: Apache-2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: co.touchlab:kermit
@@ -438,17 +438,7 @@ URL: <https://github.com/touchlab/Kermit>
 VERSION: 2.1.0
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
-NAME: co.touchlab:kermit-android-debug
-URL: <https://github.com/touchlab/Kermit>
-VERSION: 2.1.0
-LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
-
 NAME: co.touchlab:kermit-core
-URL: <https://github.com/touchlab/Kermit>
-VERSION: 2.1.0
-LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
-
-NAME: co.touchlab:kermit-core-android-debug
 URL: <https://github.com/touchlab/Kermit>
 VERSION: 2.1.0
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
@@ -480,12 +470,12 @@ LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/lice
 
 NAME: com.outsidesource:oskit-compose
 URL: <https://github.com/outsidesource/OSKit-Compose-KMP>
-VERSION: 4.2.0-alpha1
+VERSION: 4.2.0-rc1
 LICENSE: MIT License - (<https://spdx.org/licenses/MIT.html>)
 
 NAME: com.outsidesource:oskit-kmp
 URL: <https://github.com/outsidesource/OSKit-KMP>
-VERSION: 5.2.0-alpha1
+VERSION: 5.2.0-rc1
 LICENSE: MIT License - (<https://spdx.org/licenses/MIT.html>)
 
 NAME: com.squareup.okio:okio
@@ -495,27 +485,97 @@ LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/lice
 
 NAME: com.typesafe:config
 URL: <https://github.com/lightbend/config>
-VERSION: 1.4.5
+VERSION: 1.4.8
 LICENSE: Apache-2.0 - (<https://www.apache.org/licenses/LICENSE-2.0>)
+
+NAME: dev.whyoleg.cryptography:cryptography-bigint
+URL: <https://github.com/whyoleg/cryptography-kotlin>
+VERSION: 0.6.0
+LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
+
+NAME: dev.whyoleg.cryptography:cryptography-bom
+URL: <https://github.com/whyoleg/cryptography-kotlin>
+VERSION: 0.6.0
+LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
+
+NAME: dev.whyoleg.cryptography:cryptography-core
+URL: <https://github.com/whyoleg/cryptography-kotlin>
+VERSION: 0.6.0
+LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
+
+NAME: dev.whyoleg.cryptography:cryptography-provider-apple
+URL: <https://github.com/whyoleg/cryptography-kotlin>
+VERSION: 0.6.0
+LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
+
+NAME: dev.whyoleg.cryptography:cryptography-provider-base
+URL: <https://github.com/whyoleg/cryptography-kotlin>
+VERSION: 0.6.0
+LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
+
+NAME: dev.whyoleg.cryptography:cryptography-provider-cryptokit
+URL: <https://github.com/whyoleg/cryptography-kotlin>
+VERSION: 0.6.0
+LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
+
+NAME: dev.whyoleg.cryptography:cryptography-provider-jdk
+URL: <https://github.com/whyoleg/cryptography-kotlin>
+VERSION: 0.6.0
+LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
+
+NAME: dev.whyoleg.cryptography:cryptography-provider-openssl3-api
+URL: <https://github.com/whyoleg/cryptography-kotlin>
+VERSION: 0.6.0
+LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
+
+NAME: dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt
+URL: <https://github.com/whyoleg/cryptography-kotlin>
+VERSION: 0.6.0
+LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
+
+NAME: dev.whyoleg.cryptography:cryptography-provider-optimal
+URL: <https://github.com/whyoleg/cryptography-kotlin>
+VERSION: 0.6.0
+LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
+
+NAME: dev.whyoleg.cryptography:cryptography-random
+URL: <https://github.com/whyoleg/cryptography-kotlin>
+VERSION: 0.6.0
+LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
+
+NAME: dev.whyoleg.cryptography:cryptography-serialization-asn1
+URL: <https://github.com/whyoleg/cryptography-kotlin>
+VERSION: 0.6.0
+LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
+
+NAME: dev.whyoleg.cryptography:cryptography-serialization-asn1-modules
+URL: <https://github.com/whyoleg/cryptography-kotlin>
+VERSION: 0.6.0
+LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
+
+NAME: dev.whyoleg.cryptography:cryptography-serialization-pem
+URL: <https://github.com/whyoleg/cryptography-kotlin>
+VERSION: 0.6.0
+LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: io.insert-koin:koin
 URL: <https://insert-koin.io/>
-VERSION: 4.2.1
+VERSION: 4.2.2
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: io.insert-koin:koin-compose
 URL: <https://insert-koin.io/>
-VERSION: 4.2.1
+VERSION: 4.2.2
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: io.insert-koin:koin-core
 URL: <https://insert-koin.io/>
-VERSION: 4.2.1
+VERSION: 4.2.2
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: io.insert-koin:koin-core-viewmodel
 URL: <https://insert-koin.io/>
-VERSION: 4.2.1
+VERSION: 4.2.2
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: io.ktor:ktor-client-cio
@@ -575,7 +635,7 @@ LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/lic
 
 NAME: io.ktor:ktor-server-core
 URL: <https://github.com/ktorio/ktor>
-VERSION: 3.4.0
+VERSION: 3.5.0
 LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: io.ktor:ktor-sse
@@ -648,11 +708,6 @@ URL: <https://github.com/NordicSemiconductor/Android-BLE-Library>
 VERSION: 2.11.0
 LICENSE: The BSD 3-Clause License - (<http://opensource.org/licenses/BSD-3-Clause>)
 
-NAME: org.fusesource.jansi:jansi
-URL: <http://fusesource.github.io/jansi>
-VERSION: 2.4.2
-LICENSE: Apache License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
-
 NAME: org.jetbrains.androidx.lifecycle:lifecycle-common
 URL: <https://github.com/JetBrains/compose-jb>
 VERSION: 2.9.6
@@ -664,6 +719,16 @@ VERSION: 2.9.6
 LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose
+URL: <https://github.com/JetBrains/compose-jb>
+VERSION: 2.9.6
+LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
+
+NAME: org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose-uikitarm64
+URL: <https://github.com/JetBrains/compose-jb>
+VERSION: 2.9.6
+LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
+
+NAME: org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose-uikitsimarm64
 URL: <https://github.com/JetBrains/compose-jb>
 VERSION: 2.9.6
 LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
@@ -693,14 +758,24 @@ URL: <https://github.com/JetBrains/compose-jb>
 VERSION: 1.3.6
 LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
+NAME: org.jetbrains.androidx.savedstate:savedstate-compose-uikitarm64
+URL: <https://github.com/JetBrains/compose-jb>
+VERSION: 1.3.6
+LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
+
+NAME: org.jetbrains.androidx.savedstate:savedstate-compose-uikitsimarm64
+URL: <https://github.com/JetBrains/compose-jb>
+VERSION: 1.3.6
+LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
+
 NAME: org.jetbrains.compose.animation:animation
 URL: <https://github.com/JetBrains/compose-multiplatform>
-VERSION: 1.11.0
+VERSION: 1.11.1
 LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: org.jetbrains.compose.animation:animation-core
 URL: <https://github.com/JetBrains/compose-multiplatform>
-VERSION: 1.11.0
+VERSION: 1.11.1
 LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: org.jetbrains.compose.annotation-internal:annotation
@@ -715,17 +790,32 @@ LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/lic
 
 NAME: org.jetbrains.compose.components:components-resources
 URL: <https://github.com/JetBrains/compose-multiplatform>
-VERSION: 1.11.0
+VERSION: 1.11.1
+LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
+
+NAME: org.jetbrains.compose.components:components-resources-iosArm64
+URL: <https://github.com/JetBrains/compose-multiplatform>
+VERSION: 1.11.1
+LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
+
+NAME: org.jetbrains.compose.components:components-resources-iosSimulatorArm64
+URL: <https://github.com/JetBrains/compose-multiplatform>
+VERSION: 1.11.1
+LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
+
+NAME: org.jetbrains.compose.components:components-resources-macosArm64
+URL: <https://github.com/JetBrains/compose-multiplatform>
+VERSION: 1.11.1
 LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: org.jetbrains.compose.foundation:foundation
 URL: <https://github.com/JetBrains/compose-multiplatform>
-VERSION: 1.11.0
+VERSION: 1.11.1
 LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: org.jetbrains.compose.foundation:foundation-layout
 URL: <https://github.com/JetBrains/compose-multiplatform>
-VERSION: 1.11.0
+VERSION: 1.11.1
 LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: org.jetbrains.compose.material3:material3
@@ -735,7 +825,7 @@ LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/lic
 
 NAME: org.jetbrains.compose.material:material
 URL: <https://github.com/JetBrains/compose-multiplatform>
-VERSION: 1.11.0
+VERSION: 1.11.1
 LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: org.jetbrains.compose.material:material-icons-core
@@ -743,74 +833,84 @@ URL: <https://github.com/JetBrains/compose-jb>
 VERSION: 1.7.3
 LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
+NAME: org.jetbrains.compose.material:material-icons-core-uikitarm64
+URL: <https://github.com/JetBrains/compose-jb>
+VERSION: 1.7.3
+LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
+
+NAME: org.jetbrains.compose.material:material-icons-core-uikitsimarm64
+URL: <https://github.com/JetBrains/compose-jb>
+VERSION: 1.7.3
+LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
+
 NAME: org.jetbrains.compose.material:material-ripple
 URL: <https://github.com/JetBrains/compose-multiplatform>
-VERSION: 1.11.0
+VERSION: 1.11.1
 LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: org.jetbrains.compose.runtime:runtime
 URL: <https://github.com/JetBrains/compose-multiplatform>
-VERSION: 1.11.0
+VERSION: 1.11.1
 LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: org.jetbrains.compose.runtime:runtime-saveable
 URL: <https://github.com/JetBrains/compose-multiplatform>
-VERSION: 1.11.0
+VERSION: 1.11.1
 LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: org.jetbrains.compose.ui:ui
 URL: <https://github.com/JetBrains/compose-multiplatform>
-VERSION: 1.11.0
+VERSION: 1.11.1
 LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: org.jetbrains.compose.ui:ui-backhandler
 URL: <https://github.com/JetBrains/compose-multiplatform>
-VERSION: 1.11.0
+VERSION: 1.11.1
 LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: org.jetbrains.compose.ui:ui-geometry
 URL: <https://github.com/JetBrains/compose-multiplatform>
-VERSION: 1.11.0
+VERSION: 1.11.1
 LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: org.jetbrains.compose.ui:ui-graphics
 URL: <https://github.com/JetBrains/compose-multiplatform>
-VERSION: 1.11.0
+VERSION: 1.11.1
 LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: org.jetbrains.compose.ui:ui-text
 URL: <https://github.com/JetBrains/compose-multiplatform>
-VERSION: 1.11.0
+VERSION: 1.11.1
 LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: org.jetbrains.compose.ui:ui-tooling
 URL: <https://github.com/JetBrains/compose-multiplatform>
-VERSION: 1.11.0
+VERSION: 1.11.1
 LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: org.jetbrains.compose.ui:ui-tooling-data
 URL: <https://github.com/JetBrains/compose-multiplatform>
-VERSION: 1.11.0
+VERSION: 1.11.1
 LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: org.jetbrains.compose.ui:ui-tooling-preview
 URL: <https://github.com/JetBrains/compose-multiplatform>
-VERSION: 1.11.0
+VERSION: 1.11.1
 LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: org.jetbrains.compose.ui:ui-uikit
 URL: <https://github.com/JetBrains/compose-multiplatform>
-VERSION: 1.11.0
+VERSION: 1.11.1
 LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: org.jetbrains.compose.ui:ui-unit
 URL: <https://github.com/JetBrains/compose-multiplatform>
-VERSION: 1.11.0
+VERSION: 1.11.1
 LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: org.jetbrains.compose.ui:ui-util
 URL: <https://github.com/JetBrains/compose-multiplatform>
-VERSION: 1.11.0
+VERSION: 1.11.1
 LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: org.jetbrains.kotlin:kotlin-android-extensions-runtime
@@ -825,22 +925,22 @@ LICENSE: The Apache License, Version 2.0 - (<http://www.apache.org/licenses/LICE
 
 NAME: org.jetbrains.kotlin:kotlin-reflect
 URL: <https://kotlinlang.org/>
-VERSION: 2.3.0
+VERSION: 2.3.21
 LICENSE: Apache-2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: org.jetbrains.kotlin:kotlin-stdlib
 URL: <https://kotlinlang.org/>
-VERSION: 2.3.21
+VERSION: 2.4.0
 LICENSE: Apache-2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: org.jetbrains.kotlin:kotlin-stdlib-common
 URL: <https://kotlinlang.org/>
-VERSION: 2.3.21
+VERSION: 2.4.0
 LICENSE: Apache-2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: org.jetbrains.kotlinx:atomicfu
 URL: <https://github.com/Kotlin/kotlinx.atomicfu>
-VERSION: 0.32.1
+VERSION: 0.33.0
 LICENSE: Apache-2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: org.jetbrains.kotlinx:kotlinx-browser
@@ -850,7 +950,7 @@ LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/lic
 
 NAME: org.jetbrains.kotlinx:kotlinx-collections-immutable
 URL: <https://github.com/Kotlin/kotlinx.collections.immutable>
-VERSION: 0.5.0-beta01
+VERSION: 0.5.0
 LICENSE: Apache-2.0 - (<https://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: org.jetbrains.kotlinx:kotlinx-coroutines
@@ -920,7 +1020,7 @@ LICENSE: The Apache Software License, Version 2.0 - (<https://www.apache.org/lic
 
 NAME: org.jetbrains:markdown
 URL: <https://github.com/JetBrains/markdown>
-VERSION: 0.7.3
+VERSION: 0.7.5
 LICENSE: The Apache Software License, Version 2.0 - (<http://www.apache.org/licenses/LICENSE-2.0.txt>)
 
 NAME: org.jspecify:jspecify
