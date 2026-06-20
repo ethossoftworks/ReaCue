@@ -1,3 +1,5 @@
+import org.gradle.kotlin.dsl.support.serviceOf
+
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.composeMultiplatform)
@@ -111,6 +113,7 @@ val assembleApp by tasks.registering {
     description = "Assembles MacOS .app bundle"
 
     val appName = "ReaCue"
+    val execOps = serviceOf<ExecOperations>()
 
     dependsOn("linkReleaseExecutableMacosArm64", generateInfoPlist, stageRunResources)
 
@@ -149,6 +152,82 @@ val assembleApp by tasks.registering {
             target = resourcesDir.resolve("src/commonMain/composeResources"),
             overwrite = true,
         )
+
+        // Re-sign the assembled bundle with a stable ad-hoc signature. The linker-signed
+        // signature on the kexe was made before Resources existed, so it reports "code has no
+        // resources but signature indicates they must be present" and macOS kills the app on
+        // launch once it's copied (e.g. into /Applications). --force replaces it and seals the
+        // Resources + Info.plist. (Still unsigned by a Developer ID, so it's not notarized.)
+        execOps.exec { commandLine("codesign", "--force", "--sign", "-", contents.parentFile.absolutePath) }
+    }
+}
+
+// Packages the assembled .app into a distributable .dmg using create-dmg.
+// Requires the tool: brew install create-dmg
+// Run: ./gradlew :macOsApp:createDmg
+val createDmg by tasks.registering {
+    description = "Packages the MacOS .app bundle into a .dmg using create-dmg"
+
+    dependsOn(assembleApp)
+
+    val appName = "ReaCue"
+    val version = buildInfo.version
+    val execOps = serviceOf<ExecOperations>()
+
+    // assembleApp writes the bundle here.
+    val appDir = layout.buildDirectory.dir("$appName.app")
+    // Rounded macOS-style icon used only for the DMG volume (the app keeps its own AppIcon.icns).
+    val volumeIconFile = file("dmg/VolumeIcon.icns")
+    // create-dmg copies the contents of this folder into the image, so it must contain ONLY the
+    // .app. create-dmg adds the /Applications drop-link itself, so no outward symlink ever lives
+    // in a directory we later delete (this is what previously risked wiping the real /Applications).
+    val stagingDir = layout.buildDirectory.dir("dmg-staging")
+    val dmgFile = layout.buildDirectory.file("$appName-$version.dmg")
+
+    inputs.dir(appDir)
+    inputs.file(volumeIconFile)
+    outputs.file(dmgFile)
+
+    doLast {
+        val staging = stagingDir.get().asFile
+        val dmg = dmgFile.get().asFile
+
+        // Fail early with an actionable message if the tool isn't installed.
+        val toolPresent = execOps.exec {
+            commandLine("which", "create-dmg")
+            isIgnoreExitValue = true
+        }.exitValue == 0
+        if (!toolPresent) {
+            throw GradleException("create-dmg not found on PATH. Install it with: brew install create-dmg")
+        }
+
+        // `rm -rf` is symlink-safe; never use File.deleteRecursively on a dir that may hold symlinks.
+        execOps.exec { commandLine("rm", "-rf", staging.absolutePath); isIgnoreExitValue = true }
+        // create-dmg refuses to overwrite an existing output file.
+        dmg.delete()
+        staging.mkdirs()
+
+        appDir.get().asFile.copyRecursively(staging.resolve("$appName.app"), overwrite = true)
+
+        // create-dmg builds the rw image, arranges the icon-view window, sets the volume icon,
+        // adds the /Applications drop-link, and compresses — all the steps we did by hand before.
+        execOps.exec {
+            commandLine(
+                "create-dmg",
+                "--volname", appName,
+                "--volicon", volumeIconFile.absolutePath,
+                "--icon", "$appName.app", "150", "120",
+                "--app-drop-link", "410", "120",
+                "--window-size", "560", "380",
+                "--no-internet-enable",
+                dmg.absolutePath,
+                staging.absolutePath,
+            )
+        }
+
+        execOps.exec { commandLine("rm", "-rf", staging.absolutePath); isIgnoreExitValue = true }
+
+        logger.lifecycle("created: ${dmg.absolutePath}")
     }
 }
 
