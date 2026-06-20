@@ -151,9 +151,13 @@ sealed class IemEvent {
         @Serializable(with = IemUnknownErrorEventSerializer::class)
         data class Unknown(@CborLabel(0) val error: Any) : Error()
 
-        @SerialName("15") @Serializable data object BleProtocolMismatch : Error()
+        @SerialName("15") @Serializable data object DisconnectedPeripheral : Error()
 
-        @SerialName("16") @Serializable data object DisconnectedPeripheral : Error()
+        @SerialName("16") @Serializable data class BleProtocolMismatch(val expected: Int, val received: Int) : Error()
+
+        @SerialName("17") @Serializable data class TcpProtocolMismatch(val expected: Int, val received: Int) : Error()
+
+        @SerialName("18") @Serializable data class TalkbackJsfxProtocolMismatch(val expected: Int, val received: Int) : Error()
     }
 }
 

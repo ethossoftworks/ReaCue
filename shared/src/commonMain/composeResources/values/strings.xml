@@ -48,4 +48,7 @@
     <string name="dynamic_channel">Dynamic</string>
     <string name="static_channel">%1$d</string>
     <string name="enable_talkback">Enable Talkback</string>
+    <string name="talkback_jsfx_protocol_mismatch">ReaCue Talkback JSFX protocol version mismatch. Expected (%1$d), Received (%2$d). Please update all ReaCue components to the latest version.</string>
+    <string name="tcp_protocol_mismatch">ReaCue ReaScript protocol version mismatch. Expected (%1$d), Received (%2$d). Please update all ReaCue components to the latest version.</string>
+    <string name="ble_protocol_mismatch">ReaCue host protocol version mismatch. Expected (%1$d), Received (%2$d). Please update all ReaCue components to the latest version.</string>
 </resources>

@@ -134,12 +134,7 @@ function write_value(buffer, offset, value, type) (
     );
 );
 
-function write_string(buffer, value, offset) (
-    str_insert(buffer, value, offset);
-    offset + strlen(value);
-);
-
-function write_string(buffer, value, offset) (
+function write_string(buffer, offset, value) (
     str_insert(buffer, value, offset);
     offset + strlen(value);
 );
@@ -197,7 +192,7 @@ function send_tcp_message_refreshed() local(payload_size, offset, i, j, base_tra
   offset = 0;
 
   // Header
-  offset = write_value(#buffer, offset, TCP_SCHEMA_VERSION, 'cu');
+  offset = write_value(#buffer, offset, TCP_PROTOCOL_VERSION, 'cu');
   offset = write_value(#buffer, offset, MESSAGE_TYPE_STRUCTURE_CHANGED, 'cu');
   offset = write_value(#buffer, offset, payload_size, 'Iu');
 
@@ -207,7 +202,7 @@ function send_tcp_message_refreshed() local(payload_size, offset, i, j, base_tra
   offset = write_value(#buffer, offset, fader_max_db, 'F');
   offset = write_value(#buffer, offset, track_count, 'Su');
   offset = write_value(#buffer, offset, strlen(#project_name), 'Su');
-  offset = write_string(#buffer, #project_name, offset);
+  offset = write_string(#buffer, offset, #project_name);
 
   // Tracks
   i = 0;
@@ -222,7 +217,7 @@ function send_tcp_message_refreshed() local(payload_size, offset, i, j, base_tra
     offset = write_value(#buffer, offset, 0[track_ptr + MEM_TRACK_OFFSET_PAN], 'F');
     offset = write_value(#buffer, offset, 0[track_ptr + MEM_TRACK_OFFSET_MUTE], 'cu');
     offset = write_value(#buffer, offset, strlen(0[track_ptr + MEM_TRACK_OFFSET_NAME]), 'Su');
-    offset = write_string(#buffer, 0[track_ptr + MEM_TRACK_OFFSET_NAME], offset);
+    offset = write_string(#buffer, offset, 0[track_ptr + MEM_TRACK_OFFSET_NAME]);
 
     // Receives/hardware sends
     j = 0;
@@ -271,7 +266,7 @@ function send_tcp_message_send_changed(message_type, track_index, src_index, val
   payload_size = 4 + value_size;
 
   // Header
-  offset = write_value(#buffer, offset, TCP_SCHEMA_VERSION, 'cu');
+  offset = write_value(#buffer, offset, TCP_PROTOCOL_VERSION, 'cu');
   offset = write_value(#buffer, offset, message_type, 'cu');
   offset = write_value(#buffer, offset, payload_size, 'Iu');
 
@@ -310,7 +305,7 @@ function send_tcp_message_track_changed(message_type, track_index, value, value_
   payload_size = 2 + value_size;
 
   // Header
-  offset = write_value(#buffer, offset, TCP_SCHEMA_VERSION, 'cu');
+  offset = write_value(#buffer, offset, TCP_PROTOCOL_VERSION, 'cu');
   offset = write_value(#buffer, offset, message_type, 'cu');
   offset = write_value(#buffer, offset, payload_size, 'Iu');
 
@@ -343,13 +338,41 @@ function send_tcp_message_track_name_changed(track_index, value) local(offset, n
   payload_size = 2 + name_len;
 
   // Header
-  offset = write_value(#buffer, offset, TCP_SCHEMA_VERSION, 'cu');
+  offset = write_value(#buffer, offset, TCP_PROTOCOL_VERSION, 'cu');
   offset = write_value(#buffer, offset, MESSAGE_TYPE_TRACK_NAME_CHANGED, 'cu');
   offset = write_value(#buffer, offset, payload_size, 'Iu');
 
   // Payload
   offset = write_value(#buffer, offset, track_index, 'Su');
-  offset = write_string(#buffer, value, offset);
+  offset = write_string(#buffer, offset, value);
+
+  send_tcp_message(#buffer, offset);
+);
+
+/*
+ * Header
+ * byte - Schema Version
+ * byte - Message Type
+ * int - Payload Size
+ *
+ * Payload
+ * short - Error Type
+ * string - Error
+ */
+function send_tcp_message_error(error_type, message) local(offset, message_length, payload_size) (
+  #buffer = "";
+  offset = 0;
+  message_length = strlen(message);
+  payload_size = 2 + message_length;
+
+  // Header
+  offset = write_value(#buffer, offset, TCP_PROTOCOL_VERSION, 'cu');
+  offset = write_value(#buffer, offset, MESSAGE_TYPE_ERROR, 'cu');
+  offset = write_value(#buffer, offset, payload_size, 'Iu');
+
+  // Payload
+  offset = write_value(#buffer, offset, error_type, 'Su');
+  offset = write_string(#buffer, offset, message);
 
   send_tcp_message(#buffer, offset);
 );
@@ -565,14 +588,20 @@ function handle_tcp_connection() local(connection, ptr) (
  * monotonic on purpose: resetting it would race the audio-thread reader (it
  * could see the new generation but a stale write_index and replay old audio).
  */
-function handle_talkback_start(message) local(talker_id, slot, was_active) (
-  talker_id = str_getchar(message, TCP_HEADER_SIZE, 'cu');
-  talker_id >= 0 && talker_id < TB_MAX_TALKERS ? (
-    slot = MEM_TB_BASE + (talker_id * MEM_TB_BASE_STRIDE);
-    was_active = gmem[slot + MEM_TB_BASE_OFFSET_ACTIVE];
-    gmem[slot + MEM_TB_BASE_OFFSET_COUNTER] = gmem[slot + MEM_TB_BASE_OFFSET_COUNTER] + 1;
-    gmem[slot + MEM_TB_BASE_OFFSET_ACTIVE] = 1;
-    was_active == 0 ? gmem[MEM_TB_ACTIVE_COUNT] = gmem[MEM_TB_ACTIVE_COUNT] + 1;
+function handle_talkback_start(message) local(talker_id, slot, was_active, protocol_version) (
+  protocol_version = gmem[MEM_TB_BASE + MEM_TB_BASE_OFFSET_PROTOCOL_VERSION];
+  protocol_version != TB_PROTOCOL_VERSION ? (
+    sprintf(#debug, "%i,%i", TB_PROTOCOL_VERSION, protocol_version);
+    send_tcp_message_error(ERROR_TYPE_JSFX_PROTOCOL_MISMATCH, #debug);
+  ) : (
+    talker_id = str_getchar(message, TCP_HEADER_SIZE, 'cu');
+    talker_id >= 0 && talker_id < TB_MAX_TALKERS ? (
+      slot = MEM_TB_BASE + (talker_id * MEM_TB_BASE_STRIDE);
+      was_active = gmem[slot + MEM_TB_BASE_OFFSET_ACTIVE];
+      gmem[slot + MEM_TB_BASE_OFFSET_COUNTER] = gmem[slot + MEM_TB_BASE_OFFSET_COUNTER] + 1;
+      gmem[slot + MEM_TB_BASE_OFFSET_ACTIVE] = 1;
+      was_active == 0 ? gmem[MEM_TB_ACTIVE_COUNT] = gmem[MEM_TB_ACTIVE_COUNT] + 1;
+    );
   );
 );
 
@@ -785,7 +814,7 @@ function handle_tcp_receive() local(i, client_handle, bytes_read, read_buffer, p
             unread_bytes = buffer_len - read_offset;
 
             unread_bytes >= TCP_HEADER_SIZE ? (
-              str_getchar(read_buffer, read_offset + TCP_HEADER_SCHEMA_VERSION_OFFSET, 'cu') != TCP_SCHEMA_VERSION ? (
+              str_getchar(read_buffer, read_offset + TCP_HEADER_SCHEMA_VERSION_OFFSET, 'cu') != TCP_PROTOCOL_VERSION ? (
                 DEBUG > 0 ? ShowConsoleMsg("Schema version mismatch - closing client\n");
                 close_tcp_client(i);
                 socket_draining = 0;
@@ -869,7 +898,7 @@ function reacue() (
     TCP_MAX_PAYLOAD_SIZE = 65536;
     TCP_RECV_BUFFER_SIZE = 8192; // Larger than control-only needs; talkback audio is bursty
     TCP_RECV_MAX_ITERS = 64;     // Cap recv() calls per client per loop while draining the socket
-    TCP_SCHEMA_VERSION = 0;
+    TCP_PROTOCOL_VERSION = 0;
     TCP_CLIENT_TIMEOUT = 6.0; // seconds;
 
     /*
@@ -900,6 +929,12 @@ function reacue() (
     MESSAGE_TYPE_TALKBACK_START = 13;
     MESSAGE_TYPE_TALKBACK_AUDIO = 14;
     MESSAGE_TYPE_TALKBACK_STOP = 15;
+    MESSAGE_TYPE_ERROR = 16;
+
+    /*
+     * Error Types
+     */
+    ERROR_TYPE_JSFX_PROTOCOL_MISMATCH = 0;
 
     /*
      * Memory arena for TCP:
@@ -963,14 +998,16 @@ function reacue() (
      *   Ring data: MEM_TB_RING + slot*TB_RING_LEN + (write_index % TB_RING_LEN)
      *     Samples stored as normalized floats in [-1, 1].
      */
+    TB_PROTOCOL_VERSION = 0;
     TB_MAX_TALKERS = 8;
     TB_INPUT_RATE = 16000; // 16 kHz mono (clients send ADPCM over BLE; the host decodes to PCM before this).
     TB_RING_LEN = 16000; // 1.0 s of jitter/elastic buffer per talker
     MEM_TB_BASE = 0;
     MEM_TB_BASE_STRIDE = 4;
-    MEM_TB_BASE_OFFSET_WRITE_INDEX = 0;
-    MEM_TB_BASE_OFFSET_ACTIVE = 1;
-    MEM_TB_BASE_OFFSET_COUNTER = 2;
+    MEM_TB_BASE_OFFSET_PROTOCOL_VERSION = 0;
+    MEM_TB_BASE_OFFSET_WRITE_INDEX = 1;
+    MEM_TB_BASE_OFFSET_ACTIVE = 2;
+    MEM_TB_BASE_OFFSET_COUNTER = 3;
     MEM_TB_ACTIVE_COUNT = 512; // gmem global: number of currently-active talkers (lets the JSFX idle cheaply)
     MEM_TB_RING = 1024;
 

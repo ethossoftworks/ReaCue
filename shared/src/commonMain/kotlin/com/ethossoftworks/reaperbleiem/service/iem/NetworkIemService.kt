@@ -31,7 +31,7 @@ import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
 import kotlinx.io.writeFloat
 
-private val SupportedSchemaVersion: Byte = 0x00
+private const val TCP_PROTOCOL_VERSION: Byte = 0x00
 private val HeartbeatInterval = 2.seconds
 
 class NetworkIemService(private val peripheralPreferencesService: PeripheralPreferencesService) : IIemService {
@@ -55,8 +55,8 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
                 val reader = socket.openReadChannel()
                 while (isActive && socket.isActive) {
                     val schemaVersion = reader.readByte()
-                    if (schemaVersion != SupportedSchemaVersion) {
-                        Logger.e { "NetworkIemService - Received unsupported schema version $schemaVersion" }
+                    if (schemaVersion != TCP_PROTOCOL_VERSION) {
+                        send(IemEvent.Error.TcpProtocolMismatch(TCP_PROTOCOL_VERSION.toInt(), schemaVersion.toInt()))
                         close()
                         return@launch
                     }
@@ -78,6 +78,7 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
                             TcpMessageType.HwOutVolChanged.value -> parseHwOutVolChangedMessage(payload)
                             TcpMessageType.HwOutPanChanged.value -> parseHwOutPanChangedMessage(payload)
                             TcpMessageType.HwOutMuteChanged.value -> parseHwOutMuteChangedMessage(payload)
+                            TcpMessageType.Error.value -> parseErrorChangeMessage(payload, payloadSize)
                             else -> {}
                         }
 
@@ -252,15 +253,30 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
         return IemEvent.HardwareOutputMuteUpdated(trackId = trackId, hardwareOutId = hwOutId, value = value)
     }
 
+    private suspend fun parseErrorChangeMessage(payload: IKmpIoSource, payloadSize: Int): IemEvent {
+        val errorCode = payload.readShort().toInt()
+        when (errorCode) {
+            ErrorType.TalkbackJsfxProtocolMismatch.value -> {
+                val errorMessage = payload.readUtf8(payloadSize - 2)
+                val parts = errorMessage.split(",")
+                return IemEvent.Error.TalkbackJsfxProtocolMismatch(
+                    expected = parts.getOrNull(0)?.toIntOrNull() ?: -1,
+                    received = parts.getOrNull(1)?.toIntOrNull() ?: -1,
+                )
+            }
+        }
+        return IemEvent.Error.Unknown(errorCode)
+    }
+
     fun sendTalkbackStart(talkerId: Int) =
         sendMessage(TcpMessageType.TalkbackStart) {
             writeByte(talkerId.toByte())
         }
 
     /**
-     * [pcm] is raw little-endian signed 16-bit mono PCM, exactly as captured/forwarded. The sample count and the
-     * header use the protocol's big-endian framing; the PCM bytes are appended verbatim and the ReaScript reads them
-     * as little-endian shorts.
+     * [pcm] is raw little-endian signed 16-bit mono PCM, exactly as captured/forwarded. The sample count and the header
+     * use the protocol's big-endian framing; the PCM bytes are appended verbatim and the ReaScript reads them as
+     * little-endian shorts.
      */
     fun sendTalkbackAudio(talkerId: Int, pcm: ByteArray) =
         sendMessage(TcpMessageType.TalkbackAudio) {
@@ -347,7 +363,7 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
         val frame =
             Buffer()
                 .apply {
-                    writeByte(SupportedSchemaVersion)
+                    writeByte(TCP_PROTOCOL_VERSION)
                     writeByte(type.value)
                     writeInt(payload.size)
                     write(payload)
@@ -379,4 +395,9 @@ private enum class TcpMessageType(val value: Byte) {
     TalkbackStart(0x0D),
     TalkbackAudio(0x0E),
     TalkbackStop(0x0F),
+    Error(0x10),
+}
+
+private enum class ErrorType(val value: Int) {
+    TalkbackJsfxProtocolMismatch(0)
 }

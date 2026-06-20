@@ -55,7 +55,11 @@ fun InfoMessageContainer(modifier: Modifier = Modifier, interactor: InfoMessageI
 
         LaunchedEffect(message) {
             transition.animateTo(targetValue = 1f)
-            progress.animateTo(targetValue = 0f, animationSpec = tween(durationMillis = 2000, easing = LinearEasing))
+            progress.animateTo(
+                targetValue = 0f,
+                animationSpec =
+                    tween(durationMillis = message.duration.inWholeMilliseconds.toInt(), easing = LinearEasing),
+            )
             transition.animateTo(targetValue = 0f)
             interactor.onMessageFinished()
         }

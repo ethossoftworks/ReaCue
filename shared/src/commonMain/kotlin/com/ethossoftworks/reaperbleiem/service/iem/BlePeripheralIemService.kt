@@ -54,7 +54,7 @@ val REACUE_EVENT_CHARACTERISTIC_UUID = Uuid.parseHexDash("319893ca-5fa2-4c21-9f5
 val REACUE_COMMAND_CHARACTERISTIC_UUID = Uuid.parseHexDash("aa57c9ce-ada3-4779-88bb-efce418a297e")
 val REACUE_HANDSHAKE_CHARACTERISTIC_UUID = Uuid.parseHexDash("2575a2df-6aa2-4466-8eeb-7c13bade6734")
 
-const val BLE_PROTOCOL_VERSION = 1
+const val BLE_PROTOCOL_VERSION = 0
 
 @OptIn(ExperimentalSerializationApi::class)
 class BlePeripheralIemService(
@@ -122,6 +122,8 @@ class BlePeripheralIemService(
                 sendBleNotification(notification)
 
                 if (notification is IemEvent.Error) {
+                    // Ignore talkback protocol mismatch to forward to the central
+                    if (notification is IemEvent.Error.TalkbackJsfxProtocolMismatch) continue
                     delay(500.milliseconds)
                     this@channelFlow.cancel()
                 }

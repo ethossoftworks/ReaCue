@@ -20,16 +20,20 @@ slider2:buffer_ms=150<10,200,1>Jitter Buffer (ms)
 slider3:talkback_channel_dropdown=0<0,8,1{Listen to All, 0, 1, 2, 3, 4, 5, 6, 7}>Channel Filter
 
 @init
+PROTOCOL_VERSION = 0;
 MAX_TALKERS = 8;
 INPUT_RATE = 16000; // must match INPUT_RATE in ReaCue.eel (clients send ADPCM; host decodes to 16 kHz PCM)
 RING_LEN = 16000;
 MEM_BASE = 0;
 MEM_BASE_STRIDE = 4;
-MEM_BASE_OFFSET_WRITE_INDEX = 0;
-MEM_BASE_OFFSET_ACTIVE = 1;
-MEM_BASE_OFFSET_COUNTER = 2;
+MEM_BASE_OFFSET_PROTOCOL_VERSION = 0;
+MEM_BASE_OFFSET_WRITE_INDEX = 1;
+MEM_BASE_OFFSET_ACTIVE = 2;
+MEM_BASE_OFFSET_COUNTER = 3;
 MEM_ACTIVE_COUNT = 512; // gmem global: active talker count (0 = idle, skip per-sample work)
 MEM_RING = 1024;
+
+gmem[MEM_BASE + MEM_BASE_OFFSET_PROTOCOL_VERSION] = PROTOCOL_VERSION;
 
 // Per-slot consumer state (JSFX-local memory; the read cursor must never live in gmem — it is owned solely by this consumer).
 slot_read_pos = 0; // [0 .. MAX_TALKERS)

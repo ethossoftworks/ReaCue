@@ -112,7 +112,11 @@ class BleCentralIemService(
                         send(event)
                         Logger.i { "Received message - $event" }
 
-                        if (event is IemEvent.Error) cancel()
+                        if (event is IemEvent.Error) {
+                            // Don't cancel for Talkback error since it's not a failure mode
+                            if (event is IemEvent.Error.TalkbackJsfxProtocolMismatch) return@onEach
+                            cancel()
+                        }
                     } catch (e: Exception) {
                         Logger.e(e) { "Error while assembling packets: ${notification.toHexString()}" }
                     }
@@ -152,10 +156,10 @@ class BleCentralIemService(
                 }
 
             val buffer = Buffer().apply { write(authChallenge) }
-            val protocol = buffer.readInt()
+            val protocolVersion = buffer.readInt()
 
-            if (protocol != BLE_PROTOCOL_VERSION) {
-                send(IemEvent.Error.BleProtocolMismatch)
+            if (protocolVersion != BLE_PROTOCOL_VERSION) {
+                send(IemEvent.Error.BleProtocolMismatch(expected = BLE_PROTOCOL_VERSION, received = protocolVersion))
                 return Outcome.Error(Unit)
             }
 

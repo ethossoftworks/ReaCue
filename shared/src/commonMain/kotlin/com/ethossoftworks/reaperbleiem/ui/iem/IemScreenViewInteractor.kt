@@ -23,7 +23,11 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
 import reacue.shared.generated.resources.Res
+import reacue.shared.generated.resources.ble_protocol_mismatch
 import reacue.shared.generated.resources.microphone_permission_is_required
+import reacue.shared.generated.resources.talkback_jsfx_protocol_mismatch
+import reacue.shared.generated.resources.tcp_protocol_mismatch
+import kotlin.time.Duration.Companion.seconds
 
 data class IemScreenViewState(
     val bluetoothStatus: CapabilityStatus = CapabilityStatus.Unknown,
@@ -215,16 +219,35 @@ class IemScreenViewInteractor(
         subscriptionJob.value =
             iemInteractor
                 .subscribe(iemContext)
-                .onEach {
-                    when (it) {
+                .onEach { event ->
+                    when (event) {
                         is IemEvent.StructureChanged -> {
                             val trackMatch =
-                                it.tracks.values.firstOrNull { track ->
+                                event.tracks.values.firstOrNull { track ->
                                     track.isIem && track.name == state.lastSelectedIemName
                                 }
                             update { state -> state.copy(selectedIemId = trackMatch?.id) }
                         }
-                        is IemEvent.PasscodeRequired -> update { state -> state.copy(passcodeEntry = it.passcode) }
+                        is IemEvent.PasscodeRequired -> update { state -> state.copy(passcodeEntry = event.passcode) }
+                        is IemEvent.Error -> {
+                            val message =
+                                when (event) {
+                                    is IemEvent.Error.TalkbackJsfxProtocolMismatch ->
+                                        getString(
+                                            Res.string.talkback_jsfx_protocol_mismatch,
+                                            event.expected,
+                                            event.received,
+                                        )
+                                    is IemEvent.Error.TcpProtocolMismatch ->
+                                        getString(Res.string.tcp_protocol_mismatch, event.expected, event.received)
+                                    is IemEvent.Error.BleProtocolMismatch ->
+                                        getString(Res.string.ble_protocol_mismatch, event.expected, event.received)
+                                    else -> null
+                                }
+                            if (message != null) {
+                                infoMessageInteractor.enqueueMessage(message = message, duration = 4.seconds)
+                            }
+                        }
                         else -> {}
                     }
                 }
