@@ -207,7 +207,12 @@ val createDmg by tasks.registering {
         dmg.delete()
         staging.mkdirs()
 
-        appDir.get().asFile.copyRecursively(staging.resolve("$appName.app"), overwrite = true)
+        // Use `ditto`, not Kotlin's copyRecursively: the latter copies file CONTENT only and
+        // drops POSIX permissions, so the executable lost its +x bit and the installed app died
+        // with "permission denied". ditto preserves permissions, xattrs, and the code signature.
+        execOps.exec {
+            commandLine("ditto", appDir.get().asFile.absolutePath, staging.resolve("$appName.app").absolutePath)
+        }
 
         // create-dmg builds the rw image, arranges the icon-view window, sets the volume icon,
         // adds the /Applications drop-link, and compresses — all the steps we did by hand before.
