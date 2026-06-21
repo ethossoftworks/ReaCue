@@ -2,11 +2,11 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import co.touchlab.kermit.CommonWriter
-import com.ethossoftworks.reaperbleiem.PlatformContext
-import com.ethossoftworks.reaperbleiem.initKoin
-import com.ethossoftworks.reaperbleiem.lib.initLogger
-import com.ethossoftworks.reaperbleiem.macOsDiModule
-import com.ethossoftworks.reaperbleiem.ui.app.App
+import com.ethossoftworks.reacue.PlatformContext
+import com.ethossoftworks.reacue.initKoin
+import com.ethossoftworks.reacue.lib.initLogger
+import com.ethossoftworks.reacue.macOsDiModule
+import com.ethossoftworks.reacue.ui.app.App
 import com.outsidesource.oskitcompose.systemui.KmpWindowInsetsHolder
 import com.outsidesource.oskitcompose.systemui.LocalKmpWindowInsets
 import platform.AppKit.NSApplication

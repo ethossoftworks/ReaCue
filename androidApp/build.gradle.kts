@@ -5,13 +5,13 @@ plugins {
 }
 
 android {
-    namespace = "com.ethossoftworks.reaperbleiem"
+    namespace = "com.ethossoftworks.reacue"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     val buildInfo = KmpBuildInfo.read(rootProject)
 
     defaultConfig {
-        applicationId = "com.ethossoftworks.reaperbleiem"
+        applicationId = "com.ethossoftworks.reacue"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionName = buildInfo.version

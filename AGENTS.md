@@ -31,7 +31,7 @@ Primary runtime classes:
 
 ## Module And Source-Set Map
 
-- Common app code lives under `shared/src/commonMain/kotlin/com/ethossoftworks/reaperbleiem`.
+- Common app code lives under `shared/src/commonMain/kotlin/com/ethossoftworks/reacue`.
 - Shared Compose resources live under `shared/src/commonMain/composeResources`.
 - Android-specific Bluetooth and platform DI live under `shared/src/androidMain`.
 - Apple-shared BLE implementations and interop live under `shared/src/appleMain`.

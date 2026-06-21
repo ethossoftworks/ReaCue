@@ -68,7 +68,7 @@ val generateInfoPlist by tasks.registering {
                 <key>CFBundleDisplayName</key>
                 <string>ReaCue</string>
                 <key>CFBundleIdentifier</key>
-                <string>com.ethossoftworks.reaperbleiem</string>
+                <string>com.ethossoftworks.reacue</string>
                 <key>CFBundleVersion</key>
                 <string>$build</string>
                 <key>CFBundleShortVersionString</key>

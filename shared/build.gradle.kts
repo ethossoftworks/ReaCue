@@ -32,7 +32,7 @@ kotlin {
     applyDefaultHierarchyTemplate()
 
     androidLibrary {
-        namespace = "com.ethossoftworks.ixdlibrary"
+        namespace = "com.ethossoftworks.reacue.shared"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
 
@@ -45,7 +45,7 @@ kotlin {
         appleTarget.binaries.framework {
             baseName = "Shared"
             isStatic = true
-            binaryOption("bundleId", "com.ethossoftworks.reaperbleiem.shared")
+            binaryOption("bundleId", "com.ethossoftworks.reacue.shared")
             export(libs.oskit.kmp)
             export(libs.kotlinx.coroutines.core)
         }
