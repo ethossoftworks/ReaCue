@@ -147,6 +147,15 @@ Or open the project in Android Studio and run the `androidApp` configuration.
 3. EQ
 4. Full track mixer
 
+## Support
+
+ReaCue is free and open source. If it's useful to you and you'd like to support its continued development, 
+you can leave a tip:
+
+<div align="center">
+    <a href="https://www.paypal.com/donate/?hosted_button_id=VDYA97L7AHWRS"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?logo=paypal&logoColor=white" alt="Donate with PayPal"></a>
+</div>
+
 ## License
 
 [MIT](LICENSE) — Copyright (c) 2026 Ethos Softworks and Ryan Mitchener
