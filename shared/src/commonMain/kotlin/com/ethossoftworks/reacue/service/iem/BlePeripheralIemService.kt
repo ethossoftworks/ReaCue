@@ -328,7 +328,15 @@ class BlePeripheralIemService(
                     var off = 0
                     while (acc.size - off >= 2) {
                         val len = (acc[off].toInt() and 0xFF) or ((acc[off + 1].toInt() and 0xFF) shl 8)
-                        if (len < 1 || acc.size - off - 2 < len) break // need the channel byte + a full block
+                        // A zero or implausibly large length means the stream desynced (a lost/corrupt chunk).
+                        // Drop the buffer and resync at the next chunk boundary rather than wedging or
+                        // decoding garbage.
+                        if (len < 1 || len > MaxTalkbackFrameLen) {
+                            Logger.w { "Talkback stream desync for ${event.centralId} (frame len $len) — resetting" }
+                            off = acc.size
+                            break
+                        }
+                        if (acc.size - off - 2 < len) break // need the channel byte + a full block
                         val declaredChannel = acc[off + 2].toInt() // signed: -1 = auto-allocate
                         val block = acc.copyOfRange(off + 3, off + 2 + len)
                         off += 2 + len
@@ -582,3 +590,9 @@ private const val TalkbackMaxTalkers = 8
 
 /** No PCM for this long on the persistent channel => end the current talk burst (send TALKBACK_STOP). */
 private val TalkbackIdleTimeout = 300.milliseconds
+
+/**
+ * Sanity cap on a talkback L2CAP frame's declared length. Legit frames are ~20 ms of ADPCM (a few hundred bytes);
+ * anything beyond this means the length-prefixed stream desynced.
+ */
+private const val MaxTalkbackFrameLen = 8192

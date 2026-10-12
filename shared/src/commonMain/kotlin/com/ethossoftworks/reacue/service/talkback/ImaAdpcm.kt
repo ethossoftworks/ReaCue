@@ -90,7 +90,10 @@ object AdpcmDecoder {
     /** Decodes one self-contained block (as produced by [AdpcmEncoder.encode]) back to little-endian PCM16 bytes. */
     fun decode(block: ByteArray): ByteArray {
         if (block.size < ADPCM_HEADER_SIZE) return ByteArray(0)
-        val sampleCount = (block[0].toInt() and 0xFF) or ((block[1].toInt() and 0xFF) shl 8)
+        // Clamp to what the block can actually hold (2 samples per code byte) so a corrupt header
+        // can't produce a huge zero-padded result.
+        val declaredCount = (block[0].toInt() and 0xFF) or ((block[1].toInt() and 0xFF) shl 8)
+        val sampleCount = minOf(declaredCount, (block.size - ADPCM_HEADER_SIZE) * 2)
         var predictor = (block[2].toInt() and 0xFF) or (block[3].toInt() shl 8)
         var stepIndex = (block[4].toInt() and 0xFF).coerceIn(0, 88)
 

@@ -52,8 +52,10 @@ internal class AppleKmpBleL2CapChannel(
     private val channel: CBL2CAPChannel
 ) : IKmpBleL2CapChannel {
 
-    // A Channel (not SharedFlow) so the flow COMPLETES when the channel closes.
-    private val incomingChannel = Channel<ByteArray>(capacity = 256, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    // A Channel (not SharedFlow) so the flow COMPLETES when the channel closes. UNLIMITED because consumers frame the
+    // stream with length prefixes — dropping a chunk mid-stream (DROP_OLDEST) desyncs their framing permanently, and
+    // trySend is the only option on the non-suspending run-loop thread.
+    private val incomingChannel = Channel<ByteArray>(capacity = Channel.UNLIMITED)
     override val incoming: Flow<ByteArray> = incomingChannel.receiveAsFlow()
 
     private val input: NSInputStream? = channel.inputStream

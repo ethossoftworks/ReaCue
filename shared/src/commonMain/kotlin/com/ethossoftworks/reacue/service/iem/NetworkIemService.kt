@@ -34,6 +34,9 @@ import kotlinx.io.writeFloat
 private const val TCP_PROTOCOL_VERSION: Byte = 0x00
 private val HeartbeatInterval = 2.seconds
 
+/** 1 second of 16 kHz PCM16 — far above a legit ~20 ms talkback frame, far below the ReaScript's payload cap. */
+private const val MaxTalkbackPcmBytes = 32000
+
 class NetworkIemService(private val peripheralPreferencesService: PeripheralPreferencesService) : IIemService {
 
     private val tcpIp = "127.0.0.1"
@@ -278,12 +281,19 @@ class NetworkIemService(private val peripheralPreferencesService: PeripheralPref
      * use the protocol's big-endian framing; the PCM bytes are appended verbatim and the ReaScript reads them as
      * little-endian shorts.
      */
-    fun sendTalkbackAudio(talkerId: Int, pcm: ByteArray) =
+    fun sendTalkbackAudio(talkerId: Int, pcm: ByteArray) {
+        // Legit frames are ~20 ms (hundreds of bytes). Anything huge means the upstream L2CAP stream desynced and
+        // produced garbage — sending it would make the ReaScript close the connection (payload over its size cap).
+        if (pcm.size > MaxTalkbackPcmBytes) {
+            Logger.w { "Dropping oversized talkback frame (${pcm.size} bytes) — upstream stream desync?" }
+            return
+        }
         sendMessage(TcpMessageType.TalkbackAudio) {
             writeByte(talkerId.toByte())
             writeShort((pcm.size / 2).toShort())
             write(pcm)
         }
+    }
 
     fun sendTalkbackStop(talkerId: Int) =
         sendMessage(TcpMessageType.TalkbackStop) {
