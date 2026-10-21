@@ -12,9 +12,11 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.PointerKeyboardModifiers
 import androidx.compose.ui.platform.DefaultArchitectureComponentsOwner
+import androidx.compose.ui.platform.FrameRecomposer
 import androidx.compose.ui.platform.PlatformContext
 import androidx.compose.ui.platform.WindowInfo
 import androidx.compose.ui.scene.CanvasLayersComposeScene
+import androidx.compose.ui.scene.SingleComposeSceneRenderingScope
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpSize
@@ -100,9 +102,11 @@ private class AppWindow(title: String, size: DpSize, minSize: DpSize, content: @
             override var containerSize: IntSize = IntSize.Zero
             override var keyboardModifiers: PointerKeyboardModifiers = PointerKeyboardModifiers(0)
         }
+    private val frameRecomposer = FrameRecomposer(Dispatchers.Main) { skiaLayer.needRender() }
+    private val sceneRenderingScope = SingleComposeSceneRenderingScope { skiaLayer.needRender() }
     private val scene =
         CanvasLayersComposeScene(
-            coroutineContext = Dispatchers.Main,
+            frameRecomposer = frameRecomposer,
             platformContext =
                 object : PlatformContext by PlatformContext.Empty() {
                     override val architectureComponentsOwner
@@ -115,13 +119,14 @@ private class AppWindow(title: String, size: DpSize, minSize: DpSize, content: @
                         NSCursor.arrowCursor.set()
                     }
                 },
-            invalidate = skiaLayer::needRender,
+            invalidateLayout = sceneRenderingScope::onSceneInvalidation,
+            invalidateDraw = sceneRenderingScope::onSceneInvalidation,
         )
     private val renderDelegate = SkikoRenderDelegate { canvas, width, height, nanoTime ->
         val newSize = IntSize(width, height)
         windowInfo.containerSize = newSize
         scene.size = newSize
-        scene.render(canvas.asComposeCanvas(), nanoTime)
+        with(sceneRenderingScope) { scene.render(frameRecomposer, canvas.asComposeCanvas(), nanoTime) }
     }
 
     override val window =
